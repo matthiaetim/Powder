@@ -176,6 +176,7 @@ body[data-state="dead"][data-overlay="1"] #ov-dead { display: flex; }
   touch-action: none;
 }
 #version.tuned::after { content: ' · tuned'; }
+#version.update::after { content: ' · Update bereit, Fresh lädt neu'; }
 
 #tune {
   position: fixed;

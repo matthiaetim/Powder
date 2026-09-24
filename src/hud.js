@@ -5,8 +5,9 @@ import { createTunePanel, isTuned } from './tune.js';
 import { MODES } from './modes.js';
 import { drawModePreview } from './render.js';
 
-export function createHud(g, doc) {
+export function createHud(g, doc, hooks = {}) {
   const $ = (id) => doc.getElementById(id);
+  const doFresh = hooks.fresh || (() => fresh(g));
   const speedEl = $('hud-speed'), distEl = $('hud-dist');
   const deadDist = $('dead-dist'), deadBest = $('dead-best'), debugEl = $('debug');
   $('version').textContent = 'v' + VERSION;
@@ -15,7 +16,7 @@ export function createHud(g, doc) {
 
   $('btn-pause').addEventListener('click', (e) => { e.stopPropagation(); togglePause(g); });
   $('ov-pause').addEventListener('click', () => togglePause(g));
-  $('btn-fresh').addEventListener('click', () => fresh(g));
+  $('btn-fresh').addEventListener('click', doFresh);
   if (g.debug) debugEl.hidden = false;
 
   // Tuning-Panel: langer Druck auf das Versions-Label öffnet es, Spiel pausiert derweil.
@@ -44,7 +45,7 @@ export function createHud(g, doc) {
     card.querySelector('.mode-cta').textContent = m && m.soon ? 'bald' : 'Tap to play';
     card.addEventListener('click', () => {
       if (!m || m.soon) return;
-      if (id === g.mode) { fresh(g); return; }
+      if (id === g.mode) { doFresh(); return; }
       if (selectMode(g, id)) markActive();
     });
   }

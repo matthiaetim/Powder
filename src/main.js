@@ -26,13 +26,26 @@ window.addEventListener('orientationchange', onResize);
 if (window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
 onResize();
 
+// Neue Version im Hintergrund installiert: beim nächsten Fresh (oder sofort, wenn kein Run läuft) neu laden
+let updateReady = false;
+function applyUpdate() {
+  if (!updateReady) return false;
+  updateReady = false;
+  location.reload();
+  return true;
+}
+function freshOrUpdate() {
+  const overlayDone = game.state === 'dead' && game.deadT * 1000 >= C.DEATH_OVERLAY_MS + C.FRESH_GUARD_MS;
+  if (overlayDone && applyUpdate()) return;
+  G.fresh(game);
+}
 const input = createInput(canvas, {
   press: (side) => G.onPress(game, side),
   release: () => G.onRelease(game),
   pause: () => { if (G.togglePause(game)) input.cancelAll(); },
-  fresh: () => G.fresh(game),
+  fresh: freshOrUpdate,
 });
-const hud = createHud(game, document);
+const hud = createHud(game, document, { fresh: freshOrUpdate });
 
 // Debug-Haken (?debug=1): Simulation gezielt vorspulen, z. B. powder.advance(2) in der Konsole.
 if (game.debug) {
@@ -85,6 +98,9 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
     document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update(); });
   }).catch(() => { /* offline oder blockiert */ });
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (hadController && (game.state === 'ready' || game.state === 'dead')) location.reload();
+    if (!hadController) return; // Erstinstallation: Seite ist schon aktuell
+    updateReady = true;
+    document.getElementById('version').classList.add('update');
+    if (game.state === 'ready' || game.state === 'paused') applyUpdate();
   });
 }
