@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Powder – Ski Simulator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="description" content="Minimalistischer Ski-Simulator: fahr der Lawine davon.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Powder">
+  <meta name="theme-color" content="#F4EFF3">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icons/icon-180.png">
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body data-state="ready" data-overlay="">
+  <canvas id="game"></canvas>
+  <button id="btn-pause" type="button" aria-label="Pause"></button>
+  <div id="hud" aria-live="off">
+    <div id="hud-speed">0 km/h</div>
+    <div id="hud-dist">0 m</div>
+  </div>
+  <div id="hint">Tippen lenkt · Halten carvt · Doppeltipp springt</div>
+  <div id="ov-pause" class="overlay">
+    <div class="ov-title">Pause</div>
+    <div class="ov-sub">Tippen zum Weiterfahren</div>
+  </div>
+  <div id="ov-dead" class="overlay">
+    <div id="dead-dist">0 m</div>
+    <div id="dead-best">Bester Lauf 0 m</div>
+    <button id="btn-fresh" type="button">Fresh</button>
+  </div>
+  <div id="version"></div>
+  <pre id="debug" hidden></pre>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#F4EFF3"/>
+  <defs>
+    <radialGradient id="sh" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#463C50" stop-opacity="0.34"/>
+      <stop offset="0.55" stop-color="#463C50" stop-opacity="0.19"/>
+      <stop offset="1" stop-color="#463C50" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="330" cy="392" rx="132" ry="54" fill="url(#sh)"/>
+  <g fill="#3A3340">
+    <polygon points="256,318 352,404 160,404"/>
+    <polygon points="252,236 336,332 172,332"/>
+    <polygon points="250,118 320,262 184,262"/>
+    <rect x="244" y="400" width="24" height="22"/>
+  </g>
+  <g fill="#4A4252">
+    <polygon points="256,318 160,404 254,404"/>
+    <polygon points="252,236 172,332 250,332"/>
+    <polygon points="250,118 184,262 248,262"/>
+  </g>
+</svg>
