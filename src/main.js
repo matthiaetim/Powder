@@ -42,6 +42,7 @@ function freshOrUpdate() {
 const input = createInput(canvas, {
   press: (side) => G.onPress(game, side),
   release: () => G.onRelease(game),
+  plow: (on) => G.onPlow(game, on),
   pause: () => { if (G.togglePause(game)) input.cancelAll(); },
   fresh: freshOrUpdate,
 });

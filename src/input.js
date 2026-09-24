@@ -1,22 +1,35 @@
-// Eingabe: Finger runter = Halten (links/rechts), Finger hoch = Loslassen. Tastatur fürs Entwickeln.
+// Eingabe: Finger runter = Halten (links/rechts), Finger hoch = Loslassen, beide Seiten = Schneepflug.
+// Alle Finger werden verfolgt: fällt einer weg, übernimmt der verbleibende sofort. Tastatur fürs Entwickeln.
 export function createInput(canvas, h) {
-  let active = null; // aktuell gedrückter Finger oder Taste
+  const held = new Map(); // id → Seite (-1/1) aller gedrückten Finger und Tasten
+  let mode = 0;           // 0 = nichts, -1/1 = Seite, 2 = Schneepflug
+
+  function apply() {
+    let hasL = false, hasR = false;
+    for (const side of held.values()) { if (side < 0) hasL = true; else hasR = true; }
+    const next = hasL && hasR ? 2 : hasL ? -1 : hasR ? 1 : 0;
+    if (next === mode) return;
+    const prev = mode;
+    mode = next;
+    if (prev === 2) h.plow(false);
+    if (next === 2) h.plow(true);
+    else if (next === 0) h.release();
+    else h.press(next);
+  }
 
   function down(id, side) {
-    if (active) return; // nur der erste Finger zählt
-    active = { id, side };
-    h.press(side);
+    held.set(id, side);
+    apply();
   }
 
   function up(id) {
-    if (!active || active.id !== id) return;
-    active = null;
-    h.release();
+    if (!held.delete(id)) return;
+    apply();
   }
 
   function cancelAll() {
-    if (active) h.release();
-    active = null;
+    held.clear();
+    apply();
   }
 
   canvas.addEventListener('pointerdown', (e) => {

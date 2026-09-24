@@ -133,6 +133,7 @@ function die(g, cause) {
   g.deadCause = cause;
   s.alive = false;
   s.side = 0;
+  s.plow = false;
   if (cause !== 'avalanche') burst(g, 24, 4);
   s.v = 0;
   const m = Math.floor(g.dist);
@@ -179,13 +180,18 @@ export function onPress(g, side) {
 export function onRelease(g) {
   P.release(g.skier);
 }
+export function onPlow(g, on) {
+  if (on) g.lastGesture = 'plow';
+  if (g.state === 'ready' && on) start(g);
+  if (g.state === 'running') P.setPlow(g.skier, on);
+}
 export function togglePause(g) {
-  if (g.state === 'running') { g.state = 'paused'; g.skier.side = 0; return true; }
+  if (g.state === 'running') { g.state = 'paused'; g.skier.side = 0; g.skier.plow = false; return true; }
   if (g.state === 'paused') g.state = 'running';
   return false;
 }
 export function pauseIfRunning(g) {
-  if (g.state === 'running') { g.state = 'paused'; g.skier.side = 0; }
+  if (g.state === 'running') { g.state = 'paused'; g.skier.side = 0; g.skier.plow = false; }
 }
 export function fresh(g) {
   if (g.state === 'dead' && g.deadT * 1000 >= C.DEATH_OVERLAY_MS + C.FRESH_GUARD_MS) reset(g, g.fixedSeed ?? randomSeed(), false);

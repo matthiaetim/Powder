@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.7.1';
+export const VERSION = '0.7.2';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -22,19 +22,16 @@ export const C = {
   MAX_FRAME_MS: 100,
 
   // Lenkung (nach dem Original vermessen): der Kurs schwingt weich auf einen Zielwinkel ein,
-  // ohne Knick. Antippen setzt das Ziel auf TURN_TAP_DEG, Halten vertieft es stetig.
-  // Ansprechzeit = Zeitkonstante des Einschwingens (kritisch gedämpft): nach 2× Ansprechzeit
-  // sind rund 60 % des Weges geschafft. Loslassen: die Restdrehung klingt schnell ab, der
-  // Schrägwinkel bleibt und driftet nur langsam zur Falllinie zurück (wie im Original ≈13°/s).
-  TURN_TAP_DEG: 34,        // (Tuning) Zielwinkel beim Antippen (die Restdrehung legt ~8° drauf)
+  // ohne Knick. Antippen setzt das Ziel auf TURN_TAP_DEG, Halten vertieft es stetig,
+  // Loslassen setzt das Ziel auf die Falllinie. Ansprechzeit = Zeitkonstante des Einschwingens
+  // (kritisch gedämpft): nach 2× Ansprechzeit sind rund 60 % des Weges geschafft.
+  TURN_TAP_DEG: 40,        // (Tuning) Zielwinkel beim Antippen
   TURN_DEEPEN_DEG_S: 90,   // (Tuning) Vertiefung des Zielwinkels pro Sekunde Halten
   TURN_T: 0.1,             // (Tuning) Ansprechzeit in s bis TURN_T_SPEED_LO_KMH
   TURN_T_FAST: 0.14,       // (Tuning) Ansprechzeit bei TURN_T_SPEED_HI_KMH: bei Tempo liegt mehr Gewicht auf den Skiern
   TURN_T_SPEED_LO_KMH: 50,
   TURN_T_SPEED_HI_KMH: 200,
-  RETURN_T: 1.7,           // (Tuning) Zeitkonstante der Drift zurück zur Falllinie in s (Rate = Winkel / RETURN_T)
-  RETURN_MIN_DEG_S: 6,     // Mindestrate, damit kleine Restwinkel auch verschwinden
-  RETURN_DAMP_S: 0.06,     // Abklingzeit der Restdrehung nach dem Loslassen
+  RETURN_T: 0.12,          // (Tuning) Ansprechzeit der Rückkehr zur Falllinie in s
   MAX_HEADING_DEG: 120,    // (Tuning) über quer (90°) hinaus leicht bergauf
 
   // Tempo: der Start hat schon Fahrt, ohne Tippen wird man stetig schneller. Der Luftwiderstand
@@ -43,14 +40,19 @@ export const C = {
   G_SLOPE: 5.0,            // (Tuning) Hangabtrieb in m/s²
   MAX_SPEED_KMH: 200,      // (Tuning) Endtempo im Freilauf
 
-  // Bremsen: wächst mit dem Winkel (ab BRAKE_START_DEG, voll ab BRAKE_FULL_DEG)
-  // und mit dem Tempo: Verzögerung = Anteil × (BRAKE_MIN + BRAKE_K × v).
-  // Der Carve bis etwa 60° behält sein Tempo und zieht den Fahrer weit zur Seite,
-  // erst quer zum Hang und darüber hinaus bremst es bis zum Stillstand.
-  BRAKE_K: 1.8,            // (Tuning) Bremskraft pro m/s Tempo
+  // Bremsen, drei Anteile:
+  // 1. Drehen (Hauptbremse): jede Kursänderung kostet Tempo, Verzögerung = TURN_BRAKE_K × |Drehrate| × v.
+  //    Damit bremst schneller Zickzack genauso wie langes Halten, die Summe des Carvens zählt.
+  // 2. Winkel: wächst ab BRAKE_START_DEG bis BRAKE_FULL_DEG, Verzögerung = Anteil × (BRAKE_MIN + BRAKE_K × v).
+  //    Sanfter als früher, damit Halten den Fahrer erst weit zur Seite zieht und dann quer zum Stehen bringt.
+  // 3. Schneepflug (beide Daumen): geradeaus bremsen, bei hohem Tempo schwächer als Querstellen.
+  TURN_BRAKE_K: 0.03,      // (Tuning) Bremsen durch Drehen
+  BRAKE_K: 1.2,            // (Tuning) Bremskraft pro m/s Tempo (Winkelbremse)
   BRAKE_MIN: 10,           // Grundbremsung in m/s², damit man wirklich zum Stehen kommt
-  BRAKE_START_DEG: 35,     // (Tuning) darunter bremst nichts
-  BRAKE_FULL_DEG: 90,      // (Tuning) ab hier volle Bremskraft
+  BRAKE_START_DEG: 35,     // (Tuning) darunter bremst der Winkel nicht
+  BRAKE_FULL_DEG: 100,     // (Tuning) ab hier volle Winkelbremse
+  PLOW_MIN: 12,            // (Tuning) Schneepflug-Verzögerung in m/s²
+  PLOW_K: 0.05,            // Schneepflug wächst nur schwach mit dem Tempo
 
   SKIER_R: 0.45,
 
@@ -124,11 +126,13 @@ export const TUNABLES = [
   { key: 'TURN_DEEPEN_DEG_S', label: 'Vertiefen beim Halten', unit: '°/s', min: 0, max: 150, step: 5 },
   { key: 'TURN_T', label: 'Ansprechzeit', unit: 's', min: 0.05, max: 0.4, step: 0.01 },
   { key: 'TURN_T_FAST', label: 'Ansprechzeit bei 200 km/h', unit: 's', min: 0.05, max: 0.4, step: 0.01 },
-  { key: 'RETURN_T', label: 'Rückkehr zur Falllinie', unit: 's', min: 0.2, max: 4, step: 0.1 },
+  { key: 'RETURN_T', label: 'Rückkehr', unit: 's', min: 0.05, max: 0.6, step: 0.01 },
   { key: 'MAX_HEADING_DEG', label: 'Max. Winkel', unit: '°', min: 60, max: 150, step: 5 },
-  { key: 'BRAKE_K', label: 'Bremskraft', unit: '', min: 0.2, max: 6, step: 0.1 },
-  { key: 'BRAKE_START_DEG', label: 'Bremsen ab', unit: '°', min: 0, max: 60, step: 5 },
-  { key: 'BRAKE_FULL_DEG', label: 'Bremsen voll ab', unit: '°', min: 30, max: 120, step: 5 },
+  { key: 'TURN_BRAKE_K', label: 'Bremsen durch Drehen', unit: '', min: 0, max: 0.06, step: 0.002, decimals: 3 },
+  { key: 'BRAKE_K', label: 'Bremsen durch Winkel', unit: '', min: 0.2, max: 6, step: 0.1 },
+  { key: 'BRAKE_START_DEG', label: 'Winkelbremse ab', unit: '°', min: 0, max: 60, step: 5 },
+  { key: 'BRAKE_FULL_DEG', label: 'Winkelbremse voll ab', unit: '°', min: 30, max: 120, step: 5 },
+  { key: 'PLOW_MIN', label: 'Schneepflug', unit: 'm/s²', min: 0, max: 30, step: 1 },
   { key: 'START_SPEED_KMH', label: 'Starttempo', unit: 'km/h', min: 0, max: 80, step: 5 },
   { key: 'G_SLOPE', label: 'Beschleunigung', unit: 'm/s²', min: 1, max: 10, step: 0.25 },
   { key: 'MAX_SPEED_KMH', label: 'Endtempo', unit: 'km/h', min: 60, max: 300, step: 10 },

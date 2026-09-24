@@ -1,8 +1,8 @@
 // Fahrermodell: der Kurs schwingt kritisch gedämpft auf einen Zielwinkel ein (Antippen: Tipp-Winkel,
-// Halten: vertieft sich stetig). Nach dem Loslassen bleibt der Schrägwinkel und driftet nur langsam
-// zur Falllinie zurück. Dadurch hat die Spur nie einen Knick.
-// Bremsen wächst mit Winkel und Tempo bis zum Stillstand. Ohne Eingabe nähert sich das Tempo
-// weich dem Endtempo, weil der Luftwiderstand quadratisch wächst.
+// Halten: vertieft sich stetig, Loslassen: Falllinie). Dadurch hat die Spur nie einen Knick.
+// Bremsen: Drehen kostet Tempo (Hauptbremse), große Winkel bremsen bis zum Stillstand,
+// beide Daumen = Schneepflug. Ohne Eingabe nähert sich das Tempo weich dem Endtempo,
+// weil der Luftwiderstand quadratisch wächst.
 import { C } from './constants.js';
 
 const D2R = Math.PI / 180;
@@ -23,6 +23,7 @@ export function createSkier() {
     carve: 0,      // 0..1 für Spurbreite und Spray
     brake: 0,      // aktuelle Bremsverzögerung (Debug)
     side: 0,       // -1 links, 1 rechts, 0 losgelassen
+    plow: false,   // beide Daumen: Schneepflug, geradeaus bremsen
     alive: true,
   };
 }
@@ -36,6 +37,11 @@ export function release(s) {
   s.side = 0;
 }
 
+export function setPlow(s, on) {
+  s.plow = !!on;
+  if (on) s.holdT = 0; // nach dem Pflug beginnt der verbleibende Daumen wie ein neuer Tipp
+}
+
 // Ansprechzeit wächst mit dem Tempo (Gewicht auf den Skiern): linear zwischen den beiden Referenztempi
 function turnT(v) {
   const lo = C.TURN_T_SPEED_LO_KMH / 3.6, hi = C.TURN_T_SPEED_HI_KMH / 3.6;
@@ -47,25 +53,19 @@ function turnT(v) {
 export function updateSkier(s, dt) {
   const maxHead = C.MAX_HEADING_DEG * D2R;
 
-  if (s.side !== 0) {
-    // Halten: Zielwinkel = Tipp-Winkel + Vertiefung; kritisch gedämpftes Einschwingen
-    // (weicher Beginn, zügige Mitte, sanftes Ende, kein Knick)
+  // Zielwinkel: Halten = Tipp-Winkel + Vertiefung, Loslassen oder Schneepflug = Falllinie
+  let T;
+  if (s.side !== 0 && !s.plow) {
     s.target = s.side * Math.min(maxHead, (C.TURN_TAP_DEG + C.TURN_DEEPEN_DEG_S * s.holdT) * D2R);
     s.holdT += dt;
-    const T = turnT(s.v);
-    s.omega += ((s.target - s.theta) / (T * T) - (2 * s.omega) / T) * dt;
-    s.theta += s.omega * dt;
+    T = turnT(s.v);
   } else {
-    // Losgelassen: Restdrehung klingt schnell ab, dann langsame Drift zur Falllinie
     s.target = 0;
-    const mag = Math.abs(s.theta);
-    const rate = Math.min(mag / dt, Math.max(mag / C.RETURN_T, C.RETURN_MIN_DEG_S * D2R));
-    const wanted = -Math.sign(s.theta) * rate;
-    s.omega += (wanted - s.omega) * (1 - Math.exp(-dt / C.RETURN_DAMP_S));
-    const before = s.theta;
-    s.theta += s.omega * dt;
-    if (before !== 0 && Math.sign(s.theta) !== Math.sign(before)) { s.theta = 0; s.omega = 0; }
+    T = C.RETURN_T;
   }
+  // Kritisch gedämpftes Einschwingen: weicher Beginn, zügige Mitte, sanftes Ende, kein Knick
+  s.omega += ((s.target - s.theta) / (T * T) - (2 * s.omega) / T) * dt;
+  s.theta += s.omega * dt;
   if (s.theta > maxHead) { s.theta = maxHead; if (s.omega > 0) s.omega = 0; }
   else if (s.theta < -maxHead) { s.theta = -maxHead; if (s.omega < 0) s.omega = 0; }
   if (s.side === 0 && Math.abs(s.theta) < 1e-4 && Math.abs(s.omega) < 1e-3) { s.theta = 0; s.omega = 0; }
@@ -73,9 +73,12 @@ export function updateSkier(s, dt) {
   const absDeg = Math.abs(s.theta) / D2R;
   s.carve = clamp(absDeg / 90, 0, 1);
 
-  // Bremsen: 0 unterhalb BRAKE_START_DEG, voll ab BRAKE_FULL_DEG, und je schneller desto härter
+  // Bremsen: Drehen (Hauptanteil) + Winkel (ab BRAKE_START_DEG, voll ab BRAKE_FULL_DEG) + Schneepflug
   const t = clamp((absDeg - C.BRAKE_START_DEG) / Math.max(1, C.BRAKE_FULL_DEG - C.BRAKE_START_DEG), 0, 1);
-  s.brake = smoothstep(t) * (C.BRAKE_MIN + C.BRAKE_K * s.v);
+  const brakeAngle = smoothstep(t) * (C.BRAKE_MIN + C.BRAKE_K * s.v);
+  const brakeTurn = C.TURN_BRAKE_K * Math.abs(s.omega) * s.v;
+  const brakePlow = s.plow ? C.PLOW_MIN + C.PLOW_K * s.v : 0;
+  s.brake = brakeAngle + brakeTurn + brakePlow;
 
   const cos = Math.cos(s.theta);
   const sin = Math.sin(s.theta);
