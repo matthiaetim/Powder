@@ -14,7 +14,6 @@ export function createHud(g, doc, hooks = {}) {
   const nf = new Intl.NumberFormat(C.HUD_LOCALE, { maximumFractionDigits: 0 });
   let lastSpeed = -1, lastDist = -1, lastState = '', lastOverlay = '', lastDebug = 0;
 
-  $('btn-pause').addEventListener('click', (e) => { e.stopPropagation(); togglePause(g); });
   $('ov-pause').addEventListener('click', () => togglePause(g));
   $('btn-fresh').addEventListener('click', doFresh);
   if (g.debug) debugEl.hidden = false;
@@ -22,7 +21,7 @@ export function createHud(g, doc, hooks = {}) {
   // Tuning-Panel: langer Druck auf das Versions-Label öffnet es, Spiel pausiert derweil.
   const tuneEl = $('tune');
   const versionEl = $('version');
-  const markTuned = () => versionEl.classList.toggle('tuned', isTuned());
+  const markTuned = () => { versionEl.classList.toggle('tuned', isTuned()); if (hooks.onTune) hooks.onTune(); };
   const tune = createTunePanel(doc, tuneEl, markTuned);
   markTuned();
   let pressTimer = 0;

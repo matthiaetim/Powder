@@ -1,12 +1,13 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.6.2';
+export const VERSION = '0.7.0';
 
 export const C = {
-  // Sicht (Hochkant): sichtbare Breite/Höhe in Metern, Fahrer bei 33 % Bildhöhe.
+  // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
+  // Enger als anfangs, nach dem Original: Hindernisse wirken größer und stehen seltener im Bild.
   // Bei Tempo rückt der Fahrer nach oben und die Kamera zoomt leicht heraus: mehr Vorausschau.
-  VIEW_W_M: 40,
-  VIEW_H_M: 86,
+  VIEW_W_M: 30,              // (Tuning) Sichtbreite
+  VIEW_ASPECT: 2.15,         // nominale Höhe = Breite × Seitenverhältnis (iPhone-Hochkant)
   SKIER_SCREEN_Y_FRAC: 0.33,
   CAM_Y_FRAC_FAST: 0.25,     // Fahrerposition bei vollem Tempo
   CAM_ZOOM_FAST: 1.15,       // (Tuning) Herauszoomen bei vollem Tempo, 1 = aus
@@ -41,11 +42,12 @@ export const C = {
 
   // Bremsen: wächst mit dem Winkel (ab BRAKE_START_DEG, voll ab BRAKE_FULL_DEG)
   // und mit dem Tempo: Verzögerung = Anteil × (BRAKE_MIN + BRAKE_K × v).
-  // Kurzer Tipp (≈35°) kostet kaum Tempo, Halten bremst hart bis zum Stillstand.
-  BRAKE_K: 3.0,            // (Tuning) Bremskraft pro m/s Tempo
-  BRAKE_MIN: 15,           // Grundbremsung in m/s², damit man wirklich zum Stehen kommt
-  BRAKE_START_DEG: 25,     // (Tuning) darunter bremst nichts
-  BRAKE_FULL_DEG: 65,      // (Tuning) ab hier volle Bremskraft
+  // Der Carve bis etwa 60° behält sein Tempo und zieht den Fahrer weit zur Seite,
+  // erst quer zum Hang und darüber hinaus bremst es bis zum Stillstand.
+  BRAKE_K: 1.8,            // (Tuning) Bremskraft pro m/s Tempo
+  BRAKE_MIN: 10,           // Grundbremsung in m/s², damit man wirklich zum Stehen kommt
+  BRAKE_START_DEG: 35,     // (Tuning) darunter bremst nichts
+  BRAKE_FULL_DEG: 90,      // (Tuning) ab hier volle Bremskraft
 
   SKIER_R: 0.45,
 
@@ -64,8 +66,8 @@ export const C = {
   CELL_M: 40,
   CULL_CELLS: 1,
   MIN_SPACING_M: 4.0,
-  TREE_D0: 0.012,
-  TREE_D1: 0.026,          // (Tuning) Dichte am Ende des Anstiegs
+  TREE_D0: 0.010,
+  TREE_D1: 0.020,          // (Tuning) Dichte am Ende des Anstiegs
   RAMP_M: 8000,            // (Tuning) Dichte, Korridor und Felsanteil steigen über diese Strecke (Marathon)
   ROCK_FRAC0: 0.2,
   ROCK_FRAC1: 0.3,
@@ -128,6 +130,7 @@ export const TUNABLES = [
   { key: 'G_SLOPE', label: 'Beschleunigung', unit: 'm/s²', min: 1, max: 10, step: 0.25 },
   { key: 'MAX_SPEED_KMH', label: 'Endtempo', unit: 'km/h', min: 60, max: 300, step: 10 },
   { key: 'CAM_ZOOM_FAST', label: 'Vorausschau bei Tempo', unit: '×', min: 1, max: 1.5, step: 0.05 },
+  { key: 'VIEW_W_M', label: 'Sichtbreite', unit: 'm', min: 22, max: 48, step: 1 },
   { key: 'TREE_D1', label: 'Dichte am Ende', unit: '/100 m²', min: 0.01, max: 0.045, step: 0.001, scale: 100, decimals: 1 },
   { key: 'RAMP_M', label: 'Anstieg bis', unit: 'm', min: 1000, max: 15000, step: 500 },
 ];

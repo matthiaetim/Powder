@@ -6,7 +6,7 @@ import { avalancheVisibility } from './avalanche.js';
 import { laneX } from './world.js';
 
 const TAU = Math.PI * 2;
-const TREE_H = 2.8; // nominale Sprite-Höhe in Metern
+const TREE_H = 3.2; // nominale Sprite-Höhe in Metern
 const ROCK_H = 1.4;
 
 export function createRenderer(canvas) {
@@ -21,7 +21,7 @@ export function resize(R) {
   R.W = W; R.H = H; R.dpr = dpr;
   R.canvas.width = Math.round(W * dpr);
   R.canvas.height = Math.round(H * dpr);
-  R.S = Math.min(W / C.VIEW_W_M, H / C.VIEW_H_M);
+  R.S = Math.min(W / C.VIEW_W_M, H / (C.VIEW_W_M * C.VIEW_ASPECT));
   const key = R.S.toFixed(3) + '@' + dpr;
   if (key !== R.spriteKey) {
     R.sprites = makeSprites(R.S, dpr);

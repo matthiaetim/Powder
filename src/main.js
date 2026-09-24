@@ -45,7 +45,7 @@ const input = createInput(canvas, {
   pause: () => { if (G.togglePause(game)) input.cancelAll(); },
   fresh: freshOrUpdate,
 });
-const hud = createHud(game, document, { fresh: freshOrUpdate });
+const hud = createHud(game, document, { fresh: freshOrUpdate, onTune: onResize });
 
 // Debug-Haken (?debug=1): Simulation gezielt vorspulen, z. B. powder.advance(2) in der Konsole.
 if (game.debug) {

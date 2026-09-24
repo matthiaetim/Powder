@@ -25,7 +25,7 @@ export function createGame(opts = {}) {
     mode: DEFAULT_MODE, intro: true, readyDelayMs: C.READY_AUTO_START_MS,
     readyT: 0, deadT: 0, deadCause: '',
     camX: 0, skierFrac: READY_FRAC, zoom: 1,
-    viewWm: C.VIEW_W_M, viewHm: C.VIEW_H_M,
+    viewWm: C.VIEW_W_M, viewHm: C.VIEW_W_M * C.VIEW_ASPECT,
     debug: !!opts.debug, lastGesture: '–', runs: 0,
     trackAcc: 0, spawnAcc: 0,
   };

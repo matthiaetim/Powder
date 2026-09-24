@@ -69,7 +69,7 @@ function genCell(w, cx, cy) {
     const isRock = rng() < rf;
     const r = isRock ? 0.5 + rng() * 0.3 : 0.7 + rng() * 0.3;
     const variant = (rng() * 3) | 0;
-    const h = isRock ? 0.8 + rng() * 0.6 : 1.8 + rng();
+    const h = isRock ? 0.8 + rng() * 0.6 : 2.0 + rng() * 1.2;
     if (x * x + y * y < C.START_CLEAR_M * C.START_CLEAR_M) continue;
     if (Math.abs(x - laneX(w, y)) < laneHalf(y) + r) continue;
     let ok = true;

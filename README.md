@@ -6,11 +6,11 @@ Plain HTML + JavaScript + Canvas, kein Framework, kein Build.
 ## Spielen
 
 - **Tippen** links/rechts: der Kurs schwingt weich auf den Tipp-Winkel ein, ganz kurze Tipps geben kleine Kurven. Bei hohem Tempo spricht der Fahrer etwas träger an (Gewicht auf den Skiern).
-- **Halten**: der Winkel vertieft sich stetig bis über quer zum Hang, dann steht man.
+- **Halten**: der Winkel vertieft sich stetig. Bis etwa 60° ist es ein Carve mit Zug zur Seite, quer zum Hang und darüber bremst es bis zum Stillstand.
 - **Loslassen**: der Fahrer schwingt ohne Knick zurück zur Falllinie.
 - Der Start hat schon Fahrt, ohne Eingabe wird man stetig schneller bis zum Endtempo. Kurze Tipps kosten kaum Tempo, Halten bremst hart, quer zum Hang bleibt man stehen.
 - Bei hohem Tempo rückt der Fahrer im Bild nach oben und die Sicht zoomt leicht heraus (mehr Vorausschau).
-- Tastatur: `A`/`D` oder Pfeile, `P` Pause, `R` Fresh
+- Tastatur: `A`/`D` oder Pfeile, `P` Pause, `R` Fresh. Auf dem iPhone gibt es keine Pause-Taste: anhalten heißt querstellen; beim Wechsel in den Hintergrund pausiert die App von selbst.
 - **Tuning-Panel**: langer Druck auf das Versions-Label unten links. Werte bleiben gespeichert, „Standard“ setzt zurück.
 
 ## Lokal starten
