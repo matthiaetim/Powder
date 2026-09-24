@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.3.1';
+export const VERSION = '0.4.0';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite/Höhe in Metern, Fahrer bei 33 % Bildhöhe
@@ -17,8 +17,8 @@ export const C = {
 
   // Lenkung: Antippen dreht sofort ein Stück, Halten dreht gleichmäßig weiter,
   // Loslassen schwingt zur Falllinie zurück.
-  TURN_KICK_DEG: 10,       // (Tuning) Sofortdrehung beim Antippen
-  TURN_RATE_DEG_S: 130,    // (Tuning) Drehrate beim Halten
+  TURN_KICK_DEG: 15,       // (Tuning) Sofortdrehung beim Antippen
+  TURN_RATE_DEG_S: 200,    // (Tuning) Drehrate beim Halten
   MAX_HEADING_DEG: 120,    // (Tuning) über quer (90°) hinaus leicht bergauf
   RETURN_S: 0.25,          // (Tuning) Zeitkonstante der Rückkehr zur Falllinie
   RETURN_MIN_DEG_S: 40,    // damit die Rückkehr auch bei kleinen Winkeln zügig endet
@@ -30,10 +30,10 @@ export const C = {
 
   // Bremsen: wächst mit dem Winkel (ab BRAKE_START_DEG, voll ab BRAKE_FULL_DEG)
   // und mit dem Tempo: Verzögerung = Anteil × (BRAKE_MIN + BRAKE_K × v)
-  BRAKE_K: 1.6,            // (Tuning) Bremskraft pro m/s Tempo
-  BRAKE_MIN: 8,            // Grundbremsung in m/s², damit man wirklich zum Stehen kommt
-  BRAKE_START_DEG: 20,     // (Tuning) darunter bremst nichts
-  BRAKE_FULL_DEG: 70,      // (Tuning) ab hier volle Bremskraft
+  BRAKE_K: 2.4,            // (Tuning) Bremskraft pro m/s Tempo
+  BRAKE_MIN: 15,           // Grundbremsung in m/s², damit man wirklich zum Stehen kommt
+  BRAKE_START_DEG: 35,     // (Tuning) darunter bremst nichts (leichte Tipps kosten kein Tempo)
+  BRAKE_FULL_DEG: 80,      // (Tuning) ab hier volle Bremskraft
 
   SKIER_R: 0.45,
 
@@ -86,14 +86,19 @@ export const C = {
   // HUD
   HUD_LOCALE: 'de-DE',
 
-  // Farben
-  BG: '#F4EFF3',
-  INK: '#3A3340',
-  INK_LIGHT: '#4A4252',
-  ROCK: '#5A5262',
-  ROCK_TOP: '#6A6273',
-  TRACK: 'rgba(58,51,64,0.18)',
-  AVALANCHE: [58, 51, 64],
+  // Farben: Polarweiß mit leichtem Blaustich, Tannengrün, kühles Schiefergrau für Text und Fahrer
+  BG: '#F5F9FD',
+  INK: '#2E3A45',
+  INK_LIGHT: '#3E4B57',
+  TREE: '#2F4F3E',
+  TREE_LIGHT: '#3E6650',
+  TRUNK: '#2A2F33',
+  ROCK: '#6A7580',
+  ROCK_TOP: '#7E8994',
+  SHADOW_RGB: '55,75,95',
+  TRACK_RGB: '60,80,100',
+  TRACK: 'rgba(60,80,100,0.16)',
+  AVALANCHE: [46, 58, 69],
 };
 
 // Regler im Tuning-Panel (langer Druck auf das Versions-Label).
@@ -102,7 +107,7 @@ export const TUNABLES = [
   { key: 'TURN_RATE_DEG_S', label: 'Drehrate', unit: '°/s', min: 30, max: 300, step: 5 },
   { key: 'MAX_HEADING_DEG', label: 'Max. Winkel', unit: '°', min: 60, max: 150, step: 5 },
   { key: 'RETURN_S', label: 'Rückkehr', unit: 's', min: 0.05, max: 2, step: 0.05 },
-  { key: 'BRAKE_K', label: 'Bremskraft', unit: '', min: 0.2, max: 3, step: 0.1 },
+  { key: 'BRAKE_K', label: 'Bremskraft', unit: '', min: 0.2, max: 5, step: 0.1 },
   { key: 'BRAKE_START_DEG', label: 'Bremsen ab', unit: '°', min: 0, max: 60, step: 5 },
   { key: 'BRAKE_FULL_DEG', label: 'Bremsen voll ab', unit: '°', min: 30, max: 120, step: 5 },
   { key: 'G_SLOPE', label: 'Beschleunigung', unit: 'm/s²', min: 1, max: 10, step: 0.25 },

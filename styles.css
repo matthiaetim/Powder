@@ -7,8 +7,8 @@
 }
 
 :root {
-  --bg: #F4EFF3;
-  --ink: #3A3340;
+  --bg: #F5F9FD;
+  --ink: #2E3A45;
   --font: 'Playfair Display', Georgia, 'Times New Roman', serif;
 }
 
@@ -57,7 +57,7 @@ canvas#game {
   padding: 0;
   border-radius: 50%;
   border: 2px solid var(--ink);
-  background: rgba(58, 51, 64, 0.12);
+  background: rgba(46, 58, 69, 0.12);
   opacity: 0.55;
   cursor: pointer;
   touch-action: manipulation;
@@ -106,12 +106,12 @@ body[data-state="ready"][data-intro="1"] #hint { opacity: 0.6; }
   justify-content: center;
   text-align: center;
 }
-#ov-pause { background: rgba(244, 239, 243, 0.65); }
+#ov-pause { background: rgba(245, 249, 253, 0.65); }
 body[data-state="paused"] #ov-pause { display: flex; }
 .ov-title { font-size: 40px; }
 .ov-sub { font-size: 16px; opacity: 0.7; margin-top: 8px; }
 
-#ov-dead { background: rgba(58, 51, 64, 0.45); }
+#ov-dead { background: rgba(46, 58, 69, 0.45); }
 body[data-state="dead"][data-overlay="1"] #ov-dead { display: flex; }
 #dead-dist { font-size: 56px; line-height: 1; }
 #dead-best { font-size: 16px; opacity: 0.8; margin-top: 10px; }
@@ -125,7 +125,7 @@ body[data-state="dead"][data-overlay="1"] #ov-dead { display: flex; }
   cursor: pointer;
   touch-action: manipulation;
 }
-#btn-fresh:active { background: rgba(58, 51, 64, 0.12); }
+#btn-fresh:active { background: rgba(46, 58, 69, 0.12); }
 
 #modes {
   display: flex;
@@ -153,7 +153,7 @@ body[data-state="dead"][data-overlay="1"] #ov-dead { display: flex; }
   display: block;
   width: 130px;
   height: 72px;
-  border: 1px solid rgba(58, 51, 64, 0.55);
+  border: 1px solid rgba(46, 58, 69, 0.55);
   box-sizing: border-box;
 }
 .mode-card.active .mode-preview { border: 2px solid var(--ink); }
@@ -184,8 +184,8 @@ body[data-state="dead"][data-overlay="1"] #ov-dead { display: flex; }
   bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
   z-index: 10;
   padding: 12px 14px 10px;
-  background: rgba(244, 239, 243, 0.96);
-  border: 1px solid rgba(58, 51, 64, 0.5);
+  background: rgba(245, 249, 253, 0.96);
+  border: 1px solid rgba(46, 58, 69, 0.5);
   color: var(--ink);
   font-style: italic;
   touch-action: pan-y;

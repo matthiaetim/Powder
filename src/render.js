@@ -60,17 +60,17 @@ function makeTree(S, dpr, v) {
   const w = Wd + pad * 2, h = H + pad * 2;
   const [c, x] = makeCanvas(w, h, dpr);
   const ax = w / 2, ay = pad + H; // Fußpunkt
-  softEllipse(x, ax + 0.95 * S, ay - 0.1 * S, 1.2 * S, 0.5 * S, '70,60,80', 0.34);
+  softEllipse(x, ax + 0.95 * S, ay - 0.1 * S, 1.2 * S, 0.5 * S, C.SHADOW_RGB, 0.3);
   const skew = [0.07, -0.05, 0.02][v] * S;
   const tiers = [[0.0, 0.62, 0.48], [0.28, 0.52, 0.42], [0.54, 0.4, 0.46]];
   for (const [y0f, wf, hf] of tiers) {
     const yb = ay - y0f * H, yt = yb - hf * H, half = (wf * Wd) / 2;
-    x.fillStyle = C.INK;
+    x.fillStyle = C.TREE;
     x.beginPath(); x.moveTo(ax + skew, yt); x.lineTo(ax + half, yb); x.lineTo(ax - half, yb); x.closePath(); x.fill();
-    x.fillStyle = C.INK_LIGHT;
+    x.fillStyle = C.TREE_LIGHT;
     x.beginPath(); x.moveTo(ax + skew, yt); x.lineTo(ax - half, yb); x.lineTo(ax + skew * 0.5, yb); x.closePath(); x.fill();
   }
-  x.fillStyle = C.INK;
+  x.fillStyle = C.TRUNK;
   x.fillRect(ax - 0.07 * S, ay - 0.12 * S, 0.14 * S, 0.14 * S);
   return { img: c, w, h, ax, ay, nominal: TREE_H };
 }
@@ -80,7 +80,7 @@ function makeRock(S, dpr, v) {
   const w = Wd + pad * 2, h = H + pad * 2;
   const [c, x] = makeCanvas(w, h, dpr);
   const ax = w / 2, ay = pad + H;
-  softEllipse(x, ax + 0.6 * S, ay - 0.05 * S, 0.9 * S, 0.4 * S, '70,60,80', 0.3);
+  softEllipse(x, ax + 0.6 * S, ay - 0.05 * S, 0.9 * S, 0.4 * S, C.SHADOW_RGB, 0.28);
   const jit = (i) => (((i * 7 + v * 13) % 5) - 2) * 0.03;
   const P = (px, py, i) => [ax - Wd / 2 + (px + jit(i)) * Wd, ay - H + (py + jit(i + 3)) * H];
   const outline = [[0.5, 0.12], [0.92, 0.35], [0.95, 0.8], [0.55, 1.0], [0.1, 0.85], [0.05, 0.4]];
@@ -155,7 +155,7 @@ function drawTrack(R, g, ox, oy) {
   ctx.lineJoin = 'round';
   for (let b = 0; b < buckets; b++) {
     ctx.lineWidth = base * (1 + (C.TRACK_WIDTH_MAX - 1) * ((b + 0.5) / buckets));
-    ctx.strokeStyle = `rgba(58,51,64,${(0.18 + (0.14 * b) / (buckets - 1)).toFixed(2)})`;
+    ctx.strokeStyle = `rgba(${C.TRACK_RGB},${(0.16 + (0.14 * b) / (buckets - 1)).toFixed(2)})`;
     for (const off of [-0.16, 0.16]) {
       ctx.beginPath();
       let any = false;
@@ -204,7 +204,7 @@ function drawSkier(R, g, sx, sy) {
   ctx.save();
   if (dead && g.deadCause === 'avalanche') ctx.globalAlpha = Math.max(0, 1 - g.deadT / 0.7);
   // Schatten nach unten rechts
-  ctx.fillStyle = 'rgba(70,60,80,0.25)';
+  ctx.fillStyle = `rgba(${C.SHADOW_RGB},0.22)`;
   ctx.beginPath();
   ctx.ellipse(sx + 0.35 * S, sy + 0.25 * S, 0.5 * S, 0.3 * S, 0, 0, TAU);
   ctx.fill();
@@ -235,7 +235,7 @@ function drawParticles(R, g, ox, oy) {
     const p = ps[i];
     if (p.life <= 0) continue;
     const a = p.life / p.max;
-    ctx.fillStyle = p.tone ? `rgba(200,190,205,${(0.55 * a).toFixed(2)})` : `rgba(255,255,255,${(0.9 * a).toFixed(2)})`;
+    ctx.fillStyle = p.tone ? `rgba(185,200,215,${(0.6 * a).toFixed(2)})` : `rgba(255,255,255,${(0.9 * a).toFixed(2)})`;
     ctx.beginPath();
     ctx.arc(p.x * S + ox, p.y * S + oy, p.r, 0, TAU);
     ctx.fill();
@@ -344,7 +344,7 @@ function drawSnow(R, g, t) {
   ctx.fillStyle = 'rgba(255,255,255,0.95)';
   ctx.fill();
   ctx.lineWidth = 1;
-  ctx.strokeStyle = 'rgba(58,51,64,0.16)';
+  ctx.strokeStyle = `rgba(${C.TRACK_RGB},0.16)`;
   ctx.stroke();
 }
 
@@ -402,8 +402,8 @@ export function drawModePreview(canvas, modeId) {
   if (modeId === 'chase') {
     // Schneewand von oben: weiche weiße Wolke mit leichtem Schatten darunter
     const g1 = ctx.createLinearGradient(0, 0, 0, H * 0.5);
-    g1.addColorStop(0, 'rgba(58,51,64,0.16)');
-    g1.addColorStop(1, 'rgba(58,51,64,0)');
+    g1.addColorStop(0, `rgba(${C.TRACK_RGB},0.16)`);
+    g1.addColorStop(1, `rgba(${C.TRACK_RGB},0)`);
     ctx.fillStyle = g1;
     ctx.fillRect(0, 0, W, H * 0.5);
     for (let i = 0; i < 7; i++) {
@@ -415,7 +415,7 @@ export function drawModePreview(canvas, modeId) {
       ctx.fillRect(bx - r, by - r, r * 2, r * 2);
     }
     ctx.fillStyle = 'rgba(255,255,255,0.95)';
-    ctx.strokeStyle = 'rgba(58,51,64,0.18)';
+    ctx.strokeStyle = `rgba(${C.TRACK_RGB},0.18)`;
     ctx.lineWidth = 0.8;
     ctx.beginPath();
     for (let i = 0; i < 14; i++) {
