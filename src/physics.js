@@ -23,7 +23,9 @@ export function createSkier() {
 }
 
 export function press(s, side) {
+  const maxHead = C.MAX_HEADING_DEG * D2R;
   s.side = side;
+  s.theta = clamp(s.theta + side * C.TURN_KICK_DEG * D2R, -maxHead, maxHead);
 }
 
 export function release(s) {
@@ -48,9 +50,9 @@ export function updateSkier(s, dt) {
   const absDeg = Math.abs(s.theta) / D2R;
   s.carve = clamp(absDeg / 90, 0, 1);
 
-  // Bremsen: 0 unterhalb BRAKE_START_DEG, volle Kraft ab BRAKE_FULL_DEG
+  // Bremsen: 0 unterhalb BRAKE_START_DEG, voll ab BRAKE_FULL_DEG, und je schneller desto härter
   const t = clamp((absDeg - C.BRAKE_START_DEG) / Math.max(1, C.BRAKE_FULL_DEG - C.BRAKE_START_DEG), 0, 1);
-  s.brake = C.BRAKE_MAX * smoothstep(t);
+  s.brake = smoothstep(t) * (C.BRAKE_MIN + C.BRAKE_K * s.v);
 
   const cos = Math.cos(s.theta);
   const sin = Math.sin(s.theta);

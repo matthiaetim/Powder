@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.3.0';
+export const VERSION = '0.3.1';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite/Höhe in Metern, Fahrer bei 33 % Bildhöhe
@@ -15,19 +15,25 @@ export const C = {
   MAX_STEPS: 8,
   MAX_FRAME_MS: 100,
 
-  // Lenkung: Halten dreht gleichmäßig weiter, Loslassen schwingt zur Falllinie zurück.
-  TURN_RATE_DEG_S: 60,     // (Tuning) Drehrate beim Halten
+  // Lenkung: Antippen dreht sofort ein Stück, Halten dreht gleichmäßig weiter,
+  // Loslassen schwingt zur Falllinie zurück.
+  TURN_KICK_DEG: 10,       // (Tuning) Sofortdrehung beim Antippen
+  TURN_RATE_DEG_S: 130,    // (Tuning) Drehrate beim Halten
   MAX_HEADING_DEG: 120,    // (Tuning) über quer (90°) hinaus leicht bergauf
   RETURN_S: 0.25,          // (Tuning) Zeitkonstante der Rückkehr zur Falllinie
   RETURN_MIN_DEG_S: 40,    // damit die Rückkehr auch bei kleinen Winkeln zügig endet
 
-  // Tempo: ohne Tippen stetig schneller bis zum Deckel; Bremsen wächst mit dem Winkel.
+  // Tempo: ohne Tippen stetig schneller bis zum Deckel.
   G_SLOPE: 3.5,            // (Tuning) Hangabtrieb in m/s²
   DRAG_QUAD: 0.0004,       // Luftwiderstand, klein
   MAX_SPEED_KMH: 200,      // (Tuning) harter Deckel
-  BRAKE_MAX: 25,           // (Tuning) Bremsverzögerung in m/s² bei quer und darüber
+
+  // Bremsen: wächst mit dem Winkel (ab BRAKE_START_DEG, voll ab BRAKE_FULL_DEG)
+  // und mit dem Tempo: Verzögerung = Anteil × (BRAKE_MIN + BRAKE_K × v)
+  BRAKE_K: 1.6,            // (Tuning) Bremskraft pro m/s Tempo
+  BRAKE_MIN: 8,            // Grundbremsung in m/s², damit man wirklich zum Stehen kommt
   BRAKE_START_DEG: 20,     // (Tuning) darunter bremst nichts
-  BRAKE_FULL_DEG: 90,      // ab hier volle Bremskraft
+  BRAKE_FULL_DEG: 70,      // (Tuning) ab hier volle Bremskraft
 
   SKIER_R: 0.45,
 
@@ -92,11 +98,13 @@ export const C = {
 
 // Regler im Tuning-Panel (langer Druck auf das Versions-Label).
 export const TUNABLES = [
-  { key: 'TURN_RATE_DEG_S', label: 'Drehrate', unit: '°/s', min: 20, max: 200, step: 5 },
+  { key: 'TURN_KICK_DEG', label: 'Sofortdrehung', unit: '°', min: 0, max: 40, step: 1 },
+  { key: 'TURN_RATE_DEG_S', label: 'Drehrate', unit: '°/s', min: 30, max: 300, step: 5 },
   { key: 'MAX_HEADING_DEG', label: 'Max. Winkel', unit: '°', min: 60, max: 150, step: 5 },
   { key: 'RETURN_S', label: 'Rückkehr', unit: 's', min: 0.05, max: 2, step: 0.05 },
-  { key: 'BRAKE_MAX', label: 'Bremskraft', unit: 'm/s²', min: 2, max: 60, step: 1 },
+  { key: 'BRAKE_K', label: 'Bremskraft', unit: '', min: 0.2, max: 3, step: 0.1 },
   { key: 'BRAKE_START_DEG', label: 'Bremsen ab', unit: '°', min: 0, max: 60, step: 5 },
+  { key: 'BRAKE_FULL_DEG', label: 'Bremsen voll ab', unit: '°', min: 30, max: 120, step: 5 },
   { key: 'G_SLOPE', label: 'Beschleunigung', unit: 'm/s²', min: 1, max: 10, step: 0.25 },
   { key: 'MAX_SPEED_KMH', label: 'Höchsttempo', unit: 'km/h', min: 60, max: 300, step: 10 },
 ];
