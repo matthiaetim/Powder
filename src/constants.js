@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.5.0';
+export const VERSION = '0.6.0';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite/Höhe in Metern, Fahrer bei 33 % Bildhöhe.
@@ -13,20 +13,22 @@ export const C = {
   CAM_SPEED_REF_KMH: 160,    // ab hier volle Vorausschau
   CAM_ZOOM_EASE_S: 0.6,      // Zeitkonstante von Zoom und Fahrerposition
   MAX_DPR: 2,
-  CAM_X_EASE_S: 0.15,
+  CAM_X_EASE_S: 0.25,        // Kamera folgt seitlich mit etwas Verzug: der Fahrer schwingt im Bild
 
   // Loop
   STEP: 1 / 120,
   MAX_STEPS: 8,
   MAX_FRAME_MS: 100,
 
-  // Lenkung: Antippen dreht sofort ein Stück, Halten dreht gleichmäßig weiter,
-  // Loslassen schwingt zur Falllinie zurück.
-  TURN_KICK_DEG: 15,       // (Tuning) Sofortdrehung beim Antippen
-  TURN_RATE_DEG_S: 200,    // (Tuning) Drehrate beim Halten
+  // Lenkung (nach dem Original vermessen): der Kurs schwingt weich auf einen Zielwinkel ein,
+  // ohne Knick. Antippen setzt das Ziel auf TURN_TAP_DEG, Halten vertieft es stetig,
+  // Loslassen setzt das Ziel auf die Falllinie. Ansprechzeit = Zeitkonstante des Einschwingens
+  // (kritisch gedämpft): nach 2× Ansprechzeit sind rund 60 % des Weges geschafft.
+  TURN_TAP_DEG: 40,        // (Tuning) Zielwinkel beim Antippen
+  TURN_DEEPEN_DEG_S: 90,   // (Tuning) Vertiefung des Zielwinkels pro Sekunde Halten
+  TURN_T: 0.1,             // (Tuning) Ansprechzeit in s
+  RETURN_T: 0.12,          // (Tuning) Ansprechzeit der Rückkehr zur Falllinie in s
   MAX_HEADING_DEG: 120,    // (Tuning) über quer (90°) hinaus leicht bergauf
-  RETURN_S: 0.25,          // (Tuning) Zeitkonstante der Rückkehr zur Falllinie
-  RETURN_MIN_DEG_S: 40,    // damit die Rückkehr auch bei kleinen Winkeln zügig endet
 
   // Tempo: der Start hat schon Fahrt, ohne Tippen wird man stetig schneller. Der Luftwiderstand
   // wächst quadratisch und hebt den Hangabtrieb beim Endtempo auf (weiche Annäherung statt Deckel).
@@ -110,10 +112,11 @@ export const C = {
 
 // Regler im Tuning-Panel (langer Druck auf das Versions-Label).
 export const TUNABLES = [
-  { key: 'TURN_KICK_DEG', label: 'Sofortdrehung', unit: '°', min: 0, max: 40, step: 1 },
-  { key: 'TURN_RATE_DEG_S', label: 'Drehrate', unit: '°/s', min: 30, max: 300, step: 5 },
+  { key: 'TURN_TAP_DEG', label: 'Tipp-Winkel', unit: '°', min: 10, max: 80, step: 5 },
+  { key: 'TURN_DEEPEN_DEG_S', label: 'Vertiefen beim Halten', unit: '°/s', min: 0, max: 150, step: 5 },
+  { key: 'TURN_T', label: 'Ansprechzeit', unit: 's', min: 0.05, max: 0.4, step: 0.01 },
+  { key: 'RETURN_T', label: 'Rückkehr', unit: 's', min: 0.05, max: 0.6, step: 0.01 },
   { key: 'MAX_HEADING_DEG', label: 'Max. Winkel', unit: '°', min: 60, max: 150, step: 5 },
-  { key: 'RETURN_S', label: 'Rückkehr', unit: 's', min: 0.05, max: 2, step: 0.05 },
   { key: 'BRAKE_K', label: 'Bremskraft', unit: '', min: 0.2, max: 6, step: 0.1 },
   { key: 'BRAKE_START_DEG', label: 'Bremsen ab', unit: '°', min: 0, max: 60, step: 5 },
   { key: 'BRAKE_FULL_DEG', label: 'Bremsen voll ab', unit: '°', min: 30, max: 120, step: 5 },

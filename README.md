@@ -5,8 +5,9 @@ Plain HTML + JavaScript + Canvas, kein Framework, kein Build.
 
 ## Spielen
 
-- **Halten** links/rechts: der Fahrer dreht gleichmäßig weiter, bis über quer zum Hang. Kurzer Tipp = kleine Kurve.
-- **Loslassen**: der Fahrer schwingt zurück zur Falllinie.
+- **Tippen** links/rechts: der Kurs schwingt weich auf den Tipp-Winkel ein, ganz kurze Tipps geben kleine Kurven.
+- **Halten**: der Winkel vertieft sich stetig bis über quer zum Hang, dann steht man.
+- **Loslassen**: der Fahrer schwingt ohne Knick zurück zur Falllinie.
 - Der Start hat schon Fahrt, ohne Eingabe wird man stetig schneller bis zum Endtempo. Kurze Tipps kosten kaum Tempo, Halten bremst hart, quer zum Hang bleibt man stehen.
 - Bei hohem Tempo rückt der Fahrer im Bild nach oben und die Sicht zoomt leicht heraus (mehr Vorausschau).
 - Tastatur: `A`/`D` oder Pfeile, `P` Pause, `R` Fresh

@@ -1,4 +1,5 @@
-// Fahrermodell: Halten dreht gleichmäßig weiter, Loslassen schwingt zur Falllinie zurück.
+// Fahrermodell: der Kurs schwingt kritisch gedämpft auf einen Zielwinkel ein (Antippen: Tipp-Winkel,
+// Halten: vertieft sich stetig, Loslassen: Falllinie). Dadurch hat die Spur nie einen Knick.
 // Bremsen wächst mit Winkel und Tempo bis zum Stillstand. Ohne Eingabe nähert sich das Tempo
 // weich dem Endtempo, weil der Luftwiderstand quadratisch wächst.
 import { C } from './constants.js';
@@ -15,7 +16,9 @@ export function createSkier() {
     x: 0, y: 0, y0: 0,
     v: 0,
     theta: 0,      // Richtung: 0 = Falllinie, positiv = rechts, 90° = quer zum Hang
-    omega: 0,
+    omega: 0,      // Drehgeschwindigkeit in rad/s
+    target: 0,     // Zielwinkel, auf den der Kurs einschwingt
+    holdT: 0,      // wie lange die aktuelle Seite schon gehalten wird
     carve: 0,      // 0..1 für Spurbreite und Spray
     brake: 0,      // aktuelle Bremsverzögerung (Debug)
     side: 0,       // -1 links, 1 rechts, 0 losgelassen
@@ -24,9 +27,8 @@ export function createSkier() {
 }
 
 export function press(s, side) {
-  const maxHead = C.MAX_HEADING_DEG * D2R;
+  if (s.side !== side) s.holdT = 0;
   s.side = side;
-  s.theta = clamp(s.theta + side * C.TURN_KICK_DEG * D2R, -maxHead, maxHead);
 }
 
 export function release(s) {
@@ -36,17 +38,23 @@ export function release(s) {
 // Ein Physik-Schritt.
 export function updateSkier(s, dt) {
   const maxHead = C.MAX_HEADING_DEG * D2R;
-  const prev = s.theta;
 
+  // Zielwinkel: Antippen = Tipp-Winkel, Halten vertieft, Loslassen = Falllinie
+  let T;
   if (s.side !== 0) {
-    s.theta = clamp(s.theta + s.side * C.TURN_RATE_DEG_S * D2R * dt, -maxHead, maxHead);
-  } else if (s.theta !== 0) {
-    // Rückkehr zur Falllinie: exponentiell, aber mindestens RETURN_MIN_DEG_S schnell
-    const mag = Math.abs(s.theta);
-    const step = Math.max(mag * (1 - Math.exp(-dt / C.RETURN_S)), C.RETURN_MIN_DEG_S * D2R * dt);
-    s.theta -= Math.sign(s.theta) * Math.min(mag, step);
+    s.target = s.side * Math.min(maxHead, (C.TURN_TAP_DEG + C.TURN_DEEPEN_DEG_S * s.holdT) * D2R);
+    s.holdT += dt;
+    T = C.TURN_T;
+  } else {
+    s.target = 0;
+    T = C.RETURN_T;
   }
-  s.omega = (s.theta - prev) / dt;
+  // Kritisch gedämpftes Einschwingen: weicher Beginn, zügige Mitte, sanftes Ende, kein Knick
+  s.omega += ((s.target - s.theta) / (T * T) - (2 * s.omega) / T) * dt;
+  s.theta += s.omega * dt;
+  if (s.theta > maxHead) { s.theta = maxHead; if (s.omega > 0) s.omega = 0; }
+  else if (s.theta < -maxHead) { s.theta = -maxHead; if (s.omega < 0) s.omega = 0; }
+  if (s.side === 0 && Math.abs(s.theta) < 1e-4 && Math.abs(s.omega) < 1e-3) { s.theta = 0; s.omega = 0; }
 
   const absDeg = Math.abs(s.theta) / D2R;
   s.carve = clamp(absDeg / 90, 0, 1);
