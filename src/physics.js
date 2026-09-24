@@ -35,6 +35,13 @@ export function release(s) {
   s.side = 0;
 }
 
+// Ansprechzeit wächst mit dem Tempo (Gewicht auf den Skiern): linear zwischen den beiden Referenztempi
+function turnT(v) {
+  const lo = C.TURN_T_SPEED_LO_KMH / 3.6, hi = C.TURN_T_SPEED_HI_KMH / 3.6;
+  const k = clamp((v - lo) / Math.max(0.1, hi - lo), 0, 1);
+  return C.TURN_T + (C.TURN_T_FAST - C.TURN_T) * k;
+}
+
 // Ein Physik-Schritt.
 export function updateSkier(s, dt) {
   const maxHead = C.MAX_HEADING_DEG * D2R;
@@ -44,7 +51,7 @@ export function updateSkier(s, dt) {
   if (s.side !== 0) {
     s.target = s.side * Math.min(maxHead, (C.TURN_TAP_DEG + C.TURN_DEEPEN_DEG_S * s.holdT) * D2R);
     s.holdT += dt;
-    T = C.TURN_T;
+    T = turnT(s.v);
   } else {
     s.target = 0;
     T = C.RETURN_T;

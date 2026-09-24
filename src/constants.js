@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.6.1';
+export const VERSION = '0.6.2';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite/Höhe in Metern, Fahrer bei 33 % Bildhöhe.
@@ -26,7 +26,10 @@ export const C = {
   // (kritisch gedämpft): nach 2× Ansprechzeit sind rund 60 % des Weges geschafft.
   TURN_TAP_DEG: 40,        // (Tuning) Zielwinkel beim Antippen
   TURN_DEEPEN_DEG_S: 90,   // (Tuning) Vertiefung des Zielwinkels pro Sekunde Halten
-  TURN_T: 0.1,             // (Tuning) Ansprechzeit in s
+  TURN_T: 0.1,             // (Tuning) Ansprechzeit in s bis TURN_T_SPEED_LO_KMH
+  TURN_T_FAST: 0.14,       // (Tuning) Ansprechzeit bei TURN_T_SPEED_HI_KMH: bei Tempo liegt mehr Gewicht auf den Skiern
+  TURN_T_SPEED_LO_KMH: 50,
+  TURN_T_SPEED_HI_KMH: 200,
   RETURN_T: 0.12,          // (Tuning) Ansprechzeit der Rückkehr zur Falllinie in s
   MAX_HEADING_DEG: 120,    // (Tuning) über quer (90°) hinaus leicht bergauf
 
@@ -115,6 +118,7 @@ export const TUNABLES = [
   { key: 'TURN_TAP_DEG', label: 'Tipp-Winkel', unit: '°', min: 10, max: 80, step: 5 },
   { key: 'TURN_DEEPEN_DEG_S', label: 'Vertiefen beim Halten', unit: '°/s', min: 0, max: 150, step: 5 },
   { key: 'TURN_T', label: 'Ansprechzeit', unit: 's', min: 0.05, max: 0.4, step: 0.01 },
+  { key: 'TURN_T_FAST', label: 'Ansprechzeit bei 200 km/h', unit: 's', min: 0.05, max: 0.4, step: 0.01 },
   { key: 'RETURN_T', label: 'Rückkehr', unit: 's', min: 0.05, max: 0.6, step: 0.01 },
   { key: 'MAX_HEADING_DEG', label: 'Max. Winkel', unit: '°', min: 60, max: 150, step: 5 },
   { key: 'BRAKE_K', label: 'Bremskraft', unit: '', min: 0.2, max: 6, step: 0.1 },

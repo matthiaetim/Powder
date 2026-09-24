@@ -5,7 +5,7 @@ Plain HTML + JavaScript + Canvas, kein Framework, kein Build.
 
 ## Spielen
 
-- **Tippen** links/rechts: der Kurs schwingt weich auf den Tipp-Winkel ein, ganz kurze Tipps geben kleine Kurven.
+- **Tippen** links/rechts: der Kurs schwingt weich auf den Tipp-Winkel ein, ganz kurze Tipps geben kleine Kurven. Bei hohem Tempo spricht der Fahrer etwas träger an (Gewicht auf den Skiern).
 - **Halten**: der Winkel vertieft sich stetig bis über quer zum Hang, dann steht man.
 - **Loslassen**: der Fahrer schwingt ohne Knick zurück zur Falllinie.
 - Der Start hat schon Fahrt, ohne Eingabe wird man stetig schneller bis zum Endtempo. Kurze Tipps kosten kaum Tempo, Halten bremst hart, quer zum Hang bleibt man stehen.
