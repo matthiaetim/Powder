@@ -63,6 +63,12 @@ export function createInput(canvas, h) {
     if (e.target.closest && e.target.closest('#tune')) return; // Tuning-Panel darf scrollen
     e.preventDefault();
   }, { passive: false });
+  // Keine Lupe: Doppeltipp + Halten stoppt iOS nur über abgebrochenes touchstart, CSS und pointerdown reichen nicht.
+  // Ein einziger nativer Tipp (z. B. auf Fresh) reicht, damit der nächste Halte-Tipp die Lupe öffnet, daher überall
+  // außer im Tuning-Panel (Regler, Scrollen). Pointer-Events kommen trotzdem, click nicht mehr: Buttons siehe onTap in hud.js.
+  const noNative = (e) => { if (!e.target.closest?.('#tune')) e.preventDefault(); };
+  document.addEventListener('touchstart', noNative, { passive: false });
+  document.addEventListener('touchend', noNative, { passive: false });
   document.addEventListener('gesturestart', (e) => e.preventDefault());
   document.addEventListener('contextmenu', (e) => e.preventDefault());
   document.addEventListener('dblclick', (e) => e.preventDefault());

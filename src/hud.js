@@ -14,8 +14,19 @@ export function createHud(g, doc, hooks = {}) {
   const nf = new Intl.NumberFormat(C.HUD_LOCALE, { maximumFractionDigits: 0 });
   let lastSpeed = -1, lastDist = -1, lastState = '', lastOverlay = '', lastDebug = 0;
 
-  $('ov-pause').addEventListener('click', () => togglePause(g));
-  $('btn-fresh').addEventListener('click', doFresh);
+  // Tipp auf Buttons und Overlay: Maus und Tastatur über click, Touch über pointerup (input.js bricht touchstart
+  // gegen die iOS-Lupe ab, dann kommt kein click). Nur wenn der Finger auf dem Element losgelassen wird.
+  const onTap = (el, fn) => {
+    let touchAt = -1e9;
+    el.addEventListener('pointerup', (e) => {
+      if (e.pointerType === 'mouse' || !el.contains(doc.elementFromPoint(e.clientX, e.clientY))) return;
+      touchAt = performance.now();
+      fn();
+    });
+    el.addEventListener('click', () => { if (performance.now() - touchAt > 500) fn(); });
+  };
+
+  onTap($('btn-fresh'), doFresh);
   if (g.debug) debugEl.hidden = false;
 
   // Tuning-Panel: langer Druck auf das Versions-Label öffnet es, Spiel pausiert derweil.
@@ -33,7 +44,7 @@ export function createHud(g, doc, hooks = {}) {
   });
   for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) versionEl.addEventListener(ev, () => clearTimeout(pressTimer));
   tune.closeButton.addEventListener('click', closeTune);
-  $('ov-pause').addEventListener('click', closeTune);
+  onTap($('ov-pause'), () => { togglePause(g); closeTune(); });
 
   // Modus-Karten: Vorschau einmal zeichnen, aktive Karte markieren, Tipp startet
   const cards = Array.from(doc.querySelectorAll('.mode-card'));
@@ -42,7 +53,7 @@ export function createHud(g, doc, hooks = {}) {
     const m = MODES[id];
     drawModePreview(card.querySelector('.mode-preview'), id);
     card.querySelector('.mode-cta').textContent = m && m.soon ? 'bald' : 'Tap to play';
-    card.addEventListener('click', () => {
+    onTap(card, () => {
       if (!m || m.soon) return;
       if (id === g.mode) { doFresh(); return; }
       if (selectMode(g, id)) markActive();
