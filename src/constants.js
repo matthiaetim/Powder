@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
-// Einheiten: Meter, Sekunden, Grad. Tuning passiert nur hier.
-export const VERSION = '0.2.0';
+// Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
+export const VERSION = '0.3.0';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite/Höhe in Metern, Fahrer bei 33 % Bildhöhe
@@ -15,41 +15,23 @@ export const C = {
   MAX_STEPS: 8,
   MAX_FRAME_MS: 100,
 
-  // Eingabe
-  TAP_MAX_MS: 180,
-  TAP_MAX_MOVE_PX: 12,
-  DOUBLE_TAP_MS: 260,
-  DOUBLE_TAP_PX: 60,
+  // Lenkung: Halten dreht gleichmäßig weiter, Loslassen schwingt zur Falllinie zurück.
+  TURN_RATE_DEG_S: 60,     // (Tuning) Drehrate beim Halten
+  MAX_HEADING_DEG: 120,    // (Tuning) über quer (90°) hinaus leicht bergauf
+  RETURN_S: 0.25,          // (Tuning) Zeitkonstante der Rückkehr zur Falllinie
+  RETURN_MIN_DEG_S: 40,    // damit die Rückkehr auch bei kleinen Winkeln zügig endet
 
-  // Lenkung
-  TAP_TURN_DEG: 25,
-  BASE_MAX_DEG: 60,
-  TAP_EASE_S: 0.06,
-  HOLD_RATE_MIN_DEG_S: 90,
-  HOLD_RATE_MAX_DEG_S: 240,
-  HOLD_RAMP_MS: 350,
-  CARVE_MAX_DEG: 75,
-  MAX_HEADING_DEG: 85,
-  CARVE_RELEASE_S: 0.5,
-  HOLD_COMMIT_FRAC: 0.3,
-  FALL_LINE_PULL_DEG_S: 0,
-
-  // Tempo
-  G_SLOPE: 4.5,
-  DRAG_QUAD: 0.0057,
-  EDGE_DRAG: 0.15,
-  SCRUB_K: 0.1,
-
-  // Sprung
-  JUMP_AIR_S: 0.55,
-  JUMP_COOLDOWN_S: 0.9,
-  AIR_TURN_FACTOR: 0.2,
-  LAND_SPEED_FACTOR: 0.97,
-  JUMP_CLEARS_TREES: false,
+  // Tempo: ohne Tippen stetig schneller bis zum Deckel; Bremsen wächst mit dem Winkel.
+  G_SLOPE: 3.5,            // (Tuning) Hangabtrieb in m/s²
+  DRAG_QUAD: 0.0004,       // Luftwiderstand, klein
+  MAX_SPEED_KMH: 200,      // (Tuning) harter Deckel
+  BRAKE_MAX: 25,           // (Tuning) Bremsverzögerung in m/s² bei quer und darüber
+  BRAKE_START_DEG: 20,     // (Tuning) darunter bremst nichts
+  BRAKE_FULL_DEG: 90,      // ab hier volle Bremskraft
 
   SKIER_R: 0.45,
 
-  // Lawine
+  // Lawine (nur Chase-Modus, wird noch überarbeitet)
   AV_START_GAP_M: 90,
   AV_BASE_MS: 16,
   AV_RAMP_PER_M: 0.006,
@@ -83,7 +65,7 @@ export const C = {
   TRACK_WIDTH_MAX: 4,      // Spurbreite bei vollem Carve, Vielfaches der Grundbreite
   PARTICLE_POOL: 64,
 
-  // Warnschnee (Bildschirm-Pixel): faellt, wenn die Lawine naeher als AV_VISIBLE_GAP_M ist
+  // Warnschnee (nur Chase-Modus)
   SNOW_POOL: 160,
   SNOW_MIN_SPEED: 140,
   SNOW_MAX_SPEED: 260,
@@ -107,3 +89,14 @@ export const C = {
   TRACK: 'rgba(58,51,64,0.18)',
   AVALANCHE: [58, 51, 64],
 };
+
+// Regler im Tuning-Panel (langer Druck auf das Versions-Label).
+export const TUNABLES = [
+  { key: 'TURN_RATE_DEG_S', label: 'Drehrate', unit: '°/s', min: 20, max: 200, step: 5 },
+  { key: 'MAX_HEADING_DEG', label: 'Max. Winkel', unit: '°', min: 60, max: 150, step: 5 },
+  { key: 'RETURN_S', label: 'Rückkehr', unit: 's', min: 0.05, max: 2, step: 0.05 },
+  { key: 'BRAKE_MAX', label: 'Bremskraft', unit: 'm/s²', min: 2, max: 60, step: 1 },
+  { key: 'BRAKE_START_DEG', label: 'Bremsen ab', unit: '°', min: 0, max: 60, step: 5 },
+  { key: 'G_SLOPE', label: 'Beschleunigung', unit: 'm/s²', min: 1, max: 10, step: 0.25 },
+  { key: 'MAX_SPEED_KMH', label: 'Höchsttempo', unit: 'km/h', min: 60, max: 300, step: 10 },
+];

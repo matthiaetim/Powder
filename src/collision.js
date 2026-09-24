@@ -1,6 +1,5 @@
-// Kreis-gegen-Kreis in den 3×3 Zellen um den Fahrer. In der Luft zählen Felsen nicht.
+// Kreis-gegen-Kreis in den 3×3 Zellen um den Fahrer.
 import { C } from './constants.js';
-import { ROCK, TREE } from './physics.js';
 
 export function checkCollision(world, s) {
   const size = C.CELL_M;
@@ -14,7 +13,6 @@ export function checkCollision(world, s) {
       for (let i = 0; i < objs.length; i++) {
         const o = objs[i];
         if (o.y - s.y > 2 || s.y - o.y > 2) continue;
-        if (s.airborne && (o.t === ROCK || (o.t === TREE && C.JUMP_CLEARS_TREES))) continue;
         const rr = C.SKIER_R + o.r;
         const ddx = o.x - s.x, ddy = o.y - s.y;
         if (ddx * ddx + ddy * ddy < rr * rr) return o;

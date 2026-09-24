@@ -4,7 +4,9 @@ import * as G from './game.js';
 import { createInput } from './input.js';
 import { createRenderer, resize, draw } from './render.js';
 import { createHud } from './hud.js';
+import { loadTune } from './tune.js';
 
+loadTune();
 const params = new URLSearchParams(location.search);
 const seedParam = params.get('seed');
 const canvas = document.getElementById('game');
@@ -25,12 +27,8 @@ if (window.visualViewport) window.visualViewport.addEventListener('resize', onRe
 onResize();
 
 const input = createInput(canvas, {
-  getBase: () => game.skier.thetaBaseTarget,
   press: (side) => G.onPress(game, side),
   release: () => G.onRelease(game),
-  tap: (side, base) => G.onTap(game, side, base),
-  doubleTap: (base) => G.onDoubleTap(game, base),
-  jump: () => G.onJump(game),
   pause: () => { if (G.togglePause(game)) input.cancelAll(); },
   fresh: () => G.fresh(game),
 });

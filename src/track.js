@@ -22,11 +22,6 @@ export function pushTrack(t, x, y, nx, ny, w) {
   if (t.n < t.cap) t.n++;
 }
 
-// Nächster Punkt beginnt ein neues Segment (z. B. nach einem Sprung).
-export function markGap(t) {
-  t.pendingGap = true;
-}
-
 // Älteste zuerst.
 export function forEachTrackPoint(t, fn) {
   const start = (t.head - t.n + t.cap) % t.cap;

@@ -5,10 +5,11 @@ Plain HTML + JavaScript + Canvas, kein Framework, kein Build.
 
 ## Spielen
 
-- **Tippen** links/rechts: kleine Richtungsänderung
-- **Halten**: tiefer Carving-Schwung (bremst)
-- **Doppeltipp**: Sprung (überspringt Felsen, nicht Bäume)
-- Tastatur: `A`/`D` oder Pfeile, `Space` Sprung, `P` Pause, `R` Fresh
+- **Halten** links/rechts: der Fahrer dreht gleichmäßig weiter, bis über quer zum Hang. Kurzer Tipp = kleine Kurve.
+- **Loslassen**: der Fahrer schwingt zurück zur Falllinie.
+- Ohne Eingabe wird man stetig schneller. Bremsen wächst mit dem Winkel, quer zum Hang bleibt man stehen.
+- Tastatur: `A`/`D` oder Pfeile, `P` Pause, `R` Fresh
+- **Tuning-Panel**: langer Druck auf das Versions-Label unten links. Werte bleiben gespeichert, „Standard“ setzt zurück.
 
 ## Lokal starten
 

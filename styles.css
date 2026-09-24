@@ -168,11 +168,43 @@ body[data-state="dead"][data-overlay="1"] #ov-dead { display: flex; }
 
 #version {
   position: fixed;
-  left: 10px;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+  left: 0;
+  bottom: env(safe-area-inset-bottom, 0px);
+  padding: 14px 10px 6px 10px;
   font-size: 10px;
   opacity: 0.35;
-  pointer-events: none;
+  touch-action: none;
+}
+#version.tuned::after { content: ' · tuned'; }
+
+#tune {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  z-index: 10;
+  padding: 12px 14px 10px;
+  background: rgba(244, 239, 243, 0.96);
+  border: 1px solid rgba(58, 51, 64, 0.5);
+  color: var(--ink);
+  font-style: italic;
+  touch-action: pan-y;
+}
+#tune[hidden] { display: none; }
+.tune-title { font-size: 18px; margin-bottom: 8px; }
+.tune-rows { display: flex; flex-direction: column; gap: 6px; }
+.tune-row { display: grid; grid-template-columns: 1fr auto; row-gap: 2px; font-size: 13px; }
+.tune-label { opacity: 0.85; }
+.tune-value { font-variant-numeric: tabular-nums; text-align: right; }
+.tune-row input[type="range"] { grid-column: 1 / -1; width: 100%; margin: 0; accent-color: var(--ink); touch-action: pan-x; }
+.tune-actions { display: flex; justify-content: space-between; margin-top: 12px; }
+.tune-actions button {
+  font: italic 14px var(--font);
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--ink);
+  padding: 6px 14px;
+  touch-action: manipulation;
 }
 
 #debug {

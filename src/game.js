@@ -4,12 +4,12 @@ import * as P from './physics.js';
 import { createWorld, ensureCells } from './world.js';
 import { createAvalanche, updateAvalanche } from './avalanche.js';
 import { checkCollision } from './collision.js';
-import { createTrack, clearTrack, pushTrack, markGap } from './track.js';
+import { createTrack, clearTrack, pushTrack } from './track.js';
 import { createParticles, clearParticles, spawnParticle, updateParticles } from './particles.js';
 import { loadBest, saveBest, loadMode, saveMode } from './storage.js';
 import { MODES, DEFAULT_MODE } from './modes.js';
 
-const READY_FRAC = 0.78; // Fahrer steht im Ready-Zustand weit unten im Bild
+const READY_FRAC = 0.78; // Fahrer steht im Intro weit unten im Bild
 
 export function randomSeed() {
   return (Math.random() * 4294967296) >>> 0;
@@ -33,6 +33,10 @@ export function createGame(opts = {}) {
   if (MODES[saved] && !MODES[saved].soon) g.mode = saved;
   reset(g, g.fixedSeed ?? randomSeed(), true);
   return g;
+}
+
+export function hasAvalanche(g) {
+  return g.mode === 'chase';
 }
 
 // intro = true: Kamerafahrt von unten (nur beim App-Start). Sonst direkt beim Fahrer.
@@ -87,32 +91,25 @@ function start(g) {
 
 function step(g, dt) {
   const s = g.skier;
-  const landed = P.updateSkier(s, dt);
+  P.updateSkier(s, dt);
   if (s.y - s.y0 > g.dist) g.dist = s.y - s.y0;
   g.camX += (s.x - g.camX) * (1 - Math.exp(-dt / C.CAM_X_EASE_S));
   g.skierFrac += (C.SKIER_SCREEN_Y_FRAC - g.skierFrac) * (1 - Math.exp(-dt / 0.6));
   ensureView(g);
 
-  // Spur
-  if (s.airborne) {
-    markGap(g.track);
-  } else {
-    g.trackAcc += s.v * dt;
-    if (g.trackAcc >= C.TRACK_SPACING_M) {
-      g.trackAcc = 0;
-      pushTrack(g.track, s.x, s.y, Math.cos(s.theta), -Math.sin(s.theta), s.carve);
-    }
+  // Spur: alle 0,4 m ein Punkt, Breite nach Carve
+  g.trackAcc += s.v * dt;
+  if (g.trackAcc >= C.TRACK_SPACING_M) {
+    g.trackAcc = 0;
+    pushTrack(g.track, s.x, s.y, Math.cos(s.theta), -Math.sin(s.theta), s.carve);
   }
 
-  // Partikel
   spawnSpray(g, dt);
-  if (landed) burst(g, 20, 3);
   updateParticles(g.particles, dt);
 
-  // Kollision und Lawine
   const hit = checkCollision(g.world, s);
   if (hit) { die(g, hit.t === P.TREE ? 'tree' : 'rock'); return; }
-  if (updateAvalanche(g.av, s, g.dist, dt, false)) die(g, 'avalanche');
+  if (hasAvalanche(g) && updateAvalanche(g.av, s, g.dist, dt, false)) die(g, 'avalanche');
 }
 
 function die(g, cause) {
@@ -124,18 +121,17 @@ function die(g, cause) {
   s.side = 0;
   if (cause !== 'avalanche') burst(g, 24, 4);
   s.v = 0;
-  s.airborne = false;
   const m = Math.floor(g.dist);
   if (m > g.best) { g.best = m; g.newBest = true; saveBest(m); }
 }
 
 function spawnSpray(g, dt) {
   const s = g.skier;
-  if (s.airborne || s.v < 2) return;
+  if (s.v < 2) return;
   const rate = (15 + 220 * s.carve) * Math.min(1.5, s.v / 20);
   g.spawnAcc += rate * dt;
   const dx = Math.sin(s.theta), dy = Math.cos(s.theta); // Fahrtrichtung
-  const outSign = s.thetaCarve > 0 ? 1 : -1;               // Außenseite der Kurve
+  const outSign = s.theta > 0 ? 1 : -1;                    // Außenseite der Kurve
   const ox = -dy * outSign, oy = dx * outSign;
   while (g.spawnAcc >= 1) {
     g.spawnAcc -= 1;
@@ -162,27 +158,12 @@ function burst(g, n, speed) {
 // ---------- Eingabe-Handler ----------
 
 export function onPress(g, side) {
-  g.lastGesture = side < 0 ? 'press L' : 'press R';
+  g.lastGesture = side < 0 ? 'hold L' : 'hold R';
   if (g.state === 'ready') start(g);
   if (g.state === 'running') P.press(g.skier, side);
 }
 export function onRelease(g) {
-  if (g.state === 'running') P.release(g.skier);
-  else g.skier.side = 0;
-}
-export function onTap(g, side, base) {
-  g.lastGesture = side < 0 ? 'tap L' : 'tap R';
-  if (g.state === 'running') P.tap(g.skier, side, base);
-}
-export function onDoubleTap(g, base) {
-  g.lastGesture = 'double tap';
-  if (g.state === 'ready') start(g);
-  if (g.state === 'running') P.jump(g.skier);
-}
-export function onJump(g) {
-  g.lastGesture = 'jump';
-  if (g.state === 'ready') start(g);
-  if (g.state === 'running') P.jump(g.skier);
+  P.release(g.skier);
 }
 export function togglePause(g) {
   if (g.state === 'running') { g.state = 'paused'; g.skier.side = 0; return true; }

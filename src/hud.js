@@ -1,6 +1,7 @@
 // DOM-HUD: Tempo, Distanz, Pause, Fresh-Seite mit Modus-Karten, Debug-Text.
 import { C, VERSION } from './constants.js';
-import { overlayReady, togglePause, fresh, selectMode } from './game.js';
+import { overlayReady, togglePause, pauseIfRunning, fresh, selectMode } from './game.js';
+import { createTunePanel, isTuned } from './tune.js';
 import { MODES } from './modes.js';
 import { drawModePreview } from './render.js';
 
@@ -16,6 +17,23 @@ export function createHud(g, doc) {
   $('ov-pause').addEventListener('click', () => togglePause(g));
   $('btn-fresh').addEventListener('click', () => fresh(g));
   if (g.debug) debugEl.hidden = false;
+
+  // Tuning-Panel: langer Druck auf das Versions-Label öffnet es, Spiel pausiert derweil.
+  const tuneEl = $('tune');
+  const versionEl = $('version');
+  const markTuned = () => versionEl.classList.toggle('tuned', isTuned());
+  const tune = createTunePanel(doc, tuneEl, markTuned);
+  markTuned();
+  let pressTimer = 0;
+  const openTune = () => { tune.refresh(); tuneEl.hidden = false; pauseIfRunning(g); };
+  const closeTune = () => { tuneEl.hidden = true; };
+  versionEl.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    pressTimer = setTimeout(openTune, 600);
+  });
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) versionEl.addEventListener(ev, () => clearTimeout(pressTimer));
+  tune.closeButton.addEventListener('click', closeTune);
+  $('ov-pause').addEventListener('click', closeTune);
 
   // Modus-Karten: Vorschau einmal zeichnen, aktive Karte markieren, Tipp startet
   const cards = Array.from(doc.querySelectorAll('.mode-card'));
@@ -62,9 +80,9 @@ export function createHud(g, doc) {
       debugEl.textContent = [
         `${R.frameMs.toFixed(1)} ms/frame  ${R.W}x${R.H}@${R.dpr}  S=${R.S.toFixed(2)} px/m`,
         `state=${g.state}  mode=${g.mode}  intro=${g.intro}  seed=${g.seed}  runs=${g.runs}`,
-        `v=${s.v.toFixed(1)} m/s  θ=${deg(s.theta)}°  base=${deg(s.thetaBase)}°  carve=${deg(s.thetaCarve)}°`,
-        `air=${s.airborne}  cooldown=${s.jumpCooldown.toFixed(2)}`,
-        `gap=${g.av.gap.toFixed(1)} m  lawine=${g.av.speed.toFixed(1)} m/s`,
+        `v=${s.v.toFixed(1)} m/s (${Math.round(s.v * 3.6)} km/h)  θ=${deg(s.theta)}°  brake=${s.brake.toFixed(1)}  side=${s.side}`,
+        `turn=${C.TURN_RATE_DEG_S}°/s  return=${C.RETURN_S}s  brakeMax=${C.BRAKE_MAX}  g=${C.G_SLOPE}  vmax=${C.MAX_SPEED_KMH}`,
+        g.mode === 'chase' ? `gap=${g.av.gap.toFixed(1)} m  lawine=${g.av.speed.toFixed(1)} m/s` : 'lawine: aus (Classic)',
         `objs=${g.world.objCount}  cells=${g.world.cells.size}  track=${g.track.n}`,
         `gesture=${g.lastGesture}`,
       ].join('\n');

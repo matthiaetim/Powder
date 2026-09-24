@@ -1,6 +1,6 @@
 // Zeichnet die Welt auf den Canvas. HUD und Overlays sind DOM (siehe hud.js).
 import { C } from './constants.js';
-import { TREE, jumpHeight } from './physics.js';
+import { TREE } from './physics.js';
 import { forEachTrackPoint } from './track.js';
 import { avalancheVisibility } from './avalanche.js';
 import { laneX } from './world.js';
@@ -200,19 +200,16 @@ function drawWorld(R, g, ox, oy) {
 function drawSkier(R, g, sx, sy) {
   const { ctx, S } = R;
   const s = g.skier;
-  const z = jumpHeight(s);
   const dead = g.state === 'dead';
   ctx.save();
   if (dead && g.deadCause === 'avalanche') ctx.globalAlpha = Math.max(0, 1 - g.deadT / 0.7);
-  // Schatten (wandert beim Sprung nach unten rechts)
+  // Schatten nach unten rechts
   ctx.fillStyle = 'rgba(70,60,80,0.25)';
   ctx.beginPath();
-  ctx.ellipse(sx + (0.35 + 0.9 * z) * S, sy + (0.25 + 0.7 * z) * S, 0.5 * S, 0.3 * S, 0, 0, TAU);
+  ctx.ellipse(sx + 0.35 * S, sy + 0.25 * S, 0.5 * S, 0.3 * S, 0, 0, TAU);
   ctx.fill();
-  ctx.translate(sx, sy - z * 0.6 * S);
+  ctx.translate(sx, sy);
   ctx.rotate(-s.theta);
-  const sc = 1 + 0.25 * z;
-  ctx.scale(sc, sc);
   if (dead && g.deadCause !== 'avalanche') ctx.rotate(Math.min(g.deadT, 0.6) * 9);
   // Ski
   ctx.strokeStyle = C.INK;
@@ -223,7 +220,7 @@ function drawSkier(R, g, sx, sy) {
   ctx.moveTo(0.16 * S, -0.85 * S); ctx.lineTo(0.16 * S, 0.75 * S);
   ctx.stroke();
   // Körper, leicht in die Kurve gelegt
-  const lean = Math.sin(s.thetaCarve * 0.5) * 0.15 * S;
+  const lean = Math.sin(s.theta * 0.5) * 0.15 * S * s.carve;
   ctx.fillStyle = C.INK;
   ctx.beginPath(); ctx.ellipse(lean, 0, 0.26 * S, 0.42 * S, 0, 0, TAU); ctx.fill();
   ctx.fillStyle = C.INK_LIGHT;
@@ -306,6 +303,7 @@ function createSnow() {
 
 // 0..1: wie stark es schneien soll.
 function snowIntensity(g) {
+  if (g.mode !== 'chase') return 0;
   if (g.state === 'dead') return g.deadCause === 'avalanche' ? 1 : 0;
   if (g.state === 'running' || g.state === 'paused') return avalancheVisibility(g.av);
   return 0;
