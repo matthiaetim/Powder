@@ -1,5 +1,6 @@
 // Fahrermodell: Halten dreht gleichmäßig weiter, Loslassen schwingt zur Falllinie zurück.
-// Bremsen wächst mit dem Winkel, ab quer zum Hang bis zum Stillstand.
+// Bremsen wächst mit Winkel und Tempo bis zum Stillstand. Ohne Eingabe nähert sich das Tempo
+// weich dem Endtempo, weil der Luftwiderstand quadratisch wächst.
 import { C } from './constants.js';
 
 const D2R = Math.PI / 180;
@@ -56,8 +57,11 @@ export function updateSkier(s, dt) {
 
   const cos = Math.cos(s.theta);
   const sin = Math.sin(s.theta);
-  const a = C.G_SLOPE * cos - C.DRAG_QUAD * s.v * s.v - s.brake;
   const vMax = C.MAX_SPEED_KMH / 3.6;
+  // Widerstand hebt den Hangabtrieb knapp über vMax auf, damit die Anzeige das Endtempo auch erreicht
+  const vT = vMax * 1.02;
+  const drag = C.G_SLOPE * (s.v / vT) * (s.v / vT);
+  const a = C.G_SLOPE * cos - drag - s.brake;
   s.v = clamp(s.v + a * dt, 0, vMax);
 
   s.x += s.v * sin * dt;

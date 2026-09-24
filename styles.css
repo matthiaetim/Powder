@@ -184,6 +184,10 @@ body[data-state="dead"][data-overlay="1"] #ov-dead { display: flex; }
   bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
   z-index: 10;
   padding: 12px 14px 10px;
+  box-sizing: border-box;
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 40px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background: rgba(245, 249, 253, 0.96);
   border: 1px solid rgba(46, 58, 69, 0.5);
   color: var(--ink);

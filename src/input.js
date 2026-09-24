@@ -46,7 +46,10 @@ export function createInput(canvas, h) {
   });
 
   // iOS-Safari: kein Scrollen, kein Zoom, kein Kontextmenü.
-  document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+  document.addEventListener('touchmove', (e) => {
+    if (e.target.closest && e.target.closest('#tune')) return; // Tuning-Panel darf scrollen
+    e.preventDefault();
+  }, { passive: false });
   document.addEventListener('gesturestart', (e) => e.preventDefault());
   document.addEventListener('contextmenu', (e) => e.preventDefault());
   document.addEventListener('dblclick', (e) => e.preventDefault());

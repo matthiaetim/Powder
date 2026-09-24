@@ -78,10 +78,10 @@ export function createHud(g, doc) {
       const s = g.skier;
       const deg = (r) => (r * 180 / Math.PI).toFixed(0);
       debugEl.textContent = [
-        `${R.frameMs.toFixed(1)} ms/frame  ${R.W}x${R.H}@${R.dpr}  S=${R.S.toFixed(2)} px/m`,
+        `${R.frameMs.toFixed(1)} ms/frame  ${R.W}x${R.H}@${R.dpr}  S=${R.S.toFixed(2)} px/m  zoom=${g.zoom.toFixed(2)}  frac=${g.skierFrac.toFixed(2)}`,
         `state=${g.state}  mode=${g.mode}  intro=${g.intro}  seed=${g.seed}  runs=${g.runs}`,
         `v=${s.v.toFixed(1)} m/s (${Math.round(s.v * 3.6)} km/h)  θ=${deg(s.theta)}°  brake=${s.brake.toFixed(1)}  side=${s.side}`,
-        `kick=${C.TURN_KICK_DEG}°  turn=${C.TURN_RATE_DEG_S}°/s  return=${C.RETURN_S}s  brakeK=${C.BRAKE_K}  g=${C.G_SLOPE}  vmax=${C.MAX_SPEED_KMH}`,
+        `kick=${C.TURN_KICK_DEG}°  turn=${C.TURN_RATE_DEG_S}°/s  return=${C.RETURN_S}s  brake=${C.BRAKE_K}@${C.BRAKE_START_DEG}-${C.BRAKE_FULL_DEG}°  g=${C.G_SLOPE}  v0=${C.START_SPEED_KMH}  vmax=${C.MAX_SPEED_KMH}`,
         g.mode === 'chase' ? `gap=${g.av.gap.toFixed(1)} m  lawine=${g.av.speed.toFixed(1)} m/s` : 'lawine: aus (Classic)',
         `objs=${g.world.objCount}  cells=${g.world.cells.size}  track=${g.track.n}`,
         `gesture=${g.lastGesture}`,

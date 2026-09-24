@@ -24,7 +24,7 @@ export function createGame(opts = {}) {
     seed: 0, fixedSeed: opts.fixedSeed ?? null,
     mode: DEFAULT_MODE, intro: true, readyDelayMs: C.READY_AUTO_START_MS,
     readyT: 0, deadT: 0, deadCause: '',
-    camX: 0, skierFrac: READY_FRAC,
+    camX: 0, skierFrac: READY_FRAC, zoom: 1,
     viewWm: C.VIEW_W_M, viewHm: C.VIEW_H_M,
     debug: !!opts.debug, lastGesture: '–', runs: 0,
     trackAcc: 0, spawnAcc: 0,
@@ -49,7 +49,7 @@ export function reset(g, seed, intro) {
   clearParticles(g.particles);
   g.dist = 0; g.newBest = false;
   g.readyT = 0; g.deadT = 0; g.deadCause = '';
-  g.camX = 0;
+  g.camX = 0; g.zoom = 1;
   g.intro = !!intro;
   g.skierFrac = intro ? READY_FRAC : C.SKIER_SCREEN_Y_FRAC;
   g.readyDelayMs = intro ? C.READY_AUTO_START_MS : C.FRESH_START_MS;
@@ -60,8 +60,15 @@ export function reset(g, seed, intro) {
 
 function ensureView(g) {
   const s = g.skier;
-  const halfW = g.viewWm / 2;
-  ensureCells(g.world, g.camX - halfW, g.camX + halfW, s.y - g.skierFrac * g.viewHm, s.y + (1 - g.skierFrac) * g.viewHm);
+  const halfW = (g.viewWm * g.zoom) / 2;
+  const vh = g.viewHm * g.zoom;
+  ensureCells(g.world, g.camX - halfW, g.camX + halfW, s.y - g.skierFrac * vh, s.y + (1 - g.skierFrac) * vh);
+}
+
+// 0..1: wie viel Vorausschau das Tempo verlangt (Fahrer weiter oben, Sicht herausgezoomt).
+function lookahead(v) {
+  const t = Math.min(1, Math.max(0, v / (C.CAM_SPEED_REF_KMH / 3.6)));
+  return t * t * (3 - 2 * t);
 }
 
 export function update(g, dt) {
@@ -86,6 +93,7 @@ export function update(g, dt) {
 function start(g) {
   if (g.state !== 'ready') return;
   g.state = 'running';
+  g.skier.v = C.START_SPEED_KMH / 3.6;
   g.runs++;
 }
 
@@ -93,8 +101,14 @@ function step(g, dt) {
   const s = g.skier;
   P.updateSkier(s, dt);
   if (s.y - s.y0 > g.dist) g.dist = s.y - s.y0;
+  // Kamera: x folgt weich; bei Tempo rückt der Fahrer nach oben und die Sicht zoomt heraus
+  const k = lookahead(s.v);
+  const fracTarget = C.SKIER_SCREEN_Y_FRAC + (C.CAM_Y_FRAC_FAST - C.SKIER_SCREEN_Y_FRAC) * k;
+  const zoomTarget = 1 + (C.CAM_ZOOM_FAST - 1) * k;
+  const ease = 1 - Math.exp(-dt / C.CAM_ZOOM_EASE_S);
   g.camX += (s.x - g.camX) * (1 - Math.exp(-dt / C.CAM_X_EASE_S));
-  g.skierFrac += (C.SKIER_SCREEN_Y_FRAC - g.skierFrac) * (1 - Math.exp(-dt / 0.6));
+  g.skierFrac += (fracTarget - g.skierFrac) * ease;
+  g.zoom += (zoomTarget - g.zoom) * ease;
   ensureView(g);
 
   // Spur: alle 0,4 m ein Punkt, Breite nach Carve

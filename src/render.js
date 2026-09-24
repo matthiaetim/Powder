@@ -11,7 +11,7 @@ const ROCK_H = 1.4;
 
 export function createRenderer(canvas) {
   const ctx = canvas.getContext('2d', { alpha: false });
-  return { canvas, ctx, W: 0, H: 0, dpr: 1, S: 10, sprites: null, spriteKey: '', list: [], skierMarker: { skier: true, y: 0 }, frameMs: 16.7, trackPts: new Float32Array(C.TRACK_CAP * 6), snow: createSnow() };
+  return { canvas, ctx, W: 0, H: 0, dpr: 1, S: 10, Sv: 10, sprites: null, spriteKey: '', list: [], skierMarker: { skier: true, y: 0 }, frameMs: 16.7, trackPts: new Float32Array(C.TRACK_CAP * 6), snow: createSnow() };
 }
 
 export function resize(R) {
@@ -120,8 +120,10 @@ function makeSprites(S, dpr) {
 // ---------- Frame ----------
 
 export function draw(R, g, t) {
-  const { ctx, W, H, S } = R;
+  const { ctx, W, H } = R;
   const s = g.skier;
+  // Sichtmaßstab: Sprites sind für R.S vorgerendert, bei Tempo-Zoom werden sie etwas kleiner gezeichnet
+  const S = R.Sv = R.S / g.zoom;
   ctx.setTransform(R.dpr, 0, 0, R.dpr, 0, 0);
   ctx.fillStyle = C.BG;
   ctx.fillRect(0, 0, W, H);
@@ -138,7 +140,7 @@ export function draw(R, g, t) {
 }
 
 function drawTrack(R, g, ox, oy) {
-  const { ctx, S } = R;
+  const { ctx, Sv: S } = R;
   const tr = g.track;
   if (tr.n < 2) return;
   // Punkte einmal in Bildschirmkoordinaten sammeln: sx, sy, nx*S, ny*S, Carve, Lücke
@@ -174,7 +176,8 @@ function drawTrack(R, g, ox, oy) {
 }
 
 function drawWorld(R, g, ox, oy) {
-  const { ctx, S, H, list } = R;
+  const { ctx, Sv: S, H, list } = R;
+  const spriteScale = S / R.S;
   list.length = 0;
   for (const cell of g.world.cells.values()) {
     const objs = cell.objs;
@@ -192,13 +195,13 @@ function drawWorld(R, g, ox, oy) {
     const o = list[i];
     if (o.skier) { drawSkier(R, g, g.skier.x * S + ox, g.skier.y * S + oy); continue; }
     const sp = o.t === TREE ? R.sprites.trees[o.variant] : R.sprites.rocks[o.variant];
-    const sc = o.h / sp.nominal;
+    const sc = (o.h / sp.nominal) * spriteScale;
     ctx.drawImage(sp.img, o.x * S + ox - sp.ax * sc, o.y * S + oy - sp.ay * sc, sp.w * sc, sp.h * sc);
   }
 }
 
 function drawSkier(R, g, sx, sy) {
-  const { ctx, S } = R;
+  const { ctx, Sv: S } = R;
   const s = g.skier;
   const dead = g.state === 'dead';
   ctx.save();
@@ -229,7 +232,7 @@ function drawSkier(R, g, sx, sy) {
 }
 
 function drawParticles(R, g, ox, oy) {
-  const { ctx, S } = R;
+  const { ctx, Sv: S } = R;
   const ps = g.particles.p;
   for (let i = 0; i < ps.length; i++) {
     const p = ps[i];
@@ -243,7 +246,7 @@ function drawParticles(R, g, ox, oy) {
 }
 
 function drawAvalanche(R, g, ox, oy, t) {
-  const { ctx, W, S } = R;
+  const { ctx, W, Sv: S } = R;
   const av = g.av;
   const fy = av.frontY * S + oy;
   const vis = avalancheVisibility(av);
@@ -266,7 +269,7 @@ function drawAvalanche(R, g, ox, oy, t) {
 }
 
 function drawDebug(R, g, ox, oy) {
-  const { ctx, S, H, W } = R;
+  const { ctx, Sv: S, H, W } = R;
   ctx.lineWidth = 1;
   ctx.strokeStyle = 'rgba(220,40,40,0.6)';
   for (const cell of g.world.cells.values()) {

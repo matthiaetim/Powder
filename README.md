@@ -7,7 +7,8 @@ Plain HTML + JavaScript + Canvas, kein Framework, kein Build.
 
 - **Halten** links/rechts: der Fahrer dreht gleichmäßig weiter, bis über quer zum Hang. Kurzer Tipp = kleine Kurve.
 - **Loslassen**: der Fahrer schwingt zurück zur Falllinie.
-- Ohne Eingabe wird man stetig schneller. Bremsen wächst mit dem Winkel, quer zum Hang bleibt man stehen.
+- Der Start hat schon Fahrt, ohne Eingabe wird man stetig schneller bis zum Endtempo. Kurze Tipps kosten kaum Tempo, Halten bremst hart, quer zum Hang bleibt man stehen.
+- Bei hohem Tempo rückt der Fahrer im Bild nach oben und die Sicht zoomt leicht heraus (mehr Vorausschau).
 - Tastatur: `A`/`D` oder Pfeile, `P` Pause, `R` Fresh
 - **Tuning-Panel**: langer Druck auf das Versions-Label unten links. Werte bleiben gespeichert, „Standard“ setzt zurück.
 
@@ -22,7 +23,8 @@ Nützliche Parameter: `?debug=1` (Overlay mit fps, Hitboxen, Safe Lane), `?seed=
 
 ## Tuning
 
-Alle Stellschrauben stehen in `src/constants.js`.
+Alle Stellschrauben stehen in `src/constants.js`; die Liste `TUNABLES` dort bestimmt die Regler im Panel.
+Ändern sich die Standardwerte, den Schlüssel `KEY` in `src/tune.js` hochzählen, sonst bleiben alte Regler-Werte auf dem iPhone aktiv.
 
 ## Deploy (GitHub Pages)
 
