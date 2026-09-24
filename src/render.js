@@ -11,7 +11,7 @@ const ROCK_H = 1.4;
 
 export function createRenderer(canvas) {
   const ctx = canvas.getContext('2d', { alpha: false });
-  return { canvas, ctx, W: 0, H: 0, dpr: 1, S: 10, sprites: null, spriteKey: '', list: [], skierMarker: { skier: true, y: 0 }, frameMs: 16.7 };
+  return { canvas, ctx, W: 0, H: 0, dpr: 1, S: 10, sprites: null, spriteKey: '', list: [], skierMarker: { skier: true, y: 0 }, frameMs: 16.7, trackPts: new Float32Array(C.TRACK_CAP * 6), snow: createSnow() };
 }
 
 export function resize(R) {
@@ -131,7 +131,9 @@ export function draw(R, g, t) {
   drawTrack(R, g, ox, oy);
   drawWorld(R, g, ox, oy);
   drawParticles(R, g, ox, oy);
-  drawAvalanche(R, g, ox, oy, t);
+  if (g.mode === 'chase') drawAvalanche(R, g, ox, oy, t);
+  drawWhiteout(R, g);
+  drawSnow(R, g, t);
   if (g.debug) drawDebug(R, g, ox, oy);
 }
 
@@ -139,20 +141,35 @@ function drawTrack(R, g, ox, oy) {
   const { ctx, S } = R;
   const tr = g.track;
   if (tr.n < 2) return;
-  ctx.strokeStyle = C.TRACK;
-  ctx.lineWidth = Math.max(1, 0.12 * S);
+  // Punkte einmal in Bildschirmkoordinaten sammeln: sx, sy, nx*S, ny*S, Carve, Lücke
+  const pts = R.trackPts;
+  let n = 0;
+  forEachTrackPoint(tr, (x, y, nx, ny, w, gap) => {
+    const i = n * 6;
+    pts[i] = x * S + ox; pts[i + 1] = y * S + oy; pts[i + 2] = nx * S; pts[i + 3] = ny * S; pts[i + 4] = w; pts[i + 5] = gap ? 1 : 0;
+    n++;
+  });
+  const base = Math.max(1, 0.12 * S);
+  const buckets = 4;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  for (const off of [-0.16, 0.16]) {
-    ctx.beginPath();
-    let pen = false;
-    forEachTrackPoint(tr, (x, y, nx, ny, w, gap) => {
-      const px = (x + nx * off) * S + ox;
-      const py = (y + ny * off) * S + oy;
-      if (py < -20) { pen = false; return; }
-      if (gap || !pen) { ctx.moveTo(px, py); pen = true; } else ctx.lineTo(px, py);
-    });
-    ctx.stroke();
+  for (let b = 0; b < buckets; b++) {
+    ctx.lineWidth = base * (1 + (C.TRACK_WIDTH_MAX - 1) * ((b + 0.5) / buckets));
+    ctx.strokeStyle = `rgba(58,51,64,${(0.18 + (0.14 * b) / (buckets - 1)).toFixed(2)})`;
+    for (const off of [-0.16, 0.16]) {
+      ctx.beginPath();
+      let any = false;
+      for (let i = 1; i < n; i++) {
+        const j = i * 6, k = j - 6;
+        if (pts[j + 5] > 0 || pts[k + 1] < -20) continue;
+        const wb = Math.min(buckets - 1, Math.floor(pts[j + 4] * buckets));
+        if (wb !== b) continue;
+        ctx.moveTo(pts[k] + pts[k + 2] * off, pts[k + 1] + pts[k + 3] * off);
+        ctx.lineTo(pts[j] + pts[j + 2] * off, pts[j + 1] + pts[j + 3] * off);
+        any = true;
+      }
+      if (any) ctx.stroke();
+    }
   }
 }
 
@@ -277,4 +294,138 @@ function drawDebug(R, g, ox, oy) {
   ctx.lineWidth = 1;
   const fy = g.av.frontY * S + oy;
   ctx.beginPath(); ctx.moveTo(0, fy); ctx.lineTo(W, fy); ctx.stroke();
+}
+
+// ---------- Warnschnee (Bildschirmraum) und White-out ----------
+
+function createSnow() {
+  const f = [];
+  for (let i = 0; i < C.SNOW_POOL; i++) f.push({ x: 0, y: 0, vy: 0, drift: 0, phase: 0, r: 1, on: false });
+  return { f, lastT: 0 };
+}
+
+// 0..1: wie stark es schneien soll.
+function snowIntensity(g) {
+  if (g.state === 'dead') return g.deadCause === 'avalanche' ? 1 : 0;
+  if (g.state === 'running' || g.state === 'paused') return avalancheVisibility(g.av);
+  return 0;
+}
+
+function drawSnow(R, g, t) {
+  const { ctx, W, H } = R;
+  const snow = R.snow;
+  const dt = snow.lastT ? Math.min(0.05, Math.max(0, t - snow.lastT)) : 0;
+  snow.lastT = t;
+  const intensity = snowIntensity(g);
+  const target = Math.round(C.SNOW_POOL * Math.pow(intensity, 1.3));
+  const moving = g.state !== 'paused';
+  let active = 0;
+  ctx.beginPath();
+  for (let i = 0; i < snow.f.length; i++) {
+    const p = snow.f[i];
+    if (!p.on) {
+      if (active >= target || Math.random() > 0.12) continue;
+      p.on = true;
+      p.x = Math.random() * W;
+      p.y = -10 - Math.random() * 60;
+      p.vy = C.SNOW_MIN_SPEED + Math.random() * (C.SNOW_MAX_SPEED - C.SNOW_MIN_SPEED);
+      p.drift = 10 + Math.random() * 25;
+      p.phase = Math.random() * TAU;
+      p.r = 1.5 + Math.random() * 2;
+    }
+    active++;
+    if (moving) {
+      p.y += p.vy * dt;
+      p.x += Math.sin(t * 1.5 + p.phase) * p.drift * dt;
+    }
+    if (p.y > H + 10) { p.on = false; continue; }
+    ctx.moveTo(p.x + p.r, p.y);
+    ctx.arc(p.x, p.y, p.r, 0, TAU);
+  }
+  if (active === 0) return;
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(58,51,64,0.16)';
+  ctx.stroke();
+}
+
+function drawWhiteout(R, g) {
+  if (g.state !== 'dead' || g.deadCause !== 'avalanche') return;
+  const a = Math.min(1, g.deadT / C.WHITEOUT_S);
+  R.ctx.fillStyle = `rgba(255,255,255,${a.toFixed(3)})`;
+  R.ctx.fillRect(0, 0, R.W, R.H);
+}
+
+// ---------- Modus-Vorschau (kleine stille Szene für die Karten) ----------
+
+export function drawModePreview(canvas, modeId) {
+  const W = canvas.clientWidth || 130, H = canvas.clientHeight || 72;
+  const dpr = Math.min(window.devicePixelRatio || 1, C.MAX_DPR);
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const S = 5.5;
+  ctx.fillStyle = C.BG;
+  ctx.fillRect(0, 0, W, H);
+  // Spur: leichte Schlangenlinie von oben bis zum Fahrer
+  const sx = W * 0.5, sy = H * 0.62;
+  ctx.strokeStyle = C.TRACK;
+  ctx.lineWidth = 1.2;
+  for (const off of [-1, 1]) {
+    ctx.beginPath();
+    for (let y = -4; y <= sy; y += 2) {
+      const x = sx + Math.sin((y / H) * 4.5) * W * 0.09 + off;
+      y < 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  const trees = [[0.16, 0.42, 0], [0.8, 0.3, 1], [0.66, 0.9, 2], [0.3, 0.98, 1], [0.9, 0.7, 0]];
+  const sprites = [0, 1, 2].map((v) => makeTree(S, dpr, v));
+  trees.forEach(([fx, fy, v]) => {
+    const sp = sprites[v];
+    ctx.drawImage(sp.img, fx * W - sp.ax, fy * H - sp.ay, sp.w, sp.h);
+  });
+  // Fahrer
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.rotate(-0.25);
+  ctx.strokeStyle = C.INK;
+  ctx.lineWidth = 1;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-0.16 * S, -0.85 * S); ctx.lineTo(-0.16 * S, 0.75 * S);
+  ctx.moveTo(0.16 * S, -0.85 * S); ctx.lineTo(0.16 * S, 0.75 * S);
+  ctx.stroke();
+  ctx.fillStyle = C.INK;
+  ctx.beginPath(); ctx.ellipse(0, 0, 0.3 * S, 0.45 * S, 0, 0, TAU); ctx.fill();
+  ctx.restore();
+  if (modeId === 'chase') {
+    // Schneewand von oben: weiche weiße Wolke mit leichtem Schatten darunter
+    const g1 = ctx.createLinearGradient(0, 0, 0, H * 0.5);
+    g1.addColorStop(0, 'rgba(58,51,64,0.16)');
+    g1.addColorStop(1, 'rgba(58,51,64,0)');
+    ctx.fillStyle = g1;
+    ctx.fillRect(0, 0, W, H * 0.5);
+    for (let i = 0; i < 7; i++) {
+      const bx = (i / 6) * W, by = H * 0.08 + Math.sin(i * 2.1) * 4, r = 12 + (i % 3) * 3;
+      const rg = ctx.createRadialGradient(bx, by, 0, bx, by, r);
+      rg.addColorStop(0, 'rgba(255,255,255,1)');
+      rg.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = rg;
+      ctx.fillRect(bx - r, by - r, r * 2, r * 2);
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.strokeStyle = 'rgba(58,51,64,0.18)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    for (let i = 0; i < 14; i++) {
+      const fx = ((i * 37) % 100) / 100 * W, fy = H * 0.15 + ((i * 53) % 100) / 100 * H * 0.55, r = 1 + (i % 3) * 0.6;
+      ctx.moveTo(fx + r, fy);
+      ctx.arc(fx, fy, r, 0, TAU);
+    }
+    ctx.fill();
+    ctx.stroke();
+  }
 }

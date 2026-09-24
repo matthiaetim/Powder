@@ -15,7 +15,7 @@
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
 </head>
-<body data-state="ready" data-overlay="">
+<body data-state="ready" data-overlay="" data-intro="1">
   <canvas id="game"></canvas>
   <button id="btn-pause" type="button" aria-label="Pause"></button>
   <div id="hud" aria-live="off">
@@ -31,6 +31,18 @@
     <div id="dead-dist">0 m</div>
     <div id="dead-best">Bester Lauf 0 m</div>
     <button id="btn-fresh" type="button">Fresh</button>
+    <div id="modes">
+      <button class="mode-card" type="button" data-mode="classic">
+        <canvas class="mode-preview" width="130" height="72"></canvas>
+        <span class="mode-name">Classic</span>
+        <span class="mode-cta"></span>
+      </button>
+      <button class="mode-card soon" type="button" data-mode="chase" disabled>
+        <canvas class="mode-preview" width="130" height="72"></canvas>
+        <span class="mode-name">Chase</span>
+        <span class="mode-cta"></span>
+      </button>
+    </div>
   </div>
   <div id="version"></div>
   <pre id="debug" hidden></pre>

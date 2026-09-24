@@ -6,7 +6,8 @@ import { createAvalanche, updateAvalanche } from './avalanche.js';
 import { checkCollision } from './collision.js';
 import { createTrack, clearTrack, pushTrack, markGap } from './track.js';
 import { createParticles, clearParticles, spawnParticle, updateParticles } from './particles.js';
-import { loadBest, saveBest } from './storage.js';
+import { loadBest, saveBest, loadMode, saveMode } from './storage.js';
+import { MODES, DEFAULT_MODE } from './modes.js';
 
 const READY_FRAC = 0.78; // Fahrer steht im Ready-Zustand weit unten im Bild
 
@@ -21,17 +22,21 @@ export function createGame(opts = {}) {
     track: createTrack(), particles: createParticles(),
     dist: 0, best: loadBest(), newBest: false,
     seed: 0, fixedSeed: opts.fixedSeed ?? null,
+    mode: DEFAULT_MODE, intro: true, readyDelayMs: C.READY_AUTO_START_MS,
     readyT: 0, deadT: 0, deadCause: '',
     camX: 0, skierFrac: READY_FRAC,
     viewWm: C.VIEW_W_M, viewHm: C.VIEW_H_M,
     debug: !!opts.debug, lastGesture: '–', runs: 0,
     trackAcc: 0, spawnAcc: 0,
   };
-  reset(g, g.fixedSeed ?? randomSeed());
+  const saved = loadMode();
+  if (MODES[saved] && !MODES[saved].soon) g.mode = saved;
+  reset(g, g.fixedSeed ?? randomSeed(), true);
   return g;
 }
 
-export function reset(g, seed) {
+// intro = true: Kamerafahrt von unten (nur beim App-Start). Sonst direkt beim Fahrer.
+export function reset(g, seed, intro) {
   g.seed = seed;
   g.skier = P.createSkier();
   g.world = createWorld(seed);
@@ -40,7 +45,10 @@ export function reset(g, seed) {
   clearParticles(g.particles);
   g.dist = 0; g.newBest = false;
   g.readyT = 0; g.deadT = 0; g.deadCause = '';
-  g.camX = 0; g.skierFrac = READY_FRAC;
+  g.camX = 0;
+  g.intro = !!intro;
+  g.skierFrac = intro ? READY_FRAC : C.SKIER_SCREEN_Y_FRAC;
+  g.readyDelayMs = intro ? C.READY_AUTO_START_MS : C.FRESH_START_MS;
   g.trackAcc = 0; g.spawnAcc = 0;
   g.state = 'ready';
   ensureView(g);
@@ -56,7 +64,7 @@ export function update(g, dt) {
   switch (g.state) {
     case 'ready':
       g.readyT += dt;
-      if (g.readyT * 1000 >= C.READY_AUTO_START_MS) start(g);
+      if (g.readyT * 1000 >= g.readyDelayMs) start(g);
       break;
     case 'running':
       step(g, dt);
@@ -124,7 +132,7 @@ function die(g, cause) {
 function spawnSpray(g, dt) {
   const s = g.skier;
   if (s.airborne || s.v < 2) return;
-  const rate = (20 + 120 * s.carve) * Math.min(1.5, s.v / 20);
+  const rate = (15 + 220 * s.carve) * Math.min(1.5, s.v / 20);
   g.spawnAcc += rate * dt;
   const dx = Math.sin(s.theta), dy = Math.cos(s.theta); // Fahrtrichtung
   const outSign = s.thetaCarve > 0 ? 1 : -1;               // Außenseite der Kurve
@@ -134,7 +142,7 @@ function spawnSpray(g, dt) {
     const side = Math.random() < 0.5 ? -0.16 : 0.16;
     const px = s.x - dx * 0.8 + dy * side;
     const py = s.y - dy * 0.8 - dx * side;
-    const spread = 1.5 + 6 * s.carve;
+    const spread = 1.5 + 9 * s.carve;
     const k = 0.5 + Math.random();
     const vx = -dx * (0.15 * s.v) + ox * spread * k + (Math.random() - 0.5) * 2;
     const vy = -dy * (0.15 * s.v) + oy * spread * k + (Math.random() - 0.5) * 2;
@@ -169,7 +177,7 @@ export function onTap(g, side, base) {
 export function onDoubleTap(g, base) {
   g.lastGesture = 'double tap';
   if (g.state === 'ready') start(g);
-  if (g.state === 'running') { P.undoTap(g.skier, base); P.jump(g.skier); }
+  if (g.state === 'running') P.jump(g.skier);
 }
 export function onJump(g) {
   g.lastGesture = 'jump';
@@ -185,7 +193,14 @@ export function pauseIfRunning(g) {
   if (g.state === 'running') { g.state = 'paused'; g.skier.side = 0; }
 }
 export function fresh(g) {
-  if (g.state === 'dead' && g.deadT * 1000 >= C.DEATH_OVERLAY_MS + C.FRESH_GUARD_MS) reset(g, g.fixedSeed ?? randomSeed());
+  if (g.state === 'dead' && g.deadT * 1000 >= C.DEATH_OVERLAY_MS + C.FRESH_GUARD_MS) reset(g, g.fixedSeed ?? randomSeed(), false);
+}
+export function selectMode(g, id) {
+  const m = MODES[id];
+  if (!m || m.soon) return false;
+  g.mode = id;
+  saveMode(id);
+  return true;
 }
 export function overlayReady(g) {
   return g.state === 'dead' && g.deadT * 1000 >= C.DEATH_OVERLAY_MS;

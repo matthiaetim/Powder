@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Tuning passiert nur hier.
-export const VERSION = '0.1.0';
+export const VERSION = '0.2.0';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite/Höhe in Metern, Fahrer bei 33 % Bildhöhe
@@ -22,14 +22,14 @@ export const C = {
   DOUBLE_TAP_PX: 60,
 
   // Lenkung
-  TAP_TURN_DEG: 14,
-  BASE_MAX_DEG: 45,
-  TAP_EASE_S: 0.08,
-  HOLD_RATE_MIN_DEG_S: 40,
-  HOLD_RATE_MAX_DEG_S: 120,
-  HOLD_RAMP_MS: 700,
-  CARVE_MAX_DEG: 55,
-  MAX_HEADING_DEG: 75,
+  TAP_TURN_DEG: 25,
+  BASE_MAX_DEG: 60,
+  TAP_EASE_S: 0.06,
+  HOLD_RATE_MIN_DEG_S: 90,
+  HOLD_RATE_MAX_DEG_S: 240,
+  HOLD_RAMP_MS: 350,
+  CARVE_MAX_DEG: 75,
+  MAX_HEADING_DEG: 85,
   CARVE_RELEASE_S: 0.5,
   HOLD_COMMIT_FRAC: 0.3,
   FALL_LINE_PULL_DEG_S: 0,
@@ -38,7 +38,7 @@ export const C = {
   G_SLOPE: 4.5,
   DRAG_QUAD: 0.0057,
   EDGE_DRAG: 0.15,
-  SCRUB_K: 0.15,
+  SCRUB_K: 0.1,
 
   // Sprung
   JUMP_AIR_S: 0.55,
@@ -80,10 +80,18 @@ export const C = {
   // Spur & Partikel
   TRACK_SPACING_M: 0.4,
   TRACK_CAP: 512,
+  TRACK_WIDTH_MAX: 4,      // Spurbreite bei vollem Carve, Vielfaches der Grundbreite
   PARTICLE_POOL: 64,
 
+  // Warnschnee (Bildschirm-Pixel): faellt, wenn die Lawine naeher als AV_VISIBLE_GAP_M ist
+  SNOW_POOL: 160,
+  SNOW_MIN_SPEED: 140,
+  SNOW_MAX_SPEED: 260,
+  WHITEOUT_S: 0.6,
+
   // Zustände
-  READY_AUTO_START_MS: 1200,
+  READY_AUTO_START_MS: 1200, // Intro beim App-Start: Kamerafahrt, dann los
+  FRESH_START_MS: 500,       // nach Fresh: kurze Schonfrist, dann los
   DEATH_OVERLAY_MS: 700,
   FRESH_GUARD_MS: 300,
 

@@ -51,11 +51,6 @@ export function tap(s, side, baseAtPress) {
   s.pressT = 0;
 }
 
-// Doppeltipp: der erste Tipp wird zurückgenommen, damit ein Doppeltipp ein reiner Sprung ist.
-export function undoTap(s, baseAtPress) {
-  s.thetaBaseTarget = baseAtPress;
-}
-
 export function jump(s) {
   if (s.airborne || s.jumpCooldown > 0 || !s.alive) return false;
   s.airborne = true;
