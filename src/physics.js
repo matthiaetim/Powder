@@ -1,5 +1,6 @@
 // Fahrermodell: der Kurs schwingt kritisch gedämpft auf einen Zielwinkel ein (Antippen: Tipp-Winkel,
-// Halten: vertieft sich stetig, Loslassen: Falllinie). Dadurch hat die Spur nie einen Knick.
+// Halten: vertieft sich stetig). Nach dem Loslassen bleibt der Schrägwinkel und driftet nur langsam
+// zur Falllinie zurück. Dadurch hat die Spur nie einen Knick.
 // Bremsen wächst mit Winkel und Tempo bis zum Stillstand. Ohne Eingabe nähert sich das Tempo
 // weich dem Endtempo, weil der Luftwiderstand quadratisch wächst.
 import { C } from './constants.js';
@@ -46,19 +47,25 @@ function turnT(v) {
 export function updateSkier(s, dt) {
   const maxHead = C.MAX_HEADING_DEG * D2R;
 
-  // Zielwinkel: Antippen = Tipp-Winkel, Halten vertieft, Loslassen = Falllinie
-  let T;
   if (s.side !== 0) {
+    // Halten: Zielwinkel = Tipp-Winkel + Vertiefung; kritisch gedämpftes Einschwingen
+    // (weicher Beginn, zügige Mitte, sanftes Ende, kein Knick)
     s.target = s.side * Math.min(maxHead, (C.TURN_TAP_DEG + C.TURN_DEEPEN_DEG_S * s.holdT) * D2R);
     s.holdT += dt;
-    T = turnT(s.v);
+    const T = turnT(s.v);
+    s.omega += ((s.target - s.theta) / (T * T) - (2 * s.omega) / T) * dt;
+    s.theta += s.omega * dt;
   } else {
+    // Losgelassen: Restdrehung klingt schnell ab, dann langsame Drift zur Falllinie
     s.target = 0;
-    T = C.RETURN_T;
+    const mag = Math.abs(s.theta);
+    const rate = Math.min(mag / dt, Math.max(mag / C.RETURN_T, C.RETURN_MIN_DEG_S * D2R));
+    const wanted = -Math.sign(s.theta) * rate;
+    s.omega += (wanted - s.omega) * (1 - Math.exp(-dt / C.RETURN_DAMP_S));
+    const before = s.theta;
+    s.theta += s.omega * dt;
+    if (before !== 0 && Math.sign(s.theta) !== Math.sign(before)) { s.theta = 0; s.omega = 0; }
   }
-  // Kritisch gedämpftes Einschwingen: weicher Beginn, zügige Mitte, sanftes Ende, kein Knick
-  s.omega += ((s.target - s.theta) / (T * T) - (2 * s.omega) / T) * dt;
-  s.theta += s.omega * dt;
   if (s.theta > maxHead) { s.theta = maxHead; if (s.omega > 0) s.omega = 0; }
   else if (s.theta < -maxHead) { s.theta = -maxHead; if (s.omega < 0) s.omega = 0; }
   if (s.side === 0 && Math.abs(s.theta) < 1e-4 && Math.abs(s.omega) < 1e-3) { s.theta = 0; s.omega = 0; }

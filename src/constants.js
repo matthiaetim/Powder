@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.7.0';
+export const VERSION = '0.7.1';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -22,16 +22,19 @@ export const C = {
   MAX_FRAME_MS: 100,
 
   // Lenkung (nach dem Original vermessen): der Kurs schwingt weich auf einen Zielwinkel ein,
-  // ohne Knick. Antippen setzt das Ziel auf TURN_TAP_DEG, Halten vertieft es stetig,
-  // Loslassen setzt das Ziel auf die Falllinie. Ansprechzeit = Zeitkonstante des Einschwingens
-  // (kritisch gedämpft): nach 2× Ansprechzeit sind rund 60 % des Weges geschafft.
-  TURN_TAP_DEG: 40,        // (Tuning) Zielwinkel beim Antippen
+  // ohne Knick. Antippen setzt das Ziel auf TURN_TAP_DEG, Halten vertieft es stetig.
+  // Ansprechzeit = Zeitkonstante des Einschwingens (kritisch gedämpft): nach 2× Ansprechzeit
+  // sind rund 60 % des Weges geschafft. Loslassen: die Restdrehung klingt schnell ab, der
+  // Schrägwinkel bleibt und driftet nur langsam zur Falllinie zurück (wie im Original ≈13°/s).
+  TURN_TAP_DEG: 34,        // (Tuning) Zielwinkel beim Antippen (die Restdrehung legt ~8° drauf)
   TURN_DEEPEN_DEG_S: 90,   // (Tuning) Vertiefung des Zielwinkels pro Sekunde Halten
   TURN_T: 0.1,             // (Tuning) Ansprechzeit in s bis TURN_T_SPEED_LO_KMH
   TURN_T_FAST: 0.14,       // (Tuning) Ansprechzeit bei TURN_T_SPEED_HI_KMH: bei Tempo liegt mehr Gewicht auf den Skiern
   TURN_T_SPEED_LO_KMH: 50,
   TURN_T_SPEED_HI_KMH: 200,
-  RETURN_T: 0.12,          // (Tuning) Ansprechzeit der Rückkehr zur Falllinie in s
+  RETURN_T: 1.7,           // (Tuning) Zeitkonstante der Drift zurück zur Falllinie in s (Rate = Winkel / RETURN_T)
+  RETURN_MIN_DEG_S: 6,     // Mindestrate, damit kleine Restwinkel auch verschwinden
+  RETURN_DAMP_S: 0.06,     // Abklingzeit der Restdrehung nach dem Loslassen
   MAX_HEADING_DEG: 120,    // (Tuning) über quer (90°) hinaus leicht bergauf
 
   // Tempo: der Start hat schon Fahrt, ohne Tippen wird man stetig schneller. Der Luftwiderstand
@@ -121,7 +124,7 @@ export const TUNABLES = [
   { key: 'TURN_DEEPEN_DEG_S', label: 'Vertiefen beim Halten', unit: '°/s', min: 0, max: 150, step: 5 },
   { key: 'TURN_T', label: 'Ansprechzeit', unit: 's', min: 0.05, max: 0.4, step: 0.01 },
   { key: 'TURN_T_FAST', label: 'Ansprechzeit bei 200 km/h', unit: 's', min: 0.05, max: 0.4, step: 0.01 },
-  { key: 'RETURN_T', label: 'Rückkehr', unit: 's', min: 0.05, max: 0.6, step: 0.01 },
+  { key: 'RETURN_T', label: 'Rückkehr zur Falllinie', unit: 's', min: 0.2, max: 4, step: 0.1 },
   { key: 'MAX_HEADING_DEG', label: 'Max. Winkel', unit: '°', min: 60, max: 150, step: 5 },
   { key: 'BRAKE_K', label: 'Bremskraft', unit: '', min: 0.2, max: 6, step: 0.1 },
   { key: 'BRAKE_START_DEG', label: 'Bremsen ab', unit: '°', min: 0, max: 60, step: 5 },
