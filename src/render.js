@@ -478,30 +478,40 @@ export function drawModePreview(canvas, modeId) {
   ctx.beginPath(); ctx.ellipse(0, 0, 0.3 * S, 0.45 * S, 0, 0, TAU); ctx.fill();
   ctx.restore();
   if (modeId === 'chase') {
-    // Schneewand von oben: weiche weiße Wolke mit leichtem Schatten darunter
-    const g1 = ctx.createLinearGradient(0, 0, 0, H * 0.5);
-    g1.addColorStop(0, `rgba(${C.TRACK_RGB},0.16)`);
-    g1.addColorStop(1, `rgba(${C.TRACK_RGB},0)`);
+    // Schatten von oben, wie in avalanche-view.js: Dämmerung, Schleier aus Schiefergrau, wogender Rand, Fahnen
+    const rgb = C.AVALANCHE.join(',');
+    const fy = H * 0.36; // Vorderkante der Front
+    ctx.fillStyle = `rgba(${rgb},0.08)`;
+    ctx.fillRect(0, 0, W, H);
+    const bodyY = fy - 2.6 * S;
+    const g1 = ctx.createLinearGradient(0, 0, 0, bodyY);
+    g1.addColorStop(0, `rgba(${rgb},0.66)`);
+    g1.addColorStop(1, `rgba(${rgb},0.5)`);
     ctx.fillStyle = g1;
-    ctx.fillRect(0, 0, W, H * 0.5);
-    for (let i = 0; i < 7; i++) {
-      const bx = (i / 6) * W, by = H * 0.08 + Math.sin(i * 2.1) * 4, r = 12 + (i % 3) * 3;
+    ctx.fillRect(0, 0, W, bodyY);
+    const sp = 2.6 * S, n = Math.ceil(W / sp) + 2;
+    for (let i = 0; i < n; i++) {
+      const r = 3.0 * S * (1 + 0.15 * Math.sin(i * 2.7));
+      const bx = (i - 1) * sp + Math.sin(i * 1.3) * 0.6 * S;
+      const by = fy - 2.0 * S + Math.cos(i * 2.1) * 0.4 * S;
       const rg = ctx.createRadialGradient(bx, by, 0, bx, by, r);
-      rg.addColorStop(0, 'rgba(255,255,255,1)');
-      rg.addColorStop(1, 'rgba(255,255,255,0)');
+      rg.addColorStop(0, `rgba(${rgb},0.6)`);
+      rg.addColorStop(0.45, `rgba(${rgb},0.35)`);
+      rg.addColorStop(1, `rgba(${rgb},0)`);
       ctx.fillStyle = rg;
       ctx.fillRect(bx - r, by - r, r * 2, r * 2);
     }
-    ctx.fillStyle = 'rgba(255,255,255,0.95)';
-    ctx.strokeStyle = `rgba(${C.TRACK_RGB},0.18)`;
     ctx.lineWidth = 0.8;
-    ctx.beginPath();
-    for (let i = 0; i < 14; i++) {
-      const fx = ((i * 37) % 100) / 100 * W, fy = H * 0.15 + ((i * 53) % 100) / 100 * H * 0.55, r = 1 + (i % 3) * 0.6;
-      ctx.moveTo(fx + r, fy);
-      ctx.arc(fx, fy, r, 0, TAU);
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 12; i++) {
+      const ph = ((i * 53 + 17) % 100) / 100;
+      const fx = ((i * 37 + 9) % 100) / 100 * W;
+      const len = (1.0 + 3.0 * ph) * S;
+      ctx.strokeStyle = `rgba(${rgb},${(0.35 * (1 - ph)).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.moveTo(fx, fy - 0.8 * S);
+      ctx.lineTo(fx + Math.sin(i * 1.9) * 0.5 * S, fy + len);
+      ctx.stroke();
     }
-    ctx.fill();
-    ctx.stroke();
   }
 }

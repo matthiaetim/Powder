@@ -20,8 +20,8 @@ Plain HTML + JavaScript + Canvas, kein Framework, kein Build.
 ## Modi
 
 - **Classic**: freie Abfahrt, so weit es geht.
-- **Chase**: eine Lawine hält ein Tempo (Pace), das mit der Laufzeit steigt (Standard 30 → 140 km/h in drei Minuten). Wer schneller ist, hält sie knapp über dem oberen Bildrand; wer langsamer wird, holt sie sich ins Bild. Wer stehen bleibt (querstellen und halten), sieht sie nach 1,5 s am Bildrand erscheinen und heranrollen. Erwischt sie den Fahrer, zerspringt er wie beim Aufprall. Die Steuerung ist dieselbe wie in Classic.
-- Drei Looks der Lawine stehen im Tuning zur Wahl (`src/avalanche-view.js`): **Wolke** (weiße Schneewolke mit Schattenrand und Staub), **Schatten** (Schleier aus Schiefergrau mit Fahnen, das Bild dämmert), **Bruch** (Platte mit Pixel-Bruchkante, rollende Brocken wie die Splitter beim Aufprall).
+- **Chase**: eine Lawine hält ein Tempo (Pace), das mit der Laufzeit steigt (Standard 30 → 145 km/h in 90 Sekunden). Wer schneller ist, hält sie knapp über dem oberen Bildrand; wer langsamer wird, holt sie sich ins Bild. Wer langsamer als 40 km/h wird, etwa quergestellt, sieht sie nach 0,8 s am Bildrand erscheinen und heranrollen. Erwischt sie den Fahrer, zerspringt er wie beim Aufprall. Die Steuerung ist dieselbe wie in Classic.
+- Die Lawine ist ein Schatten (`src/avalanche-view.js`): ein Schleier aus Schiefergrau, dessen Rand mit weichen dunklen Wülsten wogt, davor züngeln dünne Schattenfahnen. Je näher sie kommt, desto dämmriger wird das ganze Bild.
 
 ## Ton
 
@@ -44,7 +44,7 @@ Nützliche Parameter: `?debug=1` (Overlay mit fps, Hitboxen, Safe Lane), `?seed=
 
 ## Tuning
 
-Alle Stellschrauben stehen in `src/constants.js`; die Liste `TUNABLES` dort bestimmt die Regler im Panel (Abschnitte „Fahren“, „Lawine (Chase)“: Look, Tempo am Start und Ende, Anstiegsdauer, Lauerabstand, Stillstand-Schwelle und -Wartezeit, Fangabstand, Beben, und „Ton“: Lautstärke gesamt, Wind, Ski und Kurven, Lawine, Aufprall).
+Alle Stellschrauben stehen in `src/constants.js`; die Liste `TUNABLES` dort bestimmt die Regler im Panel (Abschnitte „Fahren“, „Lawine (Chase)“: Tempo am Start und Ende, Anstiegsdauer, Lauerabstand, Stillstand-Schwelle und -Wartezeit, Fangabstand, Beben, und „Ton“: Lautstärke gesamt, Wind, Ski und Kurven, Lawine, Aufprall).
 Ändern sich die Standardwerte, den Schlüssel `KEY` in `src/tune.js` hochzählen, sonst bleiben alte Regler-Werte auf dem iPhone aktiv.
 
 ## Deploy (GitHub Pages)
