@@ -1,7 +1,7 @@
 // Zeichnet die Welt auf den Canvas. HUD und Overlays sind DOM (siehe hud.js).
 import { C } from './constants.js';
 import { TREE } from './physics.js';
-import { forEachTrackPoint } from './track.js';
+import { forEachTrackPoint, forEachRecentTrackPoint } from './track.js';
 import { drawAvalanche, makeAvSprites } from './avalanche-view.js';
 import { laneX } from './world.js';
 
@@ -9,7 +9,8 @@ const TAU = Math.PI * 2;
 const TREE_H = 3.2; // nominale Sprite-Höhe in Metern
 const ROCK_H = 1.4;
 const MARK_FONT = "italic 12px 'Playfair Display', Georgia, 'Times New Roman', serif"; // wie --font in styles.css
-const SIGN_FONT_STACK = "'Arial Black', Arial, sans-serif";
+const SIGN_FONT_STACK = "'Playfair Display', Georgia, 'Times New Roman', serif"; // nur italic 400 liegt in fonts/
+const SIGN_PAD_M = 0.3; // Rand des Offscreen-Canvas um den Schriftzug, für kursive Überhänge und das Relief
 
 // Organischer Blob-Umriss fürs Hockeystop-Nebelfeld, normiert auf ±0.5 um den Mittelpunkt (mit `size`
 // multipliziert gezeichnet). Start- plus 7 Kurven-Tripel (je 2 Kontrollpunkte + Endpunkt).
@@ -37,7 +38,18 @@ const nf = new Intl.NumberFormat(C.HUD_LOCALE);
 
 export function createRenderer(canvas) {
   const ctx = canvas.getContext('2d', { alpha: false });
-  return { canvas, ctx, W: 0, H: 0, dpr: 1, S: 10, Sv: 10, sprites: null, spriteKey: '', list: [], skierMarker: { skier: true, y: 0 }, frameMs: 16.7, paceMs: 0, trackPts: new Float32Array(C.TRACK_CAP * 7), snow: createSnow(), shards: { p: [], run: -1 } };
+  const R = {
+    canvas, ctx, W: 0, H: 0, dpr: 1, S: 10, Sv: 10, sprites: null, spriteKey: '', list: [], skierMarker: { skier: true, y: 0 },
+    frameMs: 16.7, paceMs: 0, trackPts: new Float32Array(C.TRACK_CAP * 7), snow: createSnow(), shards: { p: [], run: -1 },
+    sign: { c: null, x: null, key: '', world: null, seen: 0, x0: 0, y0: 0, wM: 0, hM: 0, Q: 1 }, fontReady: false,
+  };
+  // Der Canvas stößt das Laden der Schrift nicht an, das HUD tut es beim Seitenstart. Bis sie da ist, würde der
+  // Schriftzug in Georgia gebaut; fontReady steckt im Schlüssel und baut ihn dann einmal neu. Ein Fehler zählt
+  // auch als fertig, sonst bliebe der Schlüssel ewig offen.
+  if (document.fonts && document.fonts.load) {
+    document.fonts.load(`italic 400 20px ${SIGN_FONT_STACK}`).catch(() => {}).then(() => { R.fontReady = true; });
+  } else R.fontReady = true;
+  return R;
 }
 
 export function resize(R) {
@@ -191,25 +203,111 @@ function markLine(ctx, W, sy, label, color) {
 }
 
 // ---------- Signatur im Schnee ----------
-// Wie von einer Pistenraupe gefräst: fester Punkt im Hang (SIGN_Y_M), über die volle Sichtbreite, in Farbe und
-// Deckkraft wie die Skispur. Die Schriftgröße wird pro Bild aus der Zielbreite in Metern zurückgerechnet, damit
-// es bei jedem Zoom gleich breit wirkt; die Spur (drawTrack) zeichnet direkt danach darüber.
-function drawSignature(R, g, ox, oy) {
-  const { ctx, Sv: S, H } = R;
-  const sy = C.SIGN_Y_M * S + oy;
-  if (sy < -300 || sy > H + 300) return;
-  const targetPx = C.VIEW_W_M * C.SIGN_WIDTH_FRAC * S;
-  if (targetPx <= 0) return;
+// Der Schriftzug (SIGN_TEXT) liegt bei SIGN_Y_M, zentriert auf der Korridor-Mitte, in einem Offscreen-Canvas in
+// Welt-Koordinaten mit fester Auflösung Q px/m (wie die Sprites, unabhängig vom Tempo-Zoom). Darin sind die
+// Lagen deckend gezeichnet, die Deckkraft SIGN_ALPHA kommt erst beim Einblenden dazu: so verdeckt die Füllung den
+// Schatten dort, wo beide übereinanderliegen, und der Regler wirkt ohne Neuaufbau. Fährt der Skifahrer darüber,
+// radieren seine Spurpunkte entlang beider Ski Striche hinein (destination-out), das geht nur auf einem
+// Canvas mit Alpha. Gebunden an g.world: reset() legt eine neue Welt an, dann ist der Schriftzug wieder heil und
+// steht auf der Korridor-Mitte der neuen Welt. Die echte Spur (drawTrack) liegt wie bisher darüber.
+function signKey(R) {
+  return [R.S.toFixed(3), R.dpr, R.fontReady ? 1 : 0, C.SIGN_TEXT, C.SIGN_WIDTH_FRAC, C.VIEW_W_M, C.SIGN_RELIEF_M].join('|');
+}
+
+function buildSignature(R, g) {
+  const sg = R.sign;
+  const text = C.SIGN_TEXT;
+  const wM = C.VIEW_W_M * C.SIGN_WIDTH_FRAC;
+  const Q = Math.min(R.S * R.dpr, C.SIGN_MAX_PX / (wM + 2 * SIGN_PAD_M));
+  const c = sg.c || document.createElement('canvas');
+  const x = sg.x || c.getContext('2d');
+  // Schriftgröße aus einer Referenzmessung zurückrechnen, damit die Tinte genau wM breit wird (kursiv hängt über)
   const refPx = 200;
-  ctx.font = `900 ${refPx}px ${SIGN_FONT_STACK}`;
-  const refW = ctx.measureText(C.SIGN_TEXT).width || 1;
-  const fontPx = (targetPx / refW) * refPx;
-  ctx.font = `900 ${fontPx}px ${SIGN_FONT_STACK}`;
-  ctx.fillStyle = `rgba(${C.TRACK_RGB},${C.SIGN_ALPHA})`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  const sx = laneX(g.world, C.SIGN_Y_M) * S + ox;
-  ctx.fillText(C.SIGN_TEXT, sx, sy);
+  x.font = `italic 400 ${refPx}px ${SIGN_FONT_STACK}`;
+  const m0 = x.measureText(text);
+  const refW = m0.actualBoundingBoxLeft + m0.actualBoundingBoxRight || m0.width || 1;
+  const fontPx = ((wM * Q) / refW) * refPx;
+  const font = `italic 400 ${fontPx}px ${SIGN_FONT_STACK}`;
+  x.font = font;
+  const m1 = x.measureText(text);
+  const asc = m1.actualBoundingBoxAscent || fontPx * 0.8, desc = m1.actualBoundingBoxDescent || fontPx * 0.25;
+  const pad = SIGN_PAD_M * Q;
+  c.width = Math.ceil(wM * Q + 2 * pad); // setzt den Kontext zurück und löscht
+  c.height = Math.ceil(asc + desc + 2 * pad);
+  x.font = font;
+  x.textAlign = 'center';
+  x.textBaseline = 'alphabetic';
+  const cx = c.width / 2, by = pad + asc, d = C.SIGN_RELIEF_M * Q;
+  x.fillStyle = '#FFFFFF';
+  x.fillText(text, cx + d, by + d); // Glanz: die beleuchtete Kante unten-rechts
+  x.fillStyle = `rgb(${C.SHADOW_RGB})`;
+  x.fillText(text, cx - d, by - d); // Schatten: die Kante im Licht-Schatten oben-links
+  x.fillStyle = `rgb(${C.TRACK_RGB})`;
+  x.fillText(text, cx, by);
+  sg.c = c; sg.x = x; sg.Q = Q;
+  sg.wM = c.width / Q; sg.hM = c.height / Q;
+  sg.x0 = laneX(g.world, C.SIGN_Y_M) - sg.wM / 2;
+  sg.y0 = C.SIGN_Y_M - sg.hM / 2;
+  sg.key = signKey(R);
+  sg.world = g.world;
+  // Radierung aus dem Ringpuffer nachspielen: ein Neuaufbau mitten im Lauf (Schrift geladen, Regler gedreht,
+  // Fenster geändert) darf den kaputt gefahrenen Schriftzug nicht heilen
+  replayErase(sg, g.track, g.track.n);
+  sg.seen = g.track.total;
+}
+
+// Die letzten count Spurpunkte als Segmente radieren; das Lücken-Flag steht am späteren Punkt (wie in drawTrack)
+function replayErase(sg, tr, count) {
+  let px = 0, py = 0, pnx = 0, pny = 0, pplow = 0, has = false;
+  forEachRecentTrackPoint(tr, count, (x, y, nx, ny, w, gap, plow) => {
+    if (has && !gap) eraseSegment(sg, px, py, pnx, pny, pplow, x, y, nx, ny, w, plow);
+    px = x; py = y; pnx = nx; pny = ny; pplow = plow; has = true;
+  });
+}
+
+// Ein Spursegment auf dem Offscreen-Canvas ausradieren: je Ski ein Strich in Spurbreite (Carve macht ihn breiter,
+// der Pflug zählt wie in drawTrack als kräftiges Carve), darüber ein breiter, schwacher Strich für den
+// aufgewirbelten Schnee. Alpha unter 1: mehrere Überfahrten summieren sich, eine allein verwischt nur.
+function eraseSegment(sg, xa, ya, nxa, nya, pa, xb, yb, nxb, nyb, wb, pb) {
+  const half = sg.hM / 2;
+  if (Math.abs(ya - C.SIGN_Y_M) > half && Math.abs(yb - C.SIGN_Y_M) > half) return;
+  const { x, Q } = sg;
+  const carve = Math.max(wb, 0.6 * pb);
+  const w = 0.12 * Q * (1 + (C.TRACK_WIDTH_MAX - 1) * carve) * C.SIGN_ERASE_WIDTH_K;
+  x.globalCompositeOperation = 'destination-out';
+  x.lineCap = 'round';
+  for (let side = -1; side <= 1; side += 2) {
+    const offA = side * (0.16 + C.PLOW_SPREAD_M * pa), offB = side * (0.16 + C.PLOW_SPREAD_M * pb);
+    const ax = (xa + nxa * offA - sg.x0) * Q, ay = (ya + nya * offA - sg.y0) * Q;
+    const bx = (xb + nxb * offB - sg.x0) * Q, by = (yb + nyb * offB - sg.y0) * Q;
+    x.strokeStyle = `rgba(0,0,0,${C.SIGN_SPRAY_ALPHA})`;
+    x.lineWidth = w + C.SIGN_SPRAY_W_M * Q;
+    x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke();
+    x.strokeStyle = `rgba(0,0,0,${C.SIGN_ERASE_ALPHA})`;
+    x.lineWidth = w;
+    x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke();
+  }
+  x.globalCompositeOperation = 'source-over';
+}
+
+// Jedes Bild, auch wenn der Schriftzug nicht im Bild ist: neue Spurpunkte seit dem letzten Bild radieren.
+// Ein Punkt mehr, damit das erste neue Segment seinen Vorgänger hat.
+function updateSignature(R, g) {
+  const sg = R.sign, tr = g.track;
+  if (sg.world !== g.world || sg.key !== signKey(R)) buildSignature(R, g);
+  const fresh = Math.min(tr.total - sg.seen, tr.n);
+  if (fresh > 0) replayErase(sg, tr, fresh + 1);
+  sg.seen = tr.total;
+}
+
+function drawSignature(R, g, ox, oy) {
+  updateSignature(R, g);
+  const { ctx, Sv: S, H } = R, sg = R.sign;
+  const sy = sg.y0 * S + oy, sh = sg.hM * S;
+  if (sy + sh < 0 || sy > H) return;
+  ctx.globalAlpha = C.SIGN_ALPHA;
+  ctx.drawImage(sg.c, sg.x0 * S + ox, sy, sg.wM * S, sh);
+  ctx.globalAlpha = 1;
 }
 
 function drawTrack(R, g, ox, oy) {

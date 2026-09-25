@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.12.0';
+export const VERSION = '0.12.1';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -169,16 +169,23 @@ export const C = {
   MARK_RGBA: 'rgba(70,120,200,0.45)',
   MARK_BEST_RGBA: 'rgba(220,60,50,0.7)',
 
-  // Signatur im Schnee (render.js/world.js): Credit an den Ersteller des Repos, bei SIGN_Y_M wie von einer
-  // Pistenraupe über die volle Sichtbreite gefräst, in Farbe und Deckkraft wie die Skispur (TRACK_RGB) statt
-  // einer eigenen Farbe. Fährt der Skifahrer darüber, zeichnet sich die eigene Spur einfach darüber (gleiche
-  // Zeichenreihenfolge wie bei der Spur). SIGN_BAND_M spannt links und rechts der Mittellinie des Korridors
-  // einen hindernisfreien Streifen auf, groß genug für den Schriftzug in jeder Zoom-Stufe (world.js).
-  SIGN_TEXT: 'Made by: matthiaetim 👑',
+  // Signatur im Schnee (render.js/world.js): Credit bei SIGN_Y_M, wie in den Schnee gefräst, zentriert auf der
+  // Korridor-Mitte, in der Schrift des HUD und in der Farbe der Skispur (TRACK_RGB). Relief wie bei den Bäumen:
+  // das Licht kommt von oben-links, die Fräsung wirft ihren Schatten also nach oben-links und glänzt unten-rechts.
+  // Der Schriftzug liegt einmal gerendert in einem Offscreen-Canvas; fährt der Skifahrer darüber, radieren die
+  // Ski ihn dort aus: der Credit ist kaputt gefahren und bleibt es bis zum nächsten Lauf. SIGN_BAND_M spannt
+  // links und rechts der Mittellinie einen hindernisfreien Streifen auf (world.js).
+  SIGN_TEXT: 'made by: DJ Tim Matthiä',
   SIGN_Y_M: 333,
-  SIGN_WIDTH_FRAC: 0.86,     // Anteil von VIEW_W_M, den der Schriftzug in der Breite füllt
+  SIGN_WIDTH_FRAC: 0.86,     // (Tuning) Anteil von VIEW_W_M, den der Schriftzug in der Breite füllt
   SIGN_BAND_M: 9,            // Hindernisfreier Streifen: SIGN_Y_M ± SIGN_BAND_M
-  SIGN_ALPHA: 0.3,           // Deckkraft über TRACK_RGB
+  SIGN_ALPHA: 0.3,           // (Tuning) Deckkraft über TRACK_RGB
+  SIGN_RELIEF_M: 0.08,       // Versatz von Schatten und Glanz in m: die Tiefe der Fräsung
+  SIGN_ERASE_ALPHA: 0.6,     // (Tuning) Radierstärke je Überfahrt; unter 1 verwischt es, statt sauber auszuschneiden
+  SIGN_ERASE_WIDTH_K: 1.5,   // Radierstrich als Vielfaches der Spurbreite
+  SIGN_SPRAY_ALPHA: 0.2,     // breiter, schwacher zweiter Strich: der aufgewirbelte Schnee neben den Ski
+  SIGN_SPRAY_W_M: 0.6,       // so viel breiter als der Radierstrich
+  SIGN_MAX_PX: 2048,         // Deckel für die Breite des Offscreen-Canvas in Gerätepixeln
 
   // Hockeystop (physics.js/game.js/render.js): wird beim Halten (kein Pflug) ausgelöst, sobald HOCKEY_MIN_KMH
   // erreicht und die Bremse schon HOCKEY_HOLD_S lang gehalten ist. Statt der normalen weichen Physik springt der
@@ -237,6 +244,10 @@ export const TUNABLES = [
   { key: 'AV_MERCY_DEG', label: 'Gnade bis Winkel', unit: '°', min: 0, max: 60, step: 5 },
   { key: 'AV_CURVE_DEG', label: 'Volle Härte ab Winkel', unit: '°', min: 20, max: 95, step: 5 },
   { key: 'AV_MERCY_KMH', label: 'Schuss schüttelt ab', unit: 'km/h', min: 0, max: 30, step: 1 },
+  { heading: 'Schriftzug' },
+  { key: 'SIGN_ALPHA', label: 'Deckkraft', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
+  { key: 'SIGN_WIDTH_FRAC', label: 'Breite', unit: '%', min: 0.4, max: 1, step: 0.02, scale: 100, decimals: 0 },
+  { key: 'SIGN_ERASE_ALPHA', label: 'Verwischen beim Überfahren', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
   { heading: 'Ton' },
   { key: 'SND_MASTER', label: 'Lautstärke', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
   { key: 'SND_WIND', label: 'Wind', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },

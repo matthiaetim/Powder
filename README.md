@@ -13,6 +13,7 @@ Plain HTML + JavaScript + Canvas, kein Framework, kein Build.
 - Der Start hat schon Fahrt, ohne Eingabe wird man stetig schneller bis zum Endtempo. Kurze Tipps kosten kaum Tempo, Halten bremst hart, quer zum Hang bleibt man stehen.
 - Bei hohem Tempo rückt der Fahrer im Bild nach oben und die Sicht zoomt leicht heraus (mehr Vorausschau).
 - **Markierungen im Schnee**: alle 1000 m eine dünne blaue Linie mit Meterzahl, der bisherige Bestwert des Modus als rote Rekordlinie (beim Start des Laufs eingefroren).
+- **Credit bei 333 m**: ein Schriftzug, wie in den Schnee gefräst, quer über die Korridor-Mitte. Wer darüberfährt, radiert ihn mit den Ski aus, bis zum nächsten Lauf. Deckkraft, Breite und Verwischen sind Regler im Tuning-Panel.
 - **Fresh-Seite**: Meter und Laufzeit des letzten Laufs (unter einer Minute in Sekunden, sonst `1:34:07 Minuten`), Bestwert je Modus, Moduswahl.
 - Tastatur: `A`/`D` oder Pfeile, `P` Pause, `R`, Enter oder Leertaste Fresh (neuer Lauf). Auf dem iPhone gibt es keine Pause-Taste: anhalten heißt querstellen; beim Wechsel in den Hintergrund pausiert die App von selbst.
 - **Tuning-Panel**: langer Druck auf das Versions-Label unten links. Werte bleiben gespeichert, „Standard“ setzt zurück.
