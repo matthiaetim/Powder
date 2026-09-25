@@ -9,6 +9,7 @@ const TAU = Math.PI * 2;
 const TREE_H = 3.2; // nominale Sprite-Höhe in Metern
 const ROCK_H = 1.4;
 const MARK_FONT = "italic 12px 'Playfair Display', Georgia, 'Times New Roman', serif"; // wie --font in styles.css
+const SIGN_FONT_STACK = "'Arial Black', Arial, sans-serif";
 const nf = new Intl.NumberFormat(C.HUD_LOCALE);
 
 export function createRenderer(canvas) {
@@ -131,6 +132,7 @@ export function draw(R, g, t) {
     oy += Math.sin(t * 61 + 0.7) * k * 0.8;
   }
   drawMarks(R, g, ox, oy);
+  drawSignature(R, g, ox, oy);
   drawTrack(R, g, ox, oy);
   drawWorld(R, g, ox, oy);
   drawParticles(R, g, ox, oy);
@@ -162,6 +164,28 @@ function markLine(ctx, W, sy, label, color) {
   ctx.fillStyle = color;
   ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
   ctx.fillText(label, W - 8, sy - 3);
+}
+
+// ---------- Signatur im Schnee ----------
+// Wie von einer Pistenraupe gefräst: fester Punkt im Hang (SIGN_Y_M), über die volle Sichtbreite, in Farbe und
+// Deckkraft wie die Skispur. Die Schriftgröße wird pro Bild aus der Zielbreite in Metern zurückgerechnet, damit
+// es bei jedem Zoom gleich breit wirkt; die Spur (drawTrack) zeichnet direkt danach darüber.
+function drawSignature(R, g, ox, oy) {
+  const { ctx, Sv: S, H } = R;
+  const sy = C.SIGN_Y_M * S + oy;
+  if (sy < -300 || sy > H + 300) return;
+  const targetPx = C.VIEW_W_M * C.SIGN_WIDTH_FRAC * S;
+  if (targetPx <= 0) return;
+  const refPx = 200;
+  ctx.font = `900 ${refPx}px ${SIGN_FONT_STACK}`;
+  const refW = ctx.measureText(C.SIGN_TEXT).width || 1;
+  const fontPx = (targetPx / refW) * refPx;
+  ctx.font = `900 ${fontPx}px ${SIGN_FONT_STACK}`;
+  ctx.fillStyle = `rgba(${C.TRACK_RGB},${C.SIGN_ALPHA})`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const sx = laneX(g.world, C.SIGN_Y_M) * S + ox;
+  ctx.fillText(C.SIGN_TEXT, sx, sy);
 }
 
 function drawTrack(R, g, ox, oy) {

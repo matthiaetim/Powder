@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.11.2';
+export const VERSION = '0.11.3';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -168,6 +168,17 @@ export const C = {
   MARK_PX: 1.5,
   MARK_RGBA: 'rgba(70,120,200,0.45)',
   MARK_BEST_RGBA: 'rgba(220,60,50,0.7)',
+
+  // Signatur im Schnee (render.js/world.js): Credit an den Ersteller des Repos, bei SIGN_Y_M wie von einer
+  // Pistenraupe über die volle Sichtbreite gefräst, in Farbe und Deckkraft wie die Skispur (TRACK_RGB) statt
+  // einer eigenen Farbe. Fährt der Skifahrer darüber, zeichnet sich die eigene Spur einfach darüber (gleiche
+  // Zeichenreihenfolge wie bei der Spur). SIGN_BAND_M spannt links und rechts der Mittellinie des Korridors
+  // einen hindernisfreien Streifen auf, groß genug für den Schriftzug in jeder Zoom-Stufe (world.js).
+  SIGN_TEXT: 'Made by: matthiaetim 👑',
+  SIGN_Y_M: 333,
+  SIGN_WIDTH_FRAC: 0.86,     // Anteil von VIEW_W_M, den der Schriftzug in der Breite füllt
+  SIGN_BAND_M: 9,            // Hindernisfreier Streifen: SIGN_Y_M ± SIGN_BAND_M
+  SIGN_ALPHA: 0.3,           // Deckkraft über TRACK_RGB
 };
 
 // Regler im Tuning-Panel (langer Druck auf das Versions-Label). Einträge mit heading sind Zwischentitel,
