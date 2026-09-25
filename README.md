@@ -13,7 +13,7 @@ Plain HTML + JavaScript + Canvas, kein Framework, kein Build.
 - Der Start hat schon Fahrt, ohne Eingabe wird man stetig schneller bis zum Endtempo. Kurze Tipps kosten kaum Tempo, Halten bremst hart, quer zum Hang bleibt man stehen.
 - Bei hohem Tempo rückt der Fahrer im Bild nach oben und die Sicht zoomt leicht heraus (mehr Vorausschau).
 - **Markierungen im Schnee**: alle 1000 m eine dünne blaue Linie mit Meterzahl, der bisherige Bestwert des Modus als rote Rekordlinie, die Bestweiten der anderen aus der Bestenliste als graue Namenslinien (alle beim Start des Laufs eingefroren).
-- **Credit bei 333 m**: ein Schriftzug, wie in den Schnee gefräst, quer über die Korridor-Mitte. Wer darüberfährt, radiert ihn mit den Ski aus, bis zum nächsten Lauf. Deckkraft, Breite und Verwischen sind Regler im Tuning-Panel.
+- **Credit bei 333 m**: ein großes Schild quer über der Korridor-Mitte, weiße Platte mit Tinte-Rand und hartem Schatten. Wer darüberfährt, zerkratzt es mit den Ski, bis zum nächsten Lauf. Deckkraft, Breite und Verwischen sind Regler im Tuning-Panel.
 - **Fresh-Seite**: Meter und Laufzeit des letzten Laufs (unter einer Minute in Sekunden, sonst `1:34:07 Minuten`), Bestwert je Modus, Bestenliste (siehe unten), Moduswahl.
 - **Fresh-Seite**: Meter und Laufzeit des letzten Laufs (unter einer Minute in Sekunden, sonst `1:34:07 Minuten`), Bestwert je Modus, Moduswahl.
 - **Super-G**: Countdown mit drei kurzen und einem langen Piepton, ab dem langen läuft die Zeit. Beim App-Start wartet der Modus auf einen Tipp („Tippen zum Start“), nach Fresh zählt er von selbst. Das HUD zeigt die wirksame Zeit (Laufzeit plus Strafen), unter dem Fahrer erscheint kurz „Torfehler +3 s“ oder bei 250, 500 und 750 m die Differenz zur Bestzeit (grün schneller, rot langsamer). `P` pausiert auch den Countdown, der dann von vorn beginnt.
@@ -100,6 +100,13 @@ Alle Stellschrauben stehen in `src/constants.js`; die Liste `TUNABLES` dort best
 2. `git commit` und `git push`
 3. Auf dem iPhone die App zweimal öffnen, das Versions-Label unten links zeigt den Stand
 
-## Font
+## Fonts
 
-Playfair Display Italic (SIL Open Font License), Quelle: Google Fonts.
+Der Look folgt seit v0.16.0 dem Spiel [Don't Look Up](https://www.dontlookup.app): Papier und Tinte, harte
+Versatz-Schatten, ungleiche Ecken. Alle Schriften liegen in `fonts/` und werden selbst gehostet:
+
+- Luckiest Guy (Apache License 2.0), Quelle: Google Fonts. Display-Schrift für Zahlen, Titel, Buttons und die
+  Schilder im Schnee (Meter-, Namens- und Rekordlinien, Start, Ziel, Credit). Die
+  Referenz nutzt „FGD Marsipan“ (kostenpflichtig, fgdesigners.com) mit Luckiest Guy als Fallback; wer Marsipan kauft,
+  legt sie in `fonts/` und trägt sie in `styles.css` vor Luckiest Guy ein.
+- Nunito, variabel 400 bis 800 (SIL Open Font License), Quelle: Google Fonts. Textschrift.

@@ -1,6 +1,6 @@
 // Service Worker: alles vorab cachen, offline starten. Cache-Name trägt die Version,
 // damit ein Deploy beim nächsten Start ankommt. Version bumpen: tools/bump.sh <version>
-const VERSION = '0.15.0';
+const VERSION = '0.16.0';
 const CACHE = 'powder-' + VERSION;
 const FILES = [
   './',
@@ -26,7 +26,8 @@ const FILES = [
   './src/hud.js',
   './src/game.js',
   './src/main.js',
-  './fonts/PlayfairDisplay-Italic.woff2',
+  './fonts/LuckiestGuy-Regular.woff2',
+  './fonts/Nunito-Variable.woff2',
   './icons/icon.svg',
   './icons/icon-180.png',
   './icons/icon-192.png',

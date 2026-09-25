@@ -1,17 +1,37 @@
+/* Look nach dontlookup.app: Papier und Tinte, Display-Schrift für Zahlen und Buttons, Nunito für Text, harte
+   Versatz-Schatten ohne Weichzeichner, leicht ungleiche Ecken. Marsipan (die Original-Schrift der Referenz) ist
+   kostenpflichtig; Luckiest Guy ist ihr Fallback und liegt in fonts/. Die Schilder im Schnee (render.js) nutzen
+   dieselbe Display-Schrift. */
 @font-face {
-  font-family: 'Playfair Display';
-  font-style: italic;
+  font-family: 'Luckiest Guy';
+  font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('./fonts/PlayfairDisplay-Italic.woff2') format('woff2');
+  src: url('./fonts/LuckiestGuy-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('./fonts/Nunito-Variable.woff2') format('woff2');
 }
 
 :root {
-  --bg: #F5F9FD;
-  --ink: #2E3A45;
-  --slow: #C8433B; /* Super-G: Torfehler und Zwischenzeit langsamer, wie GATE_RED in constants.js */
-  --fast: #2F8A4E; /* Zwischenzeit schneller */
-  --font: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --bg: #F5F9FD;      /* Schnee, wie SNOW in render.js */
+  --paper: #F4F3EF;   /* Karten, Overlays */
+  --ink: #14140F;
+  --slow: #C0342A;    /* Super-G: Torfehler und Zwischenzeit langsamer, wie GATE_RED in constants.js */
+  --fast: #2E7D46;    /* Zwischenzeit schneller */
+  --mark: #F8E08A;    /* gewählte Kachel, Hinweise */
+  --display: 'Luckiest Guy', ui-rounded, 'SF Pro Rounded', system-ui, sans-serif;
+  --body: 'Nunito', ui-rounded, 'SF Pro Rounded', system-ui, sans-serif;
+  --font: var(--body);
+  /* Ecken sind absichtlich ungleich, das wirkt wie von Hand gezeichnet */
+  --r-card: 22px 27px 20px 25px / 27px 20px 25px 22px;
+  --r-btn: 24px 30px 22px 28px / 30px 22px 28px 24px;
+  --r-tile: 14px 17px 12px 16px / 17px 12px 16px 14px;
+  --press: 130ms ease-out;
 }
 
 html, body {
@@ -36,8 +56,10 @@ body {
   width: 100%;
   height: 100vh;
   height: 100dvh;
-  font-family: var(--font);
-  font-style: italic;
+  font-family: var(--body);
+  font-weight: 700;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
   color: var(--ink);
 }
 
@@ -49,20 +71,36 @@ canvas#game {
   display: block;
 }
 
+button {
+  font-family: var(--display);
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+/* Display-Schrift: Zahlen und Titel, leicht gesperrt wie in der Referenz */
+.dsp, #hud, #hud-note, #dead-dist, .ov-title, #ov-count, .board-rank, .board-m, #btn-fresh, .mode-name, .tune-title {
+  font-family: var(--display);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
 #hud {
   position: fixed;
   right: 20px;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
   text-align: right;
-  line-height: 1.15;
+  line-height: 1.05;
   pointer-events: none;
   font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 6px var(--bg), 0 0 12px var(--bg);
 }
-#hud-speed { font-size: 18px; }
-#hud-dist { font-size: 28px; }
-#hud-time { font-size: 28px; display: none; }
+#hud-speed { font-size: 17px; opacity: 0.75; }
+#hud-dist { font-size: 32px; }
+#hud-time { font-size: 32px; display: none; }
 body[data-mode="superg"] #hud-time { display: block; }
-body[data-mode="superg"] #hud-dist { font-size: 18px; }
+body[data-mode="superg"] #hud-dist { font-size: 17px; opacity: 0.75; }
 body[data-state="dead"] #hud, body[data-state="finished"][data-overlay="1"] #hud { display: none; }
 
 /* Super-G: Hinweis unter dem Fahrer (Torfehler, Zwischenzeit), blendet über die Klasse ein */
@@ -72,11 +110,12 @@ body[data-state="dead"] #hud, body[data-state="finished"][data-overlay="1"] #hud
   right: 0;
   top: 46%;
   text-align: center;
-  font-size: 30px;
+  font-size: 28px;
   font-variant-numeric: tabular-nums;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.25s;
+  text-shadow: 0 0 6px var(--bg), 0 0 12px var(--bg);
 }
 #hud-note.miss, #hud-note.slow { color: var(--slow); opacity: 1; }
 #hud-note.fast { color: var(--fast); opacity: 1; }
@@ -88,7 +127,7 @@ body[data-state="dead"] #hud, body[data-state="finished"][data-overlay="1"] #hud
   right: 0;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 72px);
   text-align: center;
-  font-size: 15px;
+  font-size: 14px;
   opacity: 0;
   transition: opacity 0.5s;
   pointer-events: none;
@@ -104,50 +143,64 @@ body[data-state="ready"][data-intro="1"] #hint { opacity: 0.6; }
   justify-content: center;
   text-align: center;
 }
-#ov-pause { background: rgba(245, 249, 253, 0.65); }
+#ov-pause { background: rgba(244, 243, 239, 0.7); }
 body[data-state="paused"] #ov-pause { display: flex; }
-.ov-title { font-size: 40px; }
-.ov-sub { font-size: 16px; opacity: 0.7; margin-top: 8px; }
+.ov-title { font-size: 44px; }
+.ov-sub { font-size: 14px; opacity: 0.7; margin-top: 8px; }
 
 /* Super-G: Countdown 3 · 2 · 1 in der Mitte, dann kurz „Go“; Tipps gehen durch auf den Canvas */
-#ov-count { font-size: 96px; line-height: 1; pointer-events: none; }
-#ov-count.go { font-size: 64px; }
+#ov-count { font-size: 120px; line-height: 1; pointer-events: none; text-shadow: 0 0 8px var(--bg), 0 0 16px var(--bg); }
+#ov-count.go { font-size: 80px; }
 body[data-state="count"] #ov-count, #ov-count.go { display: flex; }
 
-#ov-dead { background: rgba(46, 58, 69, 0.45); }
+/* Fresh-Seite: Papier-Schleier über dem Spielfeld, darauf eine weiße Karte mit allem drin */
+#ov-dead { background: rgba(244, 243, 239, 0.62); padding: 0 16px; box-sizing: border-box; }
 body[data-state="dead"][data-overlay="1"] #ov-dead, body[data-state="finished"][data-overlay="1"] #ov-dead { display: flex; }
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 340px;
+  box-sizing: border-box;
+  padding: 18px 12px 14px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 3px solid var(--ink);
+  border-radius: var(--r-card);
+  box-shadow: 5px 6px 0 var(--ink);
+  transform: rotate(-0.6deg);
+}
 #dead-dist { font-size: 56px; line-height: 1; }
-#dead-time { font-size: 16px; opacity: 0.8; margin-top: 10px; }
-#dead-best { font-size: 16px; opacity: 0.8; margin-top: 4px; }
+#dead-time { font-size: 14px; margin-top: 8px; }
+#dead-best { font-size: 14px; opacity: 0.7; margin-top: 2px; }
 
-/* Bestenliste (board.js, hud.js): Rang | Name | Meter in der Schrift der Zeilen darüber, andere Zeilen leicht
-   zurückgenommen, die eigene deckend. Die eigene Zeile trägt das Namensfeld; ohne Namen steht nur das Feld da,
-   zentriert und unterstrichen. 16 px, damit iOS beim Fokus nicht zoomt; user-select text, weil body none setzt
-   (sonst bekommt das Feld auf iOS keinen Fokus). */
-#board { width: 250px; margin-top: 14px; font-size: 16px; }
+/* Bestenliste (board.js, hud.js): Rang | Name | Meter, andere Zeilen leicht zurückgenommen, die eigene deckend.
+   Die eigene Zeile trägt das Namensfeld; ohne Namen steht nur das Feld da, zentriert. 16 px, damit iOS beim Fokus
+   nicht zoomt; user-select text, weil body none setzt (sonst bekommt das Feld auf iOS keinen Fokus). */
+#board { width: 250px; margin-top: 12px; font-size: 14px; }
 .board-row {
   display: grid;
   grid-template-columns: 2em minmax(0, 1fr) auto;
   column-gap: 10px;
   align-items: baseline;
-  line-height: 1.4;
+  line-height: 1.5;
   opacity: 0.7;
 }
-.board-own { opacity: 1; }
-.board-rank, .board-m { text-align: right; font-variant-numeric: tabular-nums; }
+.board-own { opacity: 1; align-items: center; margin-top: 4px; }
+.board-rank, .board-m { text-align: right; font-variant-numeric: tabular-nums; font-size: 15px; }
 .board-name { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #board-more { line-height: 1; opacity: 0.7; }
 #board-name {
   width: 100%;
   min-width: 0;
   margin: 0;
-  padding: 0;
-  font: italic 16px var(--font);
+  padding: 6px 10px;
+  box-sizing: border-box;
+  font: 700 16px var(--body);
   color: var(--ink);
-  background: transparent;
-  border: 0;
-  border-bottom: 1px solid transparent;
-  border-radius: 0;
+  background: #fff;
+  border: 2.5px solid var(--ink);
+  border-radius: 11px;
   outline: none;
   -webkit-appearance: none;
   appearance: none;
@@ -155,80 +208,93 @@ body[data-state="dead"][data-overlay="1"] #ov-dead, body[data-state="finished"][
   user-select: text;
   -webkit-touch-callout: default;
   touch-action: manipulation;
+  transition: box-shadow var(--press), transform var(--press);
 }
-#board-name::placeholder { color: var(--ink); opacity: 0.55; }
-#board-name:focus, #board[data-named=""] #board-name { border-bottom-color: rgba(46, 58, 69, 0.6); }
-#board[data-named=""] .board-own { grid-template-columns: 1fr; width: 160px; margin: 0 auto; }
+#board-name::placeholder { color: var(--ink); opacity: 0.45; }
+#board-name:focus { box-shadow: 3px 4px 0 var(--ink); transform: translate(-1px, -1px); }
+#board[data-named=""] .board-own { grid-template-columns: 1fr; width: 170px; margin: 6px auto 0; }
 #board[data-named=""] .board-rank, #board[data-named=""] .board-m { display: none; }
 #board[data-named=""] #board-name { text-align: center; }
-#board-note { margin: 6px -40px 0; font-size: 13px; opacity: 0.65; } /* breiter als die Liste, damit der Hinweis in einer Zeile bleibt */
-/* Mit Liste rücken die unteren Elemente enger, damit das iPhone SE (667 px) ohne Scrollen reicht */
-body[data-board="1"] #btn-fresh { margin-top: 26px; }
-body[data-board="1"] #modes { margin-top: 34px; }
-body[data-board="1"] #btn-sound { margin-top: 22px; }
-#btn-fresh {
-  margin-top: 36px;
-  font: italic 22px var(--font);
-  color: var(--ink);
-  background: transparent;
-  border: 2px solid var(--ink);
-  padding: 10px 30px;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-#btn-fresh:active { background: rgba(46, 58, 69, 0.12); }
+#board-note { margin: 8px -40px 0; font-size: 12px; opacity: 0.65; } /* breiter als die Liste, damit der Hinweis in einer Zeile bleibt */
 
+/* Haupt-Button: schwarz mit Papier-Rand, harter Schatten, sinkt beim Druck auf seinen Schatten */
+#btn-fresh {
+  margin-top: 22px;
+  height: 44px;
+  padding: 0 28px;
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fff;
+  background: #000;
+  border: 3px solid var(--paper);
+  border-radius: var(--r-btn);
+  box-shadow: 5px 6px 0 var(--ink);
+  transform: rotate(0.7deg);
+  transition: transform var(--press), box-shadow var(--press);
+}
+#btn-fresh:active { transform: rotate(0.7deg) translate(5px, 6px); box-shadow: 0 0 0 var(--ink); }
+
+/* Modus-Kacheln: weiße Kärtchen, die gewählte ist gelb. Vorschau-Canvas 104x58 wird auf 82 px skaliert, damit drei
+   Kacheln in die Karte passen (313 px innen auf dem 375-px-iPhone). */
 #modes {
   display: flex;
-  gap: 12px; /* drei Karten zu 104 px passen so auf 375 px */
-  margin-top: 48px;
+  gap: 8px;
+  margin-top: 22px;
+  align-items: flex-start;
 }
 .mode-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 7px;
-  padding: 0;
-  border: 0;
-  background: transparent;
+  gap: 5px;
+  padding: 4px 4px 5px;
   color: var(--ink);
-  font: italic 15px var(--font);
-  opacity: 0.5;
-  cursor: pointer;
-  touch-action: manipulation;
+  background: #fff;
+  border: 2.5px solid var(--ink);
+  border-radius: var(--r-tile);
+  box-shadow: 3px 4px 0 var(--ink);
   -webkit-tap-highlight-color: transparent;
+  transition: transform var(--press), box-shadow var(--press), background 0.15s;
 }
-.mode-card.active { opacity: 1; }
-.mode-card.soon { opacity: 0.32; cursor: default; }
+.mode-card:active { transform: translate(3px, 4px); box-shadow: 0 0 0 var(--ink); }
+.mode-card.active { background: var(--mark); }
+.mode-card.soon { opacity: 0.4; cursor: default; }
 .mode-preview {
   display: block;
-  width: 104px;
-  height: 58px;
-  border: 1px solid rgba(46, 58, 69, 0.55);
+  width: 82px;
+  height: 46px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
   box-sizing: border-box;
 }
-.mode-card.active .mode-preview { border: 2px solid var(--ink); }
-.mode-name { line-height: 1; }
+.mode-name { font-size: 12px; line-height: 1; letter-spacing: 0.06em; text-transform: uppercase; }
 .mode-cta {
-  font-size: 12px;
+  font-family: var(--body);
+  font-size: 11px;
   line-height: 1;
   opacity: 0.65;
   visibility: hidden;
+  text-transform: none;
+  letter-spacing: 0;
 }
 .mode-card.active .mode-cta, .mode-card.soon .mode-cta { visibility: visible; }
 
-#btn-sound {
-  margin-top: 30px;
-  padding: 8px 14px;
-  font: italic 13px var(--font);
+/* kleine flache Knöpfe: Ton, Tuning-Aktionen */
+.btn-flat, #btn-sound, .tune-actions button {
+  padding: 6px 12px;
+  font-family: var(--display);
+  font-size: 11px;
+  letter-spacing: 0.04em;
   color: var(--ink);
-  background: transparent;
-  border: 0;
-  opacity: 0.65;
-  cursor: pointer;
-  touch-action: manipulation;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  transition: background 0.14s, color 0.14s;
 }
-#btn-sound.off { opacity: 0.4; }
+.btn-flat:active, #btn-sound:active, .tune-actions button:active { background: var(--ink); color: var(--paper); }
+#btn-sound { margin-top: 16px; }
+#btn-sound.off { opacity: 0.45; }
 
 #version {
   position: fixed;
@@ -236,7 +302,8 @@ body[data-board="1"] #btn-sound { margin-top: 22px; }
   bottom: env(safe-area-inset-bottom, 0px);
   padding: 14px 10px 6px 10px;
   font-size: 10px;
-  opacity: 0.35;
+  font-weight: 600;
+  opacity: 0.4;
   touch-action: none;
 }
 #version.tuned::after { content: ' · tuned'; }
@@ -248,35 +315,28 @@ body[data-board="1"] #btn-sound { margin-top: 22px; }
   right: 12px;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
   z-index: 10;
-  padding: 12px 14px 10px;
+  padding: 12px 14px 12px;
   box-sizing: border-box;
   max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 40px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  background: rgba(245, 249, 253, 0.96);
-  border: 1px solid rgba(46, 58, 69, 0.5);
+  background: rgba(255, 255, 255, 0.97);
+  border: 3px solid var(--ink);
+  border-radius: 16px;
+  box-shadow: 7px 8px 0 rgba(20, 20, 15, 0.1);
   color: var(--ink);
-  font-style: italic;
   touch-action: pan-y;
 }
 #tune[hidden] { display: none; }
-.tune-title { font-size: 18px; margin-bottom: 8px; }
+.tune-title { font-size: 16px; margin-bottom: 8px; }
 .tune-rows { display: flex; flex-direction: column; gap: 6px; }
-.tune-heading { font-size: 14px; opacity: 0.6; margin: 8px 0 0; }
+.tune-heading { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.55; margin: 8px 0 0; }
 .tune-heading:first-child { margin-top: 0; }
 .tune-row { display: grid; grid-template-columns: 1fr auto; row-gap: 2px; font-size: 13px; }
 .tune-label { opacity: 0.85; }
 .tune-value { font-variant-numeric: tabular-nums; text-align: right; }
 .tune-row input[type="range"] { grid-column: 1 / -1; width: 100%; margin: 0; accent-color: var(--ink); touch-action: pan-x; }
 .tune-actions { display: flex; justify-content: space-between; margin-top: 12px; }
-.tune-actions button {
-  font: italic 14px var(--font);
-  color: var(--ink);
-  background: transparent;
-  border: 1px solid var(--ink);
-  padding: 6px 14px;
-  touch-action: manipulation;
-}
 
 #debug {
   position: fixed;
@@ -285,7 +345,6 @@ body[data-board="1"] #btn-sound { margin-top: 22px; }
   margin: 0;
   padding: 4px 6px;
   font: 11px/1.3 ui-monospace, Menlo, monospace;
-  font-style: normal;
   color: var(--ink);
   background: rgba(255, 255, 255, 0.6);
   white-space: pre;

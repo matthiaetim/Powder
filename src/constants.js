@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.15.0';
+export const VERSION = '0.16.0';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -157,14 +157,15 @@ export const C = {
   BOARD_NAME_MAX: 12,        // länger sprengt die Zeile Rang | Name | Meter bei 16 px
   BOARD_MAX_M: 99999,        // Obergrenze der Regeln: darüber ist es kein Lauf mehr, sondern ein Skript
   BOARD_TIMEOUT_MS: 6000,    // hängender Abruf blockiert sonst das Nachholen; die Liste kommt dann aus dem Cache
-  MARK_FRIEND_RGBA: 'rgba(46,58,69,0.4)', // Namenslinien fremder Bestweiten: blasses Schiefergrau, die eigene bleibt rot
-  BOARD_LABEL_GAP_PX: 14,    // 12-px-Labels brauchen ~14 px Abstand, sonst überlappen Weiten, die ~1 m auseinanderliegen
+  MARK_FRIEND_RGBA: 'rgba(20,20,15,0.35)', // Namenslinien fremder Bestweiten: blasse Tinte, die eigene bleibt rot
+  BOARD_LABEL_GAP_PX: 22,    // Schilder sind 18 px hoch plus Schatten, sonst überlappen Weiten, die ~1 m auseinanderliegen
 
-  // Farben: Polarweiß mit leichtem Blaustich, sattes Tannengrün mit braunem Stamm, kühles Schiefergrau für Text und Fahrer
+  // Farben: Polarweiß mit leichtem Blaustich, sattes Tannengrün mit braunem Stamm, Tinte wie --ink in styles.css
+  // für Fahrer, Stangen und Schilder (Look nach dontlookup.app)
   BG: '#F5F9FD',
-  BG_DIM: '#9BA3AA',         // Fresh-Seite: Abdunklung (styles.css, #ov-dead) über BG; färbt die iOS-Statusleiste mit
-  INK: '#2E3A45',
-  INK_LIGHT: '#3E4B57',
+  BG_DIM: '#F4F3EF',         // Fresh-Seite: Papier-Schleier (styles.css, #ov-dead) über BG; färbt die iOS-Statusleiste mit
+  INK: '#14140F',
+  INK_LIGHT: '#2C2C25',
   TREE: '#265A3A',
   TREE_LIGHT: '#357350',
   TRUNK: '#6B4F3B',
@@ -175,31 +176,33 @@ export const C = {
   TRACK: 'rgba(60,80,100,0.16)',
   AVALANCHE: [46, 58, 69],
   // Super-G: Fähnchen der Tore abwechselnd rot und blau, gedeckt wie der Rest der Palette, mit hellerer Oberkante
-  GATE_RED: '#C8433B',
-  GATE_RED_LIGHT: '#DA6A63',
+  GATE_RED: '#C0342A',       // wie --slow in styles.css
+  GATE_RED_LIGHT: '#D25A50',
   GATE_BLUE: '#3568B5',
   GATE_BLUE_LIGHT: '#5F8ACB',
-  FINISH_RGBA: 'rgba(46,58,69,0.5)', // karierte Ziellinie
+  FINISH_RGBA: 'rgba(20,20,15,0.5)', // karierte Ziellinie
 
   // Markierungen im Schnee (render.js): alle MARK_M eine blaue Querlinie mit Meterzahl, der Bestwert des Modus
   // als rote Rekordlinie. Dünn in CSS-Pixeln, unabhängig vom Zoom; Spur, Bäume und Fahrer liegen darüber.
   MARK_M: 1000,
   MARK_PX: 1.5,
   MARK_RGBA: 'rgba(70,120,200,0.45)',
-  MARK_BEST_RGBA: 'rgba(220,60,50,0.7)',
+  MARK_BEST_RGBA: 'rgba(192,52,42,0.75)',
 
-  // Signatur im Schnee (render.js/world.js): Credit bei SIGN_Y_M, wie in den Schnee gefräst, zentriert auf der
-  // Korridor-Mitte, in der Schrift des HUD und in der Farbe der Skispur (TRACK_RGB). Relief wie bei den Bäumen:
-  // das Licht kommt von oben-links, die Fräsung wirft ihren Schatten also nach oben-links und glänzt unten-rechts.
-  // Der Schriftzug liegt einmal gerendert in einem Offscreen-Canvas; fährt der Skifahrer darüber, radieren die
-  // Ski ihn dort aus: der Credit ist kaputt gefahren und bleibt es bis zum nächsten Lauf. SIGN_BAND_M spannt
+  // Signatur im Schnee (render.js/world.js): Credit bei SIGN_Y_M auf einem großen weißen Schild, zentriert auf der
+  // Korridor-Mitte, in der Display-Schrift des HUD mit Tinte-Rand und hartem Versatz-Schatten wie die Buttons.
+  // Das Schild liegt einmal gerendert in einem Offscreen-Canvas; fährt der Skifahrer darüber, radieren die
+  // Ski es dort aus: der Credit ist zerkratzt und bleibt es bis zum nächsten Lauf. SIGN_BAND_M spannt
   // links und rechts der Mittellinie einen hindernisfreien Streifen auf (world.js).
   SIGN_TEXT: 'made by: DJ Tim Matthiä',
   SIGN_Y_M: 333,
-  SIGN_WIDTH_FRAC: 0.86,     // (Tuning) Anteil von VIEW_W_M, den der Schriftzug in der Breite füllt
+  SIGN_WIDTH_FRAC: 0.86,     // (Tuning) Anteil von VIEW_W_M, den das Schild in der Breite füllt
   SIGN_BAND_M: 9,            // Hindernisfreier Streifen: SIGN_Y_M ± SIGN_BAND_M
-  SIGN_ALPHA: 0.3,           // (Tuning) Deckkraft über TRACK_RGB
-  SIGN_RELIEF_M: 0.08,       // Versatz von Schatten und Glanz in m: die Tiefe der Fräsung
+  SIGN_ALPHA: 0.9,           // (Tuning) Deckkraft des Schilds; unter 1 scheint der Schnee leicht durch
+  SIGN_PAD_M: 0.45,          // Innenrand der Platte um den Text
+  SIGN_BORDER_M: 0.12,       // Tinte-Rand der Platte
+  SIGN_SHADOW_M: 0.25,       // Versatz des harten Schattens nach unten-rechts
+  SIGN_TILT_DEG: -1.5,       // leicht schief, wie die Zettel der Vorlage
   SIGN_ERASE_ALPHA: 0.6,     // (Tuning) Radierstärke je Überfahrt; unter 1 verwischt es, statt sauber auszuschneiden
   SIGN_ERASE_WIDTH_K: 1.5,   // Radierstrich als Vielfaches der Spurbreite
   SIGN_SPRAY_ALPHA: 0.2,     // breiter, schwacher zweiter Strich: der aufgewirbelte Schnee neben den Ski

@@ -9,9 +9,14 @@ const TAU = Math.PI * 2;
 const TREE_H = 3.2; // nominale Sprite-Höhe in Metern
 const ROCK_H = 1.4;
 const POLE_H = 1.8; // Torstange (Super-G)
-const MARK_FONT = "italic 12px 'Playfair Display', Georgia, 'Times New Roman', serif"; // wie --font in styles.css
-const SIGN_FONT_STACK = "'Playfair Display', Georgia, 'Times New Roman', serif"; // nur italic 400 liegt in fonts/
-const SIGN_PAD_M = 0.3; // Rand des Offscreen-Canvas um den Schriftzug, für kursive Überhänge und das Relief
+// Texte im Schnee sitzen auf kleinen Schildern: weiße Platte, Tinte-Rand, harter Versatz-Schatten, leicht
+// schief, Display-Schrift wie im HUD (--display in styles.css). Die Display-Schrift ist Versalien-only, Rang und
+// Namen erscheinen also in Großbuchstaben, das gehört zum Look.
+const DISPLAY_FONT_STACK = "'Luckiest Guy', ui-rounded, 'SF Pro Rounded', system-ui, sans-serif";
+const TAG_FONT = `11px ${DISPLAY_FONT_STACK}`;
+const TAG_PAD_X = 7, TAG_H = 18, TAG_BORDER = 1.5, TAG_SHADOW = 2, TAG_TILT = -1.2 * Math.PI / 180;
+const TAG_RADII = [6, 8, 5, 7]; // ungleiche Ecken, wie von Hand gezeichnet
+const SIGN_FONT_STACK = DISPLAY_FONT_STACK;
 
 // Hockeystop deaktiviert (Tim und Jürgen wollen ihn nicht) — auskommentiert statt gelöscht.
 // Organischer Blob-Umriss fürs Hockeystop-Nebelfeld, normiert auf ±0.5 um den Mittelpunkt (mit `size`
@@ -46,10 +51,10 @@ export function createRenderer(canvas) {
     sign: { c: null, x: null, key: '', world: null, seen: 0, x0: 0, y0: 0, wM: 0, hM: 0, Q: 1 }, fontReady: false,
   };
   // Der Canvas stößt das Laden der Schrift nicht an, das HUD tut es beim Seitenstart. Bis sie da ist, würde der
-  // Schriftzug in Georgia gebaut; fontReady steckt im Schlüssel und baut ihn dann einmal neu. Ein Fehler zählt
+  // Schriftzug in der Systemschrift gebaut; fontReady steckt im Schlüssel und baut ihn dann einmal neu. Ein Fehler zählt
   // auch als fertig, sonst bliebe der Schlüssel ewig offen.
   if (document.fonts && document.fonts.load) {
-    document.fonts.load(`italic 400 20px ${SIGN_FONT_STACK}`).catch(() => {}).then(() => { R.fontReady = true; });
+    document.fonts.load(`400 20px ${SIGN_FONT_STACK}`).catch(() => {}).then(() => { R.fontReady = true; });
   } else R.fontReady = true;
   return R;
 }
@@ -214,12 +219,12 @@ function drawMarks(R, g, ox, oy) {
   const { ctx, Sv: S, W, H } = R;
   const y0 = -oy / S, y1 = (H - oy) / S;
   ctx.lineWidth = C.MARK_PX;
-  ctx.font = MARK_FONT;
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'bottom';
+  ctx.font = TAG_FONT;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
   if (g.course) { drawCourseLines(R, g, ox, oy, y0, y1); return; }
   for (let k = Math.max(1, Math.ceil(y0 / C.MARK_M)); k * C.MARK_M <= y1; k++) {
-    markLine(ctx, W, k * C.MARK_M * S + oy, nf.format(k * C.MARK_M) + ' m', C.MARK_RGBA);
+    markLine(ctx, W, k * C.MARK_M * S + oy, nf.format(k * C.MARK_M) + ' m', C.MARK_RGBA, TAG_PAPER);
   }
   // Bestweiten der anderen (g.runMarks, beim Start eingefroren, Meter absteigend = im Bild von unten nach oben).
   // Liegen zwei Weiten dichter als BOARD_LABEL_GAP_PX, weicht das obere Label nach oben aus; die Linie bleibt exakt.
@@ -228,17 +233,17 @@ function drawMarks(R, g, ox, oy) {
     if (f.m < y0 || f.m > y1) continue;
     const sy = f.m * S + oy;
     labelY = Math.min(sy - 3, labelY - C.BOARD_LABEL_GAP_PX);
-    markLine(ctx, W, sy, f.name + ' · ' + nf.format(f.m) + ' m', C.MARK_FRIEND_RGBA, labelY);
+    markLine(ctx, W, sy, f.name + ' · ' + nf.format(f.m) + ' m', C.MARK_FRIEND_RGBA, TAG_WHITE, labelY);
   }
   const b = g.runBest;
-  if (b > 0 && b >= y0 && b <= y1) markLine(ctx, W, b * S + oy, 'Rekord · ' + nf.format(b) + ' m', C.MARK_BEST_RGBA);
+  if (b > 0 && b >= y0 && b <= y1) markLine(ctx, W, b * S + oy, 'Rekord · ' + nf.format(b) + ' m', C.MARK_BEST_RGBA, TAG_RED);
 }
 
 // Super-G: Startlinie bei 0 und karierte Ziellinie bei SG_FINISH_M statt Meter- und Rekordlinien (die blaue
 // 1000-m-Linie läge genau auf dem Ziel). Die Zeit wird auf der Fuge zwischen den beiden Karo-Reihen genommen.
 function drawCourseLines(R, g, ox, oy, y0, y1) {
   const { ctx, Sv: S, W } = R;
-  if (y0 <= 0 && 0 <= y1) markLine(ctx, W, oy, 'Start', C.MARK_RGBA);
+  if (y0 <= 0 && 0 <= y1) markLine(ctx, W, oy, 'Start', C.MARK_RGBA, TAG_WHITE);
   const fy = g.course.finishY;
   const cell = Math.max(4, 0.7 * S);
   if (fy + cell / S < y0 || fy - cell / S > y1) return;
@@ -247,58 +252,103 @@ function drawCourseLines(R, g, ox, oy, y0, y1) {
   for (let row = 0; row < 2; row++) {
     for (let i = row; i * cell < W; i += 2) ctx.fillRect(i * cell, sy - cell + row * cell, cell, cell);
   }
-  ctx.fillText('Ziel', W - 8, sy - cell - 3);
+  drawTag(ctx, W - 8, sy - cell - 3, 'Ziel', TAG_WHITE);
 }
 
-function markLine(ctx, W, sy, label, color, labelY = sy - 3) {
+// Schild-Farben: Meterlinien auf Papier, Namen und Start/Ziel auf Weiß, der Rekord rot mit heller Schrift
+const TAG_PAPER = { fill: '#F4F3EF', ink: C.INK, text: C.INK };
+const TAG_WHITE = { fill: '#FFFFFF', ink: C.INK, text: C.INK };
+const TAG_RED = { fill: C.GATE_RED, ink: C.INK, text: '#F4F3EF' };
+
+function markLine(ctx, W, sy, label, color, tag, labelY = sy - 3) {
   ctx.strokeStyle = color;
-  ctx.fillStyle = color;
   ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
-  ctx.fillText(label, W - 8, labelY);
+  drawTag(ctx, W - 8, labelY, label, tag);
+}
+
+// Ein Schild mit rechter Unterkante bei (right, bottom): Schatten, Platte mit Rand, Text zentriert. Leicht gedreht
+// um die eigene Mitte, wie die Hinweis-Zettel der Vorlage. Der Pfad braucht roundRect (iOS 16+), ohne fällt er
+// auf eine gerade Ecke zurück.
+function drawTag(ctx, right, bottom, text, tag) {
+  const w = Math.ceil(ctx.measureText(text).width) + 2 * TAG_PAD_X;
+  const cx = right - w / 2, cy = bottom - TAG_H / 2;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(TAG_TILT);
+  ctx.lineWidth = TAG_BORDER;
+  ctx.strokeStyle = tag.ink;
+  ctx.fillStyle = tag.ink;
+  tagPath(ctx, -w / 2 + TAG_SHADOW, -TAG_H / 2 + TAG_SHADOW, w, TAG_H);
+  ctx.fill();
+  ctx.fillStyle = tag.fill;
+  tagPath(ctx, -w / 2, -TAG_H / 2, w, TAG_H);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = tag.text;
+  ctx.fillText(text, 0, 1);
+  ctx.restore();
+}
+
+function tagPath(ctx, x, y, w, h) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, TAG_RADII); else ctx.rect(x, y, w, h);
 }
 
 // ---------- Signatur im Schnee ----------
-// Der Schriftzug (SIGN_TEXT) liegt bei SIGN_Y_M, zentriert auf der Korridor-Mitte, in einem Offscreen-Canvas in
-// Welt-Koordinaten mit fester Auflösung Q px/m (wie die Sprites, unabhängig vom Tempo-Zoom). Darin sind die
-// Lagen deckend gezeichnet, die Deckkraft SIGN_ALPHA kommt erst beim Einblenden dazu: so verdeckt die Füllung den
-// Schatten dort, wo beide übereinanderliegen, und der Regler wirkt ohne Neuaufbau. Fährt der Skifahrer darüber,
-// radieren seine Spurpunkte entlang beider Ski Striche hinein (destination-out), das geht nur auf einem
-// Canvas mit Alpha. Gebunden an g.world: reset() legt eine neue Welt an, dann ist der Schriftzug wieder heil und
+// Der Credit (SIGN_TEXT) steht bei SIGN_Y_M auf einem großen Schild, zentriert auf der Korridor-Mitte, in einem
+// Offscreen-Canvas in Welt-Koordinaten mit fester Auflösung Q px/m (wie die Sprites, unabhängig vom Tempo-Zoom).
+// Das Schild ist SIGN_WIDTH_FRAC der Sichtbreite breit, mit Tinte-Rand, hartem Versatz-Schatten und leicht
+// schief wie die kleinen Schilder an den Linien. Darin ist alles deckend gezeichnet, die Deckkraft SIGN_ALPHA kommt
+// erst beim Einblenden dazu, so wirkt der Regler ohne Neuaufbau. Fährt der Skifahrer darüber, radieren seine
+// Spurpunkte entlang beider Ski Striche hinein (destination-out), das geht nur auf einem Canvas mit Alpha: das
+// Schild wird zerkratzt und bleibt es bis zum nächsten Lauf. Gebunden an g.world: reset() legt eine neue Welt an, dann ist der Schriftzug wieder heil und
 // steht auf der Korridor-Mitte der neuen Welt. Die echte Spur (drawTrack) liegt wie bisher darüber.
 function signKey(R) {
-  return [R.S.toFixed(3), R.dpr, R.fontReady ? 1 : 0, C.SIGN_TEXT, C.SIGN_WIDTH_FRAC, C.VIEW_W_M, C.SIGN_RELIEF_M].join('|');
+  return [R.S.toFixed(3), R.dpr, R.fontReady ? 1 : 0, C.SIGN_TEXT, C.SIGN_WIDTH_FRAC, C.VIEW_W_M, C.SIGN_SHADOW_M].join('|');
 }
 
 function buildSignature(R, g) {
   const sg = R.sign;
   const text = C.SIGN_TEXT;
-  const wM = C.VIEW_W_M * C.SIGN_WIDTH_FRAC;
-  const Q = Math.min(R.S * R.dpr, C.SIGN_MAX_PX / (wM + 2 * SIGN_PAD_M));
+  const wM = C.VIEW_W_M * C.SIGN_WIDTH_FRAC;                       // Breite der Platte
+  const outer = C.SIGN_SHADOW_M + C.SIGN_BORDER_M + 0.3;            // Rand des Canvas: Schatten, Rand, Drehung
+  const Q = Math.min(R.S * R.dpr, C.SIGN_MAX_PX / (wM + 2 * outer));
   const c = sg.c || document.createElement('canvas');
   const x = sg.x || c.getContext('2d');
-  // Schriftgröße aus einer Referenzmessung zurückrechnen, damit die Tinte genau wM breit wird (kursiv hängt über)
+  // Schriftgröße aus einer Referenzmessung zurückrechnen, damit der Text die Platte bis auf den Innenrand füllt
   const refPx = 200;
-  x.font = `italic 400 ${refPx}px ${SIGN_FONT_STACK}`;
+  x.font = `400 ${refPx}px ${SIGN_FONT_STACK}`;
   const m0 = x.measureText(text);
   const refW = m0.actualBoundingBoxLeft + m0.actualBoundingBoxRight || m0.width || 1;
-  const fontPx = ((wM * Q) / refW) * refPx;
-  const font = `italic 400 ${fontPx}px ${SIGN_FONT_STACK}`;
+  const textW = (wM - 2 * C.SIGN_PAD_M) * Q;
+  const fontPx = (textW / refW) * refPx;
+  const font = `400 ${fontPx}px ${SIGN_FONT_STACK}`;
   x.font = font;
   const m1 = x.measureText(text);
   const asc = m1.actualBoundingBoxAscent || fontPx * 0.8, desc = m1.actualBoundingBoxDescent || fontPx * 0.25;
-  const pad = SIGN_PAD_M * Q;
-  c.width = Math.ceil(wM * Q + 2 * pad); // setzt den Kontext zurück und löscht
-  c.height = Math.ceil(asc + desc + 2 * pad);
+  const pw = wM * Q, ph = asc + desc + 2 * C.SIGN_PAD_M * Q;       // Platte in px
+  const pad = outer * Q;
+  c.width = Math.ceil(pw + 2 * pad); // setzt den Kontext zurück und löscht
+  c.height = Math.ceil(ph + 2 * pad);
   x.font = font;
   x.textAlign = 'center';
   x.textBaseline = 'alphabetic';
-  const cx = c.width / 2, by = pad + asc, d = C.SIGN_RELIEF_M * Q;
+  x.translate(c.width / 2, c.height / 2);
+  x.rotate(C.SIGN_TILT_DEG * Math.PI / 180);
+  const d = C.SIGN_SHADOW_M * Q, r = 0.6 * Q;
+  const radii = [r * 0.9, r * 1.15, r * 0.85, r * 1.05];
+  x.fillStyle = C.INK;
+  signPath(x, -pw / 2 + d, -ph / 2 + d, pw, ph, radii);
+  x.fill();
   x.fillStyle = '#FFFFFF';
-  x.fillText(text, cx + d, by + d); // Glanz: die beleuchtete Kante unten-rechts
-  x.fillStyle = `rgb(${C.SHADOW_RGB})`;
-  x.fillText(text, cx - d, by - d); // Schatten: die Kante im Licht-Schatten oben-links
-  x.fillStyle = `rgb(${C.TRACK_RGB})`;
-  x.fillText(text, cx, by);
+  x.strokeStyle = C.INK;
+  x.lineWidth = C.SIGN_BORDER_M * Q;
+  signPath(x, -pw / 2, -ph / 2, pw, ph, radii);
+  x.fill();
+  x.stroke();
+  x.fillStyle = C.INK;
+  x.fillText(text, 0, -ph / 2 + C.SIGN_PAD_M * Q + asc);
+  x.setTransform(1, 0, 0, 1, 0, 0);
   sg.c = c; sg.x = x; sg.Q = Q;
   sg.wM = c.width / Q; sg.hM = c.height / Q;
   sg.x0 = laneX(g.world, C.SIGN_Y_M) - sg.wM / 2;
@@ -309,6 +359,11 @@ function buildSignature(R, g) {
   // Fenster geändert) darf den kaputt gefahrenen Schriftzug nicht heilen
   replayErase(sg, g.track, g.track.n);
   sg.seen = g.track.total;
+}
+
+function signPath(x, px, py, w, h, radii) {
+  x.beginPath();
+  if (x.roundRect) x.roundRect(px, py, w, h, radii); else x.rect(px, py, w, h);
 }
 
 // Die letzten count Spurpunkte als Segmente radieren; das Lücken-Flag steht am späteren Punkt (wie in drawTrack)
