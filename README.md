@@ -12,8 +12,15 @@ Plain HTML + JavaScript + Canvas, kein Framework, kein Build.
 - **Bremsen**: vor allem der Winkel bremst, jede Kursänderung kostet zusätzlich etwas Tempo.
 - Der Start hat schon Fahrt, ohne Eingabe wird man stetig schneller bis zum Endtempo. Kurze Tipps kosten kaum Tempo, Halten bremst hart, quer zum Hang bleibt man stehen.
 - Bei hohem Tempo rückt der Fahrer im Bild nach oben und die Sicht zoomt leicht heraus (mehr Vorausschau).
+- **Fresh-Seite**: Meter und Laufzeit des letzten Laufs (unter einer Minute in Sekunden, sonst `1:34:07 Minuten`), Bestwert je Modus, Moduswahl.
 - Tastatur: `A`/`D` oder Pfeile, `P` Pause, `R` Fresh. Auf dem iPhone gibt es keine Pause-Taste: anhalten heißt querstellen; beim Wechsel in den Hintergrund pausiert die App von selbst.
 - **Tuning-Panel**: langer Druck auf das Versions-Label unten links. Werte bleiben gespeichert, „Standard“ setzt zurück.
+
+## Modi
+
+- **Classic**: freie Abfahrt, so weit es geht.
+- **Chase**: eine Lawine hält ein Tempo (Pace), das mit der Laufzeit steigt (Standard 30 → 140 km/h in drei Minuten). Wer schneller ist, hält sie knapp über dem oberen Bildrand; wer langsamer wird, holt sie sich ins Bild. Wer stehen bleibt (querstellen und halten), sieht sie nach 1,5 s am Bildrand erscheinen und heranrollen. Erwischt sie den Fahrer, zerspringt er wie beim Aufprall. Die Steuerung ist dieselbe wie in Classic.
+- Drei Looks der Lawine stehen im Tuning zur Wahl (`src/avalanche-view.js`): **Wolke** (weiße Schneewolke mit Schattenrand und Staub), **Schatten** (Schleier aus Schiefergrau mit Fahnen, das Bild dämmert), **Bruch** (Platte mit Pixel-Bruchkante, rollende Brocken wie die Splitter beim Aufprall).
 
 ## Lokal starten
 
@@ -26,7 +33,7 @@ Nützliche Parameter: `?debug=1` (Overlay mit fps, Hitboxen, Safe Lane), `?seed=
 
 ## Tuning
 
-Alle Stellschrauben stehen in `src/constants.js`; die Liste `TUNABLES` dort bestimmt die Regler im Panel.
+Alle Stellschrauben stehen in `src/constants.js`; die Liste `TUNABLES` dort bestimmt die Regler im Panel (Abschnitte „Fahren“ und „Lawine (Chase)“: Look, Tempo am Start und Ende, Anstiegsdauer, Lauerabstand, Stillstand-Schwelle und -Wartezeit, Fangabstand, Beben).
 Ändern sich die Standardwerte, den Schlüssel `KEY` in `src/tune.js` hochzählen, sonst bleiben alte Regler-Werte auf dem iPhone aktiv.
 
 ## Deploy (GitHub Pages)

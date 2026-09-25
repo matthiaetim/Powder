@@ -1,32 +1,38 @@
-// Tuning-Panel: Regler für die Steuerung, Werte überschreiben C live und bleiben gespeichert.
+// Tuning-Panel: Regler für Steuerung und Lawine, Werte überschreiben C live und bleiben gespeichert.
 import { C, TUNABLES } from './constants.js';
 
 const KEY = 'powder.tune.v9'; // Versionssprung verwirft alte Regler-Werte, wenn sich die Defaults ändern
-const DEFAULTS = Object.fromEntries(TUNABLES.map((t) => [t.key, C[t.key]]));
+const ROWS = TUNABLES.filter((t) => t.key); // ohne Zwischentitel
+const DEFAULTS = Object.fromEntries(ROWS.map((t) => [t.key, C[t.key]]));
 
 export function loadTune() {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) || '{}');
-    for (const t of TUNABLES) if (typeof saved[t.key] === 'number') C[t.key] = saved[t.key];
+    for (const t of ROWS) if (typeof saved[t.key] === 'number') C[t.key] = saved[t.key];
   } catch { /* egal */ }
 }
 
 function saveTune() {
   try {
-    localStorage.setItem(KEY, JSON.stringify(Object.fromEntries(TUNABLES.map((t) => [t.key, C[t.key]]))));
+    localStorage.setItem(KEY, JSON.stringify(Object.fromEntries(ROWS.map((t) => [t.key, C[t.key]]))));
   } catch { /* egal */ }
 }
 
 export function resetTune() {
-  for (const t of TUNABLES) C[t.key] = DEFAULTS[t.key];
+  for (const t of ROWS) C[t.key] = DEFAULTS[t.key];
   try { localStorage.removeItem(KEY); } catch { /* egal */ }
 }
 
 export function isTuned() {
-  return TUNABLES.some((t) => C[t.key] !== DEFAULTS[t.key]);
+  return ROWS.some((t) => C[t.key] !== DEFAULTS[t.key]);
 }
 
-const fmt = (t, v) => (v * (t.scale || 1)).toFixed(t.decimals ?? (t.step < 1 ? 2 : 0));
+// Anzeige eines Werts: Name aus names (1 = erster), sonst Zahl mit Einheit.
+const fmt = (t, v) => {
+  if (t.names) return t.names[Math.round(v) - 1] ?? String(v);
+  const num = (v * (t.scale || 1)).toFixed(t.decimals ?? (t.step < 1 ? 2 : 0));
+  return t.unit ? num + ' ' + t.unit : num;
+};
 
 // Baut die Regler in das Panel-Element und hält Anzeige und C synchron.
 export function createTunePanel(doc, panel, onChange) {
@@ -34,6 +40,13 @@ export function createTunePanel(doc, panel, onChange) {
   rows.className = 'tune-rows';
   const inputs = new Map();
   for (const t of TUNABLES) {
+    if (t.heading) {
+      const h = doc.createElement('div');
+      h.className = 'tune-heading';
+      h.textContent = t.heading;
+      rows.append(h);
+      continue;
+    }
     const row = doc.createElement('label');
     row.className = 'tune-row';
     const head = doc.createElement('span');
@@ -48,7 +61,7 @@ export function createTunePanel(doc, panel, onChange) {
     head.textContent = t.label;
     input.addEventListener('input', () => {
       C[t.key] = Number(input.value);
-      val.textContent = fmt(t, C[t.key]) + ' ' + t.unit;
+      val.textContent = fmt(t, C[t.key]);
       saveTune();
       if (onChange) onChange();
     });
@@ -70,7 +83,7 @@ export function createTunePanel(doc, panel, onChange) {
   function refresh() {
     for (const { input, val, t } of inputs.values()) {
       input.value = String(C[t.key]);
-      val.textContent = fmt(t, C[t.key]) + ' ' + t.unit;
+      val.textContent = fmt(t, C[t.key]);
     }
   }
   reset.addEventListener('click', () => { resetTune(); refresh(); if (onChange) onChange(); });

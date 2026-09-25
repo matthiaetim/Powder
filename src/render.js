@@ -2,7 +2,7 @@
 import { C } from './constants.js';
 import { TREE } from './physics.js';
 import { forEachTrackPoint } from './track.js';
-import { avalancheVisibility } from './avalanche.js';
+import { drawAvalanche, makeAvSprites } from './avalanche-view.js';
 import { laneX } from './world.js';
 
 const TAU = Math.PI * 2;
@@ -96,24 +96,11 @@ function makeRock(S, dpr, v) {
   return { img: c, w, h, ax, ay, nominal: ROCK_H };
 }
 
-function makeBlob() {
-  const n = 256;
-  const [c, x] = makeCanvas(n, n, 1);
-  const [r, g, b] = C.AVALANCHE;
-  const grad = x.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
-  grad.addColorStop(0, `rgba(${r},${g},${b},0.6)`);
-  grad.addColorStop(0.45, `rgba(${r},${g},${b},0.35)`);
-  grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
-  x.fillStyle = grad;
-  x.fillRect(0, 0, n, n);
-  return { img: c, w: n, h: n };
-}
-
 function makeSprites(S, dpr) {
   return {
     trees: [0, 1, 2].map((v) => makeTree(S, dpr, v)),
     rocks: [0, 1, 2].map((v) => makeRock(S, dpr, v)),
-    blob: makeBlob(),
+    av: makeAvSprites(),
   };
 }
 
@@ -135,6 +122,11 @@ export function draw(R, g, t) {
     const k = Math.max(0, 1 - g.deadT / C.SHAKE_S);
     ox += Math.sin(g.deadT * 57) * k * k * C.SHAKE_PX;
     oy += Math.sin(g.deadT * 73 + 1.3) * k * k * C.SHAKE_PX * 0.8;
+  } else if (g.mode === 'chase' && g.state === 'running' && g.av.threat > 0) {
+    // Lawine im Bild: leichtes Beben, das mit der Nähe wächst
+    const k = g.av.threat * g.av.threat * C.AV_RUMBLE_PX;
+    ox += Math.sin(t * 47) * k;
+    oy += Math.sin(t * 61 + 0.7) * k * 0.8;
   }
   drawTrack(R, g, ox, oy);
   drawWorld(R, g, ox, oy);
@@ -214,7 +206,6 @@ function drawSkier(R, g, sx, sy) {
   const { ctx, Sv: S } = R;
   const s = g.skier;
   ctx.save();
-  if (g.state === 'dead' && g.deadCause === 'avalanche') ctx.globalAlpha = Math.max(0, 1 - g.deadT / 0.7);
   // Schatten nach unten rechts
   ctx.fillStyle = `rgba(${C.SHADOW_RGB},0.22)`;
   ctx.beginPath();
@@ -244,14 +235,15 @@ function skierShape(ctx, S, s) {
   ctx.beginPath(); ctx.arc(lean * 1.3, -0.1 * S, 0.14 * S, 0, TAU); ctx.fill();
 }
 
-// ---------- Aufprall: der Fahrer zerspringt in Pixel ----------
+// ---------- Aufprall oder Lawine: der Fahrer zerspringt in Pixel ----------
 
 function shattered(g) {
-  return g.state === 'dead' && g.deadCause !== 'avalanche';
+  return g.state === 'dead';
 }
 
 // Einmal pro Aufprall: den Fahrer offscreen zeichnen und in Pixel-Blöcke zerlegen. Jeder Block wird ein
-// Splitter in Weltkoordinaten, der vom Hindernis weg und etwas in Fahrtrichtung fliegt, sich dreht und hüpft.
+// Splitter in Weltkoordinaten, der vom Hindernis weg (bei der Lawine: von oben, mit ihrem Schub) und etwas
+// in Fahrtrichtung fliegt, sich dreht und hüpft.
 function spawnShards(R, g) {
   const S = R.Sv, s = g.skier, sh = R.shards;
   sh.run = g.runs;
@@ -283,7 +275,7 @@ function spawnShards(R, g) {
       const ang = Math.atan2(py, px) + (Math.random() - 0.5) * 1.2;
       const sp = C.SHATTER_SPEED * (0.3 + 0.7 * Math.random()) * boost;
       const carry = g.crashV * (0.04 + 0.12 * Math.random());
-      const away = 0.5 + 2.5 * Math.random();
+      const away = 0.5 + 2.5 * Math.random() + g.crashPush * (0.5 + Math.random());
       sh.p.push({
         x: s.x + px / S, y: s.y + py / S,
         vx: Math.cos(ang) * sp + fx * carry + nx * away,
@@ -350,29 +342,6 @@ function drawParticles(R, g, ox, oy) {
   }
 }
 
-function drawAvalanche(R, g, ox, oy, t) {
-  const { ctx, W, Sv: S } = R;
-  const av = g.av;
-  const fy = av.frontY * S + oy;
-  const vis = avalancheVisibility(av);
-  if (vis <= 0) return;
-  const r = 40 + 90 * vis;
-  const [cr, cg, cb] = C.AVALANCHE;
-  const top = fy - r * 0.5;
-  if (top > 0) {
-    ctx.fillStyle = `rgba(${cr},${cg},${cb},0.55)`;
-    ctx.fillRect(0, 0, W, top);
-  }
-  const blob = R.sprites.blob;
-  const n = C.AV_BLOBS;
-  for (let i = 0; i < n; i++) {
-    const bx = (i / (n - 1)) * W + Math.sin(t * 0.7 + i * 1.7) * 14;
-    const by = fy + Math.sin(t * 1.1 + i * 2.3) * 12 - r * 0.2;
-    const rr = r * (1 + 0.08 * Math.sin(t * 4.4 + i * 1.3));
-    ctx.drawImage(blob.img, bx - rr, by - rr, rr * 2, rr * 2);
-  }
-}
-
 function drawDebug(R, g, ox, oy) {
   const { ctx, Sv: S, H, W } = R;
   ctx.lineWidth = 1;
@@ -413,7 +382,7 @@ function createSnow() {
 function snowIntensity(g) {
   if (g.mode !== 'chase') return 0;
   if (g.state === 'dead') return g.deadCause === 'avalanche' ? 1 : 0;
-  if (g.state === 'running' || g.state === 'paused') return avalancheVisibility(g.av);
+  if (g.state === 'running' || g.state === 'paused') return g.av.near;
   return 0;
 }
 
@@ -458,7 +427,8 @@ function drawSnow(R, g, t) {
 
 function drawWhiteout(R, g) {
   if (g.state !== 'dead' || g.deadCause !== 'avalanche') return;
-  const a = Math.min(1, g.deadT / C.WHITEOUT_S);
+  const a = Math.min(1, Math.max(0, g.deadT - C.AV_WHITEOUT_DELAY_S) / C.WHITEOUT_S);
+  if (a <= 0) return;
   R.ctx.fillStyle = `rgba(255,255,255,${a.toFixed(3)})`;
   R.ctx.fillRect(0, 0, R.W, R.H);
 }

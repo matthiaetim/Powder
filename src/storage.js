@@ -1,18 +1,18 @@
-// Bestwert im localStorage. Fällt still auf 0 zurück, wenn Speicher nicht verfügbar ist.
-const KEY = 'powder.best';
+// Bestwert je Modus und gewählter Modus im localStorage. Fällt still auf 0 bzw. '' zurück, wenn Speicher fehlt.
+const bestKey = (mode) => (mode === 'classic' || !mode ? 'powder.best' : 'powder.best.' + mode);
 
-export function loadBest() {
+export function loadBest(mode) {
   try {
-    const v = parseInt(localStorage.getItem(KEY), 10);
+    const v = parseInt(localStorage.getItem(bestKey(mode)), 10);
     return Number.isFinite(v) && v > 0 ? v : 0;
   } catch {
     return 0;
   }
 }
 
-export function saveBest(v) {
+export function saveBest(mode, v) {
   try {
-    localStorage.setItem(KEY, String(v));
+    localStorage.setItem(bestKey(mode), String(v));
   } catch {
     /* privater Modus o. ä. */
   }

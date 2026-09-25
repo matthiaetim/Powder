@@ -7,7 +7,7 @@
   <meta name="description" content="Minimalistischer Ski-Simulator: fahr der Lawine davon.">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Powder">
   <meta name="theme-color" content="#F5F9FD">
   <link rel="manifest" href="./manifest.webmanifest">
@@ -28,6 +28,7 @@
   </div>
   <div id="ov-dead" class="overlay">
     <div id="dead-dist">0 m</div>
+    <div id="dead-time">in 0,00 Sekunden</div>
     <div id="dead-best">Bester Lauf 0 m</div>
     <button id="btn-fresh" type="button">Fresh</button>
     <div id="modes">
@@ -36,7 +37,7 @@
         <span class="mode-name">Classic</span>
         <span class="mode-cta"></span>
       </button>
-      <button class="mode-card soon" type="button" data-mode="chase" disabled>
+      <button class="mode-card" type="button" data-mode="chase">
         <canvas class="mode-preview" width="130" height="72"></canvas>
         <span class="mode-name">Chase</span>
         <span class="mode-cta"></span>

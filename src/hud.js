@@ -1,15 +1,27 @@
-// DOM-HUD: Tempo, Distanz, Pause, Fresh-Seite mit Modus-Karten, Debug-Text.
+// DOM-HUD: Tempo, Distanz, Pause, Fresh-Seite mit Laufzeit und Modus-Karten, Debug-Text.
 import { C, VERSION } from './constants.js';
 import { overlayReady, togglePause, pauseIfRunning, fresh, selectMode } from './game.js';
 import { createTunePanel, isTuned } from './tune.js';
 import { MODES } from './modes.js';
 import { drawModePreview } from './render.js';
 
+const pad2 = (n) => String(n).padStart(2, '0');
+
+// Laufzeit: unter einer Minute „43,27 Sekunden“, sonst „1:34:07 Minuten“ (Minuten:Sekunden:Hundertstel).
+export function formatRunTime(sec) {
+  const cs = Math.max(0, Math.round(sec * 100));
+  const hh = pad2(cs % 100);
+  const total = Math.floor(cs / 100);
+  const m = Math.floor(total / 60), s = total % 60;
+  return m === 0 ? `${s},${hh} Sekunden` : `${m}:${pad2(s)}:${hh} Minuten`;
+}
+
 export function createHud(g, doc, hooks = {}) {
   const $ = (id) => doc.getElementById(id);
   const doFresh = hooks.fresh || (() => fresh(g));
   const speedEl = $('hud-speed'), distEl = $('hud-dist');
-  const deadDist = $('dead-dist'), deadBest = $('dead-best'), debugEl = $('debug');
+  const deadDist = $('dead-dist'), deadTime = $('dead-time'), deadBest = $('dead-best'), debugEl = $('debug');
+  const themeEl = doc.querySelector('meta[name="theme-color"]'); // färbt die iOS-Statusleiste (Safari-Tab) mit
   $('version').textContent = 'v' + VERSION;
   const nf = new Intl.NumberFormat(C.HUD_LOCALE, { maximumFractionDigits: 0 });
   let lastSpeed = -1, lastDist = -1, lastState = '', lastOverlay = '', lastDebug = 0, lastText = -1e9;
@@ -46,6 +58,13 @@ export function createHud(g, doc, hooks = {}) {
   tune.closeButton.addEventListener('click', closeTune);
   onTap($('ov-pause'), () => { togglePause(g); closeTune(); });
 
+  // Fresh-Seite: Meter und Laufzeit des letzten Laufs, Bestwert des gewählten Modus
+  function refreshDead() {
+    deadDist.textContent = nf.format(Math.floor(g.dist)) + ' m';
+    deadTime.textContent = 'in ' + formatRunTime(g.runT);
+    deadBest.textContent = g.newBest && g.mode === g.runMode ? 'Neuer Rekord' : 'Bester Lauf ' + nf.format(g.best) + ' m';
+  }
+
   // Modus-Karten: Vorschau einmal zeichnen, aktive Karte markieren, Tipp startet
   const cards = Array.from(doc.querySelectorAll('.mode-card'));
   for (const card of cards) {
@@ -56,7 +75,7 @@ export function createHud(g, doc, hooks = {}) {
     onTap(card, () => {
       if (!m || m.soon) return;
       if (id === g.mode) { doFresh(); return; }
-      if (selectMode(g, id)) markActive();
+      if (selectMode(g, id)) { markActive(); refreshDead(); }
     });
   }
   function markActive() {
@@ -82,22 +101,21 @@ export function createHud(g, doc, hooks = {}) {
     if (ov !== lastOverlay) {
       lastOverlay = ov;
       doc.body.dataset.overlay = ov;
-      if (ov) {
-        deadDist.textContent = nf.format(m) + ' m';
-        deadBest.textContent = g.newBest ? 'Neuer Rekord' : 'Bester Lauf ' + nf.format(g.best) + ' m';
-        markActive();
-      }
+      if (themeEl) themeEl.content = ov ? C.BG_DIM : C.BG;
+      if (ov) { refreshDead(); markActive(); }
     }
     if (g.debug && (force || now - lastDebug > 250)) {
       lastDebug = now;
-      const s = g.skier;
+      const s = g.skier, av = g.av;
       const deg = (r) => (r * 180 / Math.PI).toFixed(0);
       debugEl.textContent = [
         `${R.frameMs.toFixed(1)} ms/frame  Takt ${R.paceMs.toFixed(2)} ms  ${R.W}x${R.H}@${R.dpr}  S=${R.S.toFixed(2)} px/m  zoom=${g.zoom.toFixed(2)}  frac=${g.skierFrac.toFixed(2)}`,
-        `state=${g.state}  mode=${g.mode}  intro=${g.intro}  seed=${g.seed}  runs=${g.runs}`,
+        `state=${g.state}  mode=${g.mode}  intro=${g.intro}  seed=${g.seed}  runs=${g.runs}  t=${g.runT.toFixed(1)} s`,
         `v=${s.v.toFixed(1)} m/s (${Math.round(s.v * 3.6)} km/h)  θ=${deg(s.theta)}°  brake=${s.brake.toFixed(1)}  side=${s.side}${s.plow ? '  PFLUG' : ''}`,
         `tap=${C.TURN_TAP_DEG}°+${C.TURN_DEEPEN_DEG_S}°/s  T=${C.TURN_T}-${C.TURN_T_FAST}/${C.RETURN_T}s  target=${deg(s.target)}°  brake=turn ${C.TURN_BRAKE_K} + ${C.BRAKE_K}@${C.BRAKE_START_DEG}-${C.BRAKE_FULL_DEG}° + plow ${C.PLOW_MIN}  g=${C.G_SLOPE}  v0=${C.START_SPEED_KMH}  vmax=${C.MAX_SPEED_KMH}`,
-        g.mode === 'chase' ? `gap=${g.av.gap.toFixed(1)} m  lawine=${g.av.speed.toFixed(1)} m/s` : 'lawine: aus (Classic)',
+        g.mode === 'chase'
+          ? `lawine look=${C.AV_STYLE}  gap=${av.gap.toFixed(1)} m  v=${(av.speed * 3.6).toFixed(0)} km/h  pace=${(av.pace * 3.6).toFixed(0)} km/h  stall=${av.stallT.toFixed(1)} s  near=${av.near.toFixed(2)}  threat=${av.threat.toFixed(2)}`
+          : 'lawine: aus (Classic)',
         `objs=${g.world.objCount}  cells=${g.world.cells.size}  track=${g.track.n}`,
         `gesture=${g.lastGesture}`,
       ].join('\n');

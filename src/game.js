@@ -20,11 +20,11 @@ export function createGame(opts = {}) {
     state: 'ready',
     skier: P.createSkier(), world: null, av: null,
     track: createTrack(), particles: createParticles(),
-    dist: 0, best: loadBest(), newBest: false,
+    dist: 0, runT: 0, best: 0, newBest: false,
     seed: 0, fixedSeed: opts.fixedSeed ?? null,
-    mode: DEFAULT_MODE, intro: true, readyDelayMs: C.READY_AUTO_START_MS,
+    mode: DEFAULT_MODE, runMode: DEFAULT_MODE, intro: true, readyDelayMs: C.READY_AUTO_START_MS,
     readyT: 0, deadT: 0, deadCause: '',
-    crashV: 0, crashX: 0, crashY: 0, // Tempo und Hindernis beim Aufprall (für die Splitter)
+    crashV: 0, crashX: 0, crashY: 0, crashPush: 0, // Tempo, Hindernis und Schub beim Aufprall (für die Splitter)
     camX: 0, skierFrac: READY_FRAC, zoom: 1,
     viewWm: C.VIEW_W_M, viewHm: C.VIEW_W_M * C.VIEW_ASPECT,
     debug: !!opts.debug, lastGesture: '–', runs: 0,
@@ -32,6 +32,7 @@ export function createGame(opts = {}) {
   };
   const saved = loadMode();
   if (MODES[saved] && !MODES[saved].soon) g.mode = saved;
+  g.best = loadBest(g.mode);
   reset(g, g.fixedSeed ?? randomSeed(), true);
   return g;
 }
@@ -48,7 +49,7 @@ export function reset(g, seed, intro) {
   g.av = createAvalanche(0);
   clearTrack(g.track);
   clearParticles(g.particles);
-  g.dist = 0; g.newBest = false;
+  g.dist = 0; g.runT = 0; g.newBest = false;
   g.readyT = 0; g.deadT = 0; g.deadCause = '';
   g.camX = 0; g.zoom = 1;
   g.intro = !!intro;
@@ -64,6 +65,11 @@ function ensureView(g) {
   const halfW = (g.viewWm * g.zoom) / 2;
   const vh = g.viewHm * g.zoom;
   ensureCells(g.world, g.camX - halfW, g.camX + halfW, s.y - g.skierFrac * vh, s.y + (1 - g.skierFrac) * vh);
+}
+
+// Abstand vom Fahrer zum oberen Bildrand in m (dort erscheint die Lawine).
+export function topDist(g) {
+  return g.skierFrac * g.viewHm * g.zoom;
 }
 
 // 0..1: wie viel Vorausschau das Tempo verlangt (Fahrer weiter oben, Sicht herausgezoomt).
@@ -83,7 +89,7 @@ export function update(g, dt) {
       break;
     case 'dead':
       g.deadT += dt;
-      if (g.deadCause === 'avalanche') updateAvalanche(g.av, g.skier, g.dist, dt, false);
+      if (g.deadCause === 'avalanche') updateAvalanche(g.av, g.skier, g.runT, dt, topDist(g)); // rollt über den Fahrer
       updateParticles(g.particles, dt);
       break;
     default:
@@ -94,12 +100,15 @@ export function update(g, dt) {
 function start(g) {
   if (g.state !== 'ready') return;
   g.state = 'running';
+  g.runMode = g.mode;
+  g.best = loadBest(g.mode);
   g.skier.v = C.START_SPEED_KMH / 3.6;
   g.runs++;
 }
 
 function step(g, dt) {
   const s = g.skier;
+  g.runT += dt;
   P.updateSkier(s, dt);
   if (s.y - s.y0 > g.dist) g.dist = s.y - s.y0;
   // Kamera: x folgt weich; bei Tempo rückt der Fahrer nach oben und die Sicht zoomt heraus
@@ -124,7 +133,7 @@ function step(g, dt) {
 
   const hit = checkCollision(g.world, s);
   if (hit) { die(g, hit.t === P.TREE ? 'tree' : 'rock', hit); return; }
-  if (hasAvalanche(g) && updateAvalanche(g.av, s, g.dist, dt, false)) die(g, 'avalanche');
+  if (hasAvalanche(g) && updateAvalanche(g.av, s, g.runT, dt, topDist(g))) die(g, 'avalanche');
 }
 
 function die(g, cause, hit) {
@@ -133,15 +142,17 @@ function die(g, cause, hit) {
   g.deadT = 0;
   g.deadCause = cause;
   g.crashV = s.v;
+  // Lawine: sie trifft von oben, die Splitter fliegen mit ihrem Tempo hangabwärts
   g.crashX = hit ? hit.x : s.x;
-  g.crashY = hit ? hit.y : s.y;
+  g.crashY = hit ? hit.y : s.y - 1.5;
+  g.crashPush = hit ? 0 : g.av.speed * 0.5;
   s.alive = false;
   s.side = 0;
   s.plow = false;
-  if (cause !== 'avalanche') burst(g, 24, 4);
+  burst(g, 24, 4);
   s.v = 0;
   const m = Math.floor(g.dist);
-  if (m > g.best) { g.best = m; g.newBest = true; saveBest(m); }
+  if (m > g.best) { g.best = m; g.newBest = true; saveBest(g.runMode, m); }
 }
 
 function spawnSpray(g, dt) {
@@ -200,10 +211,12 @@ export function pauseIfRunning(g) {
 export function fresh(g) {
   if (g.state === 'dead' && g.deadT * 1000 >= C.DEATH_OVERLAY_MS + C.FRESH_GUARD_MS) reset(g, g.fixedSeed ?? randomSeed(), false);
 }
+// Modus wechseln (auf der Fresh-Seite): Bestwert gehört zum Modus.
 export function selectMode(g, id) {
   const m = MODES[id];
   if (!m || m.soon) return false;
   g.mode = id;
+  g.best = loadBest(id);
   saveMode(id);
   return true;
 }

@@ -90,7 +90,8 @@ body[data-state="paused"] #ov-pause { display: flex; }
 #ov-dead { background: rgba(46, 58, 69, 0.45); }
 body[data-state="dead"][data-overlay="1"] #ov-dead { display: flex; }
 #dead-dist { font-size: 56px; line-height: 1; }
-#dead-best { font-size: 16px; opacity: 0.8; margin-top: 10px; }
+#dead-time { font-size: 16px; opacity: 0.8; margin-top: 10px; }
+#dead-best { font-size: 16px; opacity: 0.8; margin-top: 4px; }
 #btn-fresh {
   margin-top: 36px;
   font: italic 22px var(--font);
@@ -174,6 +175,8 @@ body[data-state="dead"][data-overlay="1"] #ov-dead { display: flex; }
 #tune[hidden] { display: none; }
 .tune-title { font-size: 18px; margin-bottom: 8px; }
 .tune-rows { display: flex; flex-direction: column; gap: 6px; }
+.tune-heading { font-size: 14px; opacity: 0.6; margin: 8px 0 0; }
+.tune-heading:first-child { margin-top: 0; }
 .tune-row { display: grid; grid-template-columns: 1fr auto; row-gap: 2px; font-size: 13px; }
 .tune-label { opacity: 0.85; }
 .tune-value { font-variant-numeric: tabular-nums; text-align: right; }

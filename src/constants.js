@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.7.5';
+export const VERSION = '0.8.0';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -57,16 +57,23 @@ export const C = {
 
   SKIER_R: 0.45,
 
-  // Lawine (nur Chase-Modus, wird noch überarbeitet)
-  AV_START_GAP_M: 90,
-  AV_BASE_MS: 16,
-  AV_RAMP_PER_M: 0.006,
-  AV_MAX_MS: 27,
-  AV_MAX_GAP_M: 80,
-  AV_RUBBER: true,
-  AV_CATCH_M: 1.0,
-  AV_VISIBLE_GAP_M: 45,
-  AV_BLOBS: 9,
+  // Lawine (nur Chase): eine Front, die von oben nachrückt. Sie hält ein Tempo (Pace), das mit der Laufzeit
+  // steigt: wer langsamer fährt, holt sie sich ins Bild, wer schneller ist, lässt sie AV_LURK_M über dem oberen
+  // Bildrand lauern. Steht der Fahrer (unter AV_STALL_KMH für AV_STALL_S), kommt sie sofort an den Bildrand
+  // und rollt mit Pace-Tempo auf ihn zu. Erwischt ist er, wenn die Front auf AV_CATCH_M heran ist.
+  AV_STYLE: 1,               // (Tuning) Look: 1 Wolke, 2 Schatten, 3 Bruch (siehe avalanche-view.js)
+  AV_PACE0_KMH: 30,          // (Tuning) Tempo der Lawine beim Start
+  AV_PACE1_KMH: 140,         // (Tuning) Tempo am Ende des Anstiegs
+  AV_RAMP_S: 180,            // (Tuning) Laufzeit in s, bis das Endtempo erreicht ist
+  AV_LURK_M: 10,             // (Tuning) Lauerabstand über dem oberen Bildrand, solange der Fahrer schneller ist
+  AV_FOLLOW_MS: 3,           // Nachrücken auf den Lauerabstand: so viel schneller als der Fahrer, in m/s
+  AV_STALL_KMH: 6,           // (Tuning) darunter gilt der Fahrer als stehend
+  AV_STALL_S: 1.5,           // (Tuning) so lange stehen, dann erscheint die Lawine am Bildrand
+  AV_ENTER_M: 6,             // beim Erscheinen beginnt die Front so weit über dem Bildrand (Staub und Brocken reichen 7 m vor)
+  AV_CATCH_M: 1.0,           // (Tuning) Abstand, bei dem sie den Fahrer erwischt
+  AV_START_GAP_M: 60,        // Abstand beim Start des Laufs
+  AV_RUMBLE_PX: 2,           // (Tuning) Bildbeben in px, wenn sie nah ist
+  AV_WHITEOUT_DELAY_S: 0.3,  // nach dem Erwischen: kurz die Front über dem Fahrer zeigen, dann Weiß
 
   // Welt
   CELL_M: 40,
@@ -102,11 +109,11 @@ export const C = {
   SHAKE_PX: 5,             // Bildwackeln beim Aufprall
   SHAKE_S: 0.4,
 
-  // Warnschnee (nur Chase-Modus)
+  // Warnschnee (nur Chase): setzt ein, sobald die Lawine ihren Lauerabstand verlässt
   SNOW_POOL: 160,
   SNOW_MIN_SPEED: 140,
   SNOW_MAX_SPEED: 260,
-  WHITEOUT_S: 0.6,
+  WHITEOUT_S: 0.5,
 
   // Zustände
   READY_AUTO_START_MS: 1200, // Intro beim App-Start: Kamerafahrt, dann los
@@ -120,6 +127,7 @@ export const C = {
 
   // Farben: Polarweiß mit leichtem Blaustich, sattes Tannengrün mit braunem Stamm, kühles Schiefergrau für Text und Fahrer
   BG: '#F5F9FD',
+  BG_DIM: '#9BA3AA',         // Fresh-Seite: Abdunklung (styles.css, #ov-dead) über BG; färbt die iOS-Statusleiste mit
   INK: '#2E3A45',
   INK_LIGHT: '#3E4B57',
   TREE: '#265A3A',
@@ -133,8 +141,10 @@ export const C = {
   AVALANCHE: [46, 58, 69],
 };
 
-// Regler im Tuning-Panel (langer Druck auf das Versions-Label).
+// Regler im Tuning-Panel (langer Druck auf das Versions-Label). Einträge mit heading sind Zwischentitel,
+// names zeigt statt der Zahl einen Namen (1 = erster Name).
 export const TUNABLES = [
+  { heading: 'Fahren' },
   { key: 'TURN_TAP_DEG', label: 'Tipp-Winkel', unit: '°', min: 10, max: 80, step: 5 },
   { key: 'TURN_DEEPEN_DEG_S', label: 'Vertiefen beim Halten', unit: '°/s', min: 0, max: 150, step: 5 },
   { key: 'TURN_T', label: 'Ansprechzeit', unit: 's', min: 0.05, max: 0.4, step: 0.01 },
@@ -153,4 +163,14 @@ export const TUNABLES = [
   { key: 'VIEW_W_M', label: 'Sichtbreite', unit: 'm', min: 22, max: 48, step: 1 },
   { key: 'TREE_D1', label: 'Dichte am Ende', unit: '/100 m²', min: 0.01, max: 0.045, step: 0.001, scale: 100, decimals: 1 },
   { key: 'RAMP_M', label: 'Anstieg bis', unit: 'm', min: 1000, max: 15000, step: 500 },
+  { heading: 'Lawine (Chase)' },
+  { key: 'AV_STYLE', label: 'Look', unit: '', min: 1, max: 3, step: 1, names: ['Wolke', 'Schatten', 'Bruch'] },
+  { key: 'AV_PACE0_KMH', label: 'Tempo am Start', unit: 'km/h', min: 5, max: 120, step: 5 },
+  { key: 'AV_PACE1_KMH', label: 'Tempo am Ende', unit: 'km/h', min: 20, max: 250, step: 5 },
+  { key: 'AV_RAMP_S', label: 'Schneller bis Laufzeit', unit: 's', min: 30, max: 600, step: 10 },
+  { key: 'AV_LURK_M', label: 'Lauert über dem Bild', unit: 'm', min: 0, max: 60, step: 2 },
+  { key: 'AV_STALL_S', label: 'Kommt bei Stillstand nach', unit: 's', min: 0.3, max: 5, step: 0.1 },
+  { key: 'AV_STALL_KMH', label: 'Stillstand unter', unit: 'km/h', min: 0, max: 40, step: 1 },
+  { key: 'AV_CATCH_M', label: 'Erwischt ab Abstand', unit: 'm', min: 0, max: 6, step: 0.5 },
+  { key: 'AV_RUMBLE_PX', label: 'Beben bei Nähe', unit: 'px', min: 0, max: 8, step: 0.5 },
 ];
