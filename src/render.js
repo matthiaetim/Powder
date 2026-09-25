@@ -8,6 +8,8 @@ import { laneX } from './world.js';
 const TAU = Math.PI * 2;
 const TREE_H = 3.2; // nominale Sprite-Höhe in Metern
 const ROCK_H = 1.4;
+const MARK_FONT = "italic 12px 'Playfair Display', Georgia, 'Times New Roman', serif"; // wie --font in styles.css
+const nf = new Intl.NumberFormat(C.HUD_LOCALE);
 
 export function createRenderer(canvas) {
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -128,6 +130,7 @@ export function draw(R, g, t) {
     ox += Math.sin(t * 47) * k;
     oy += Math.sin(t * 61 + 0.7) * k * 0.8;
   }
+  drawMarks(R, g, ox, oy);
   drawTrack(R, g, ox, oy);
   drawWorld(R, g, ox, oy);
   drawParticles(R, g, ox, oy);
@@ -135,6 +138,30 @@ export function draw(R, g, t) {
   drawWhiteout(R, g);
   drawSnow(R, g, t);
   if (g.debug) drawDebug(R, g, ox, oy);
+}
+
+// ---------- Markierungen im Schnee ----------
+// Alle MARK_M eine blaue Querlinie mit Meterzahl (Welt-y = Meter im HUD), der Bestwert des Modus beim Start des
+// Laufs als rote Rekordlinie. Vor der Spur gezeichnet: Spur, Bäume und Fahrer liegen darüber.
+function drawMarks(R, g, ox, oy) {
+  const { ctx, Sv: S, W, H } = R;
+  const y0 = -oy / S, y1 = (H - oy) / S;
+  ctx.lineWidth = C.MARK_PX;
+  ctx.font = MARK_FONT;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'bottom';
+  for (let k = Math.max(1, Math.ceil(y0 / C.MARK_M)); k * C.MARK_M <= y1; k++) {
+    markLine(ctx, W, k * C.MARK_M * S + oy, nf.format(k * C.MARK_M) + ' m', C.MARK_RGBA);
+  }
+  const b = g.runBest;
+  if (b > 0 && b >= y0 && b <= y1) markLine(ctx, W, b * S + oy, 'Rekord · ' + nf.format(b) + ' m', C.MARK_BEST_RGBA);
+}
+
+function markLine(ctx, W, sy, label, color) {
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
+  ctx.fillText(label, W - 8, sy - 3);
 }
 
 function drawTrack(R, g, ox, oy) {

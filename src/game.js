@@ -21,6 +21,7 @@ export function createGame(opts = {}) {
     skier: P.createSkier(), world: null, av: null,
     track: createTrack(), particles: createParticles(),
     dist: 0, runT: 0, best: 0, newBest: false,
+    runBest: 0, // Bestwert beim Start des Laufs: dort steht die Rekordlinie, auch wenn best beim Aufprall schon steigt
     seed: 0, fixedSeed: opts.fixedSeed ?? null,
     mode: DEFAULT_MODE, runMode: DEFAULT_MODE, intro: true, readyDelayMs: C.READY_AUTO_START_MS,
     readyT: 0, deadT: 0, deadCause: '',
@@ -55,6 +56,7 @@ export function reset(g, seed, intro) {
   clearTrack(g.track);
   clearParticles(g.particles);
   g.dist = 0; g.runT = 0; g.newBest = false;
+  g.runBest = g.best;
   g.readyT = 0; g.deadT = 0; g.deadCause = '';
   g.camX = 0; g.zoom = 1;
   g.intro = !!intro;
@@ -107,6 +109,7 @@ function start(g) {
   g.state = 'running';
   g.runMode = g.mode;
   g.best = loadBest(g.mode);
+  g.runBest = g.best;
   g.skier.v = C.START_SPEED_KMH / 3.6;
   g.runs++;
 }

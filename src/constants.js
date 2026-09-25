@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.10.1';
+export const VERSION = '0.11.0';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -154,6 +154,13 @@ export const C = {
   TRACK_RGB: '60,80,100',
   TRACK: 'rgba(60,80,100,0.16)',
   AVALANCHE: [46, 58, 69],
+
+  // Markierungen im Schnee (render.js): alle MARK_M eine blaue Querlinie mit Meterzahl, der Bestwert des Modus
+  // als rote Rekordlinie. Dünn in CSS-Pixeln, unabhängig vom Zoom; Spur, Bäume und Fahrer liegen darüber.
+  MARK_M: 1000,
+  MARK_PX: 1.5,
+  MARK_RGBA: 'rgba(70,120,200,0.45)',
+  MARK_BEST_RGBA: 'rgba(220,60,50,0.7)',
 };
 
 // Regler im Tuning-Panel (langer Druck auf das Versions-Label). Einträge mit heading sind Zwischentitel,
