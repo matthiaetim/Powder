@@ -11,7 +11,7 @@ const ROCK_H = 1.4;
 
 export function createRenderer(canvas) {
   const ctx = canvas.getContext('2d', { alpha: false });
-  return { canvas, ctx, W: 0, H: 0, dpr: 1, S: 10, Sv: 10, sprites: null, spriteKey: '', list: [], skierMarker: { skier: true, y: 0 }, frameMs: 16.7, trackPts: new Float32Array(C.TRACK_CAP * 6), snow: createSnow(), shards: { p: [], run: -1 } };
+  return { canvas, ctx, W: 0, H: 0, dpr: 1, S: 10, Sv: 10, sprites: null, spriteKey: '', list: [], skierMarker: { skier: true, y: 0 }, frameMs: 16.7, paceMs: 0, trackPts: new Float32Array(C.TRACK_CAP * 6), snow: createSnow(), shards: { p: [], run: -1 } };
 }
 
 export function resize(R) {

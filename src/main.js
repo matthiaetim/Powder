@@ -61,21 +61,44 @@ if (game.debug) {
   };
 }
 
-let last = performance.now();
-let acc = 0;
-function frame(now) {
-  let dtMs = now - last;
-  last = now;
-  if (dtMs > C.MAX_FRAME_MS) dtMs = C.MAX_FRAME_MS;
-  R.frameMs = R.frameMs * 0.95 + dtMs * 0.05;
-  acc += dtMs / 1000;
-  let steps = 0;
-  while (acc >= C.STEP && steps < C.MAX_STEPS) {
-    G.update(game, C.STEP);
-    acc -= C.STEP;
-    steps++;
+// Bildtakt: die Zeitstempel sind je nach Browser nur millisekundengenau und flackern leicht. Deshalb wird das
+// Bildintervall geschätzt (Median der ersten Bilder, dann gleitend nachgeführt) und jede Bildzeit auf ganze
+// Intervalle gerundet: ein Bild ist genau ein Takt, ein Aussetzer genau zwei. Passt nichts, gilt der Rohwert.
+const pace = { est: 0, boot: [], low: 0 };
+function pacedDt(raw) {
+  if (!(raw > 1) || raw > 250) return raw;              // unplausibel (Tab war weg o. ä.): weder lernen noch runden
+  if (!pace.est) {
+    if (raw >= 3) pace.boot.push(raw);
+    if (pace.boot.length < 30) return raw;
+    pace.est = pace.boot.sort((a, b) => a - b)[15];
   }
-  if (steps === C.MAX_STEPS) acc = 0;
+  const est = pace.est;
+  const k = Math.round(raw / est);
+  if (k >= 1 && Math.abs(raw - k * est) <= est * 0.25) {
+    pace.est = est + (raw / k - est) * 0.02; // träge nachführen, damit der Jitter nicht in den Takt durchschlägt
+    pace.low = 0;
+    return k * pace.est;
+  }
+  // Deutlich kürzere Bilder in Folge: das Display läuft schneller als angelernt (z. B. 120 Hz), neu anlernen
+  if (raw < est * 0.75) { if (++pace.low >= 10) { pace.est = raw; pace.low = 0; } } else pace.low = 0;
+  return raw;
+}
+
+// Loop: die Simulation läuft in Teilschritten von höchstens STEP genau bis zur Zeit des Bildes, damit jedes Bild
+// exakt seinen Zeitpunkt zeigt. Ein fester Takt mit Restzeit-Akkumulator liefert je nach Bild mal 1, mal 2,
+// mal 3 Schritte, bei Tempo sind das sichtbar ungleiche Sprünge.
+let last = 0;
+function frame(now) {
+  const raw = last ? now - last : 1000 / 60;
+  last = now;
+  let dtMs = pacedDt(raw);
+  if (dtMs > C.MAX_FRAME_MS) dtMs = C.MAX_FRAME_MS;
+  R.frameMs = R.frameMs * 0.95 + Math.min(raw, C.MAX_FRAME_MS) * 0.05;
+  R.paceMs = pace.est;
+  const dt = dtMs / 1000;
+  const n = Math.max(1, Math.min(C.MAX_STEPS, Math.ceil(dt / C.STEP - 0.05)));
+  const h = dt / n;
+  for (let i = 0; i < n; i++) G.update(game, h);
   draw(R, game, now / 1000);
   hud.sync(now, R);
   requestAnimationFrame(frame);
@@ -86,7 +109,6 @@ requestAnimationFrame(frame);
 function autoPause() {
   G.pauseIfRunning(game);
   input.cancelAll();
-  acc = 0;
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) autoPause(); });
 window.addEventListener('pagehide', autoPause);

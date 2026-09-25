@@ -8,13 +8,13 @@
     </radialGradient>
   </defs>
   <ellipse cx="330" cy="392" rx="132" ry="54" fill="url(#sh)"/>
-  <g fill="#2F4F3E">
+  <g fill="#265A3A">
     <polygon points="256,318 352,404 160,404"/>
     <polygon points="252,236 336,332 172,332"/>
     <polygon points="250,118 320,262 184,262"/>
-    <rect x="244" y="400" width="24" height="22" fill="#2A2F33"/>
+    <rect x="244" y="400" width="24" height="22" fill="#6B4F3B"/>
   </g>
-  <g fill="#3E6650">
+  <g fill="#357350">
     <polygon points="256,318 160,404 254,404"/>
     <polygon points="252,236 172,332 250,332"/>
     <polygon points="250,118 184,262 248,262"/>

@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.7.4';
+export const VERSION = '0.7.5';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -10,47 +10,48 @@ export const C = {
   VIEW_ASPECT: 2.15,         // nominale Höhe = Breite × Seitenverhältnis (iPhone-Hochkant)
   SKIER_SCREEN_Y_FRAC: 0.33,
   CAM_Y_FRAC_FAST: 0.25,     // Fahrerposition bei vollem Tempo
-  CAM_ZOOM_FAST: 1.15,       // (Tuning) Herauszoomen bei vollem Tempo, 1 = aus
+  CAM_ZOOM_FAST: 1.20,       // (Tuning) Herauszoomen bei vollem Tempo, 1 = aus
   CAM_SPEED_REF_KMH: 160,    // ab hier volle Vorausschau
   CAM_ZOOM_EASE_S: 0.6,      // Zeitkonstante von Zoom und Fahrerposition
   MAX_DPR: 2,
   CAM_X_EASE_S: 0.25,        // Kamera folgt seitlich mit etwas Verzug: der Fahrer schwingt im Bild
 
-  // Loop
+  // Loop: Teilschritte von höchstens STEP, die genau bis zur Bildzeit reichen (main.js). Längere Aussetzer
+  // werden auf MAX_FRAME_MS gekappt, MAX_STEPS deckelt die Schritte pro Bild.
   STEP: 1 / 120,
-  MAX_STEPS: 8,
+  MAX_STEPS: 12,
   MAX_FRAME_MS: 100,
 
   // Lenkung (nach dem Original vermessen): der Kurs schwingt weich auf einen Zielwinkel ein,
   // ohne Knick. Antippen setzt das Ziel auf TURN_TAP_DEG, Halten vertieft es stetig,
   // Loslassen setzt das Ziel auf die Falllinie. Ansprechzeit = Zeitkonstante des Einschwingens
   // (kritisch gedämpft): nach 2× Ansprechzeit sind rund 60 % des Weges geschafft.
-  TURN_TAP_DEG: 40,        // (Tuning) Zielwinkel beim Antippen
-  TURN_DEEPEN_DEG_S: 90,   // (Tuning) Vertiefung des Zielwinkels pro Sekunde Halten
-  TURN_T: 0.1,             // (Tuning) Ansprechzeit in s bis TURN_T_SPEED_LO_KMH
-  TURN_T_FAST: 0.14,       // (Tuning) Ansprechzeit bei TURN_T_SPEED_HI_KMH: bei Tempo liegt mehr Gewicht auf den Skiern
+  TURN_TAP_DEG: 45,        // (Tuning) Zielwinkel beim Antippen
+  TURN_DEEPEN_DEG_S: 70,   // (Tuning) Vertiefung des Zielwinkels pro Sekunde Halten
+  TURN_T: 0.08,            // (Tuning) Ansprechzeit in s bis TURN_T_SPEED_LO_KMH
+  TURN_T_FAST: 0.08,       // (Tuning) Ansprechzeit bei TURN_T_SPEED_HI_KMH; gleich TURN_T heißt: kein Unterschied bei Tempo
   TURN_T_SPEED_LO_KMH: 50,
   TURN_T_SPEED_HI_KMH: 200,
-  RETURN_T: 0.12,          // (Tuning) Ansprechzeit der Rückkehr zur Falllinie in s
-  MAX_HEADING_DEG: 120,    // (Tuning) über quer (90°) hinaus leicht bergauf
+  RETURN_T: 0.08,          // (Tuning) Ansprechzeit der Rückkehr zur Falllinie in s
+  MAX_HEADING_DEG: 95,     // (Tuning) über quer (90°) hinaus leicht bergauf
 
   // Tempo: der Start hat schon Fahrt, ohne Tippen wird man stetig schneller. Der Luftwiderstand
   // wächst quadratisch und hebt den Hangabtrieb beim Endtempo auf (weiche Annäherung statt Deckel).
   START_SPEED_KMH: 25,     // (Tuning) Anfahrt beim Start
-  G_SLOPE: 5.0,            // (Tuning) Hangabtrieb in m/s²
-  MAX_SPEED_KMH: 200,      // (Tuning) Endtempo im Freilauf
+  G_SLOPE: 5.25,           // (Tuning) Hangabtrieb in m/s²
+  MAX_SPEED_KMH: 190,      // (Tuning) Endtempo im Freilauf
 
   // Bremsen, drei Anteile:
-  // 1. Drehen (Hauptbremse): jede Kursänderung kostet Tempo, Verzögerung = TURN_BRAKE_K × |Drehrate| × v.
-  //    Damit bremst schneller Zickzack genauso wie langes Halten, die Summe des Carvens zählt.
-  // 2. Winkel: wächst ab BRAKE_START_DEG bis BRAKE_FULL_DEG, Verzögerung = Anteil × (BRAKE_MIN + BRAKE_K × v).
+  // 1. Drehen: jede Kursänderung kostet etwas Tempo, Verzögerung = TURN_BRAKE_K × |Drehrate| × v.
+  //    Schwach eingestellt, damit Zickzack flüssig bleibt und vor allem der Winkel bremst.
+  // 2. Winkel (Hauptbremse): wächst ab BRAKE_START_DEG bis BRAKE_FULL_DEG, Verzögerung = Anteil × (BRAKE_MIN + BRAKE_K × v).
   //    Sanfter als früher, damit Halten den Fahrer erst weit zur Seite zieht und dann quer zum Stehen bringt.
   // 3. Schneepflug (beide Daumen): geradeaus bremsen, bei hohem Tempo schwächer als Querstellen.
-  TURN_BRAKE_K: 0.03,      // (Tuning) Bremsen durch Drehen
-  BRAKE_K: 1.2,            // (Tuning) Bremskraft pro m/s Tempo (Winkelbremse)
+  TURN_BRAKE_K: 0.006,     // (Tuning) Bremsen durch Drehen
+  BRAKE_K: 1.8,            // (Tuning) Bremskraft pro m/s Tempo (Winkelbremse)
   BRAKE_MIN: 10,           // Grundbremsung in m/s², damit man wirklich zum Stehen kommt
-  BRAKE_START_DEG: 35,     // (Tuning) darunter bremst der Winkel nicht
-  BRAKE_FULL_DEG: 100,     // (Tuning) ab hier volle Winkelbremse
+  BRAKE_START_DEG: 25,     // (Tuning) darunter bremst der Winkel nicht
+  BRAKE_FULL_DEG: 95,      // (Tuning) ab hier volle Winkelbremse
   PLOW_MIN: 12,            // (Tuning) Schneepflug-Verzögerung in m/s²
   PLOW_K: 0.05,            // Schneepflug wächst nur schwach mit dem Tempo
 
@@ -72,8 +73,8 @@ export const C = {
   CULL_CELLS: 1,
   MIN_SPACING_M: 4.0,
   TREE_D0: 0.010,
-  TREE_D1: 0.020,          // (Tuning) Dichte am Ende des Anstiegs
-  RAMP_M: 8000,            // (Tuning) Dichte, Korridor und Felsanteil steigen über diese Strecke (Marathon)
+  TREE_D1: 0.017,          // (Tuning) Dichte am Ende des Anstiegs
+  RAMP_M: 10000,           // (Tuning) Dichte, Korridor und Felsanteil steigen über diese Strecke (Marathon)
   ROCK_FRAC0: 0.2,
   ROCK_FRAC1: 0.3,
   LANE_AMP: 12,
@@ -115,14 +116,15 @@ export const C = {
 
   // HUD
   HUD_LOCALE: 'de-DE',
+  HUD_TEXT_MS: 50,           // Tempo und Distanz höchstens 20× pro Sekunde in den DOM schreiben (Layout kostet pro Bild)
 
-  // Farben: Polarweiß mit leichtem Blaustich, Tannengrün, kühles Schiefergrau für Text und Fahrer
+  // Farben: Polarweiß mit leichtem Blaustich, sattes Tannengrün mit braunem Stamm, kühles Schiefergrau für Text und Fahrer
   BG: '#F5F9FD',
   INK: '#2E3A45',
   INK_LIGHT: '#3E4B57',
-  TREE: '#2F4F3E',
-  TREE_LIGHT: '#3E6650',
-  TRUNK: '#2A2F33',
+  TREE: '#265A3A',
+  TREE_LIGHT: '#357350',
+  TRUNK: '#6B4F3B',
   ROCK: '#6A7580',
   ROCK_TOP: '#7E8994',
   SHADOW_RGB: '55,75,95',

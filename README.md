@@ -5,11 +5,11 @@ Plain HTML + JavaScript + Canvas, kein Framework, kein Build.
 
 ## Spielen
 
-- **Tippen** links/rechts: der Kurs schwingt weich auf den Tipp-Winkel ein, ganz kurze Tipps geben kleine Kurven. Bei hohem Tempo spricht der Fahrer etwas träger an (Gewicht auf den Skiern).
-- **Halten**: der Winkel vertieft sich stetig. Bis etwa 60° ist es ein Carve mit Zug zur Seite, quer zum Hang und darüber bremst es bis zum Stillstand.
+- **Tippen** links/rechts: der Kurs schwingt weich auf den Tipp-Winkel ein, ganz kurze Tipps geben kleine Kurven.
+- **Halten**: der Winkel vertieft sich stetig bis knapp über quer (95°). Ab etwa 25° bremst der Winkel, je querer, desto stärker, quer zum Hang bis zum Stillstand.
 - **Loslassen**: der Fahrer schwingt ohne Knick zurück zur Falllinie.
 - **Beide Daumen**: Schneepflug, bremst geradeaus. Bei hohem Tempo schwächer als Querstellen. Hebt man einen Daumen, lenkt der andere.
-- **Bremsen**: jede Kursänderung kostet Tempo (Zickzack bremst wie langes Halten), große Winkel bremsen bis zum Stillstand.
+- **Bremsen**: vor allem der Winkel bremst, jede Kursänderung kostet zusätzlich etwas Tempo.
 - Der Start hat schon Fahrt, ohne Eingabe wird man stetig schneller bis zum Endtempo. Kurze Tipps kosten kaum Tempo, Halten bremst hart, quer zum Hang bleibt man stehen.
 - Bei hohem Tempo rückt der Fahrer im Bild nach oben und die Sicht zoomt leicht heraus (mehr Vorausschau).
 - Tastatur: `A`/`D` oder Pfeile, `P` Pause, `R` Fresh. Auf dem iPhone gibt es keine Pause-Taste: anhalten heißt querstellen; beim Wechsel in den Hintergrund pausiert die App von selbst.
