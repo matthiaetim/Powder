@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.7.3';
+export const VERSION = '0.7.4';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -89,6 +89,17 @@ export const C = {
   TRACK_CAP: 512,
   TRACK_WIDTH_MAX: 4,      // Spurbreite bei vollem Carve, Vielfaches der Grundbreite
   PARTICLE_POOL: 64,
+
+  // Aufprall an Baum oder Fels: der Fahrer zerspringt in Pixel-Splitter (nur Bild, siehe render.js)
+  SHATTER_PX: 2,           // Kantenlänge eines Splitters in CSS-Pixeln
+  SHATTER_STEP_PX: 1.25,   // Rasterabstand beim Zerlegen: enger als die Splittergröße gibt mehr Splitter
+  SHATTER_FREEZE_S: 0.06,  // kurzer Standbild-Moment vor dem Zerspringen
+  SHATTER_SPEED: 7,        // Wurfgeschwindigkeit der Splitter in m/s (zufällig 30–100 %)
+  SHATTER_DRAG: 2.6,       // Abbremsen im Schnee pro Sekunde
+  SHATTER_LIFE_S: 1.6,     // so lange liegen die Splitter im Mittel, dann verblassen sie
+  SHATTER_FADE_S: 0.5,
+  SHAKE_PX: 5,             // Bildwackeln beim Aufprall
+  SHAKE_S: 0.4,
 
   // Warnschnee (nur Chase-Modus)
   SNOW_POOL: 160,

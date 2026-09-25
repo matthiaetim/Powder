@@ -24,6 +24,7 @@ export function createGame(opts = {}) {
     seed: 0, fixedSeed: opts.fixedSeed ?? null,
     mode: DEFAULT_MODE, intro: true, readyDelayMs: C.READY_AUTO_START_MS,
     readyT: 0, deadT: 0, deadCause: '',
+    crashV: 0, crashX: 0, crashY: 0, // Tempo und Hindernis beim Aufprall (für die Splitter)
     camX: 0, skierFrac: READY_FRAC, zoom: 1,
     viewWm: C.VIEW_W_M, viewHm: C.VIEW_W_M * C.VIEW_ASPECT,
     debug: !!opts.debug, lastGesture: '–', runs: 0,
@@ -122,15 +123,18 @@ function step(g, dt) {
   updateParticles(g.particles, dt);
 
   const hit = checkCollision(g.world, s);
-  if (hit) { die(g, hit.t === P.TREE ? 'tree' : 'rock'); return; }
+  if (hit) { die(g, hit.t === P.TREE ? 'tree' : 'rock', hit); return; }
   if (hasAvalanche(g) && updateAvalanche(g.av, s, g.dist, dt, false)) die(g, 'avalanche');
 }
 
-function die(g, cause) {
+function die(g, cause, hit) {
   const s = g.skier;
   g.state = 'dead';
   g.deadT = 0;
   g.deadCause = cause;
+  g.crashV = s.v;
+  g.crashX = hit ? hit.x : s.x;
+  g.crashY = hit ? hit.y : s.y;
   s.alive = false;
   s.side = 0;
   s.plow = false;

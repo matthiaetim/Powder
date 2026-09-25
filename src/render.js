@@ -11,7 +11,7 @@ const ROCK_H = 1.4;
 
 export function createRenderer(canvas) {
   const ctx = canvas.getContext('2d', { alpha: false });
-  return { canvas, ctx, W: 0, H: 0, dpr: 1, S: 10, Sv: 10, sprites: null, spriteKey: '', list: [], skierMarker: { skier: true, y: 0 }, frameMs: 16.7, trackPts: new Float32Array(C.TRACK_CAP * 6), snow: createSnow() };
+  return { canvas, ctx, W: 0, H: 0, dpr: 1, S: 10, Sv: 10, sprites: null, spriteKey: '', list: [], skierMarker: { skier: true, y: 0 }, frameMs: 16.7, trackPts: new Float32Array(C.TRACK_CAP * 6), snow: createSnow(), shards: { p: [], run: -1 } };
 }
 
 export function resize(R) {
@@ -128,8 +128,14 @@ export function draw(R, g, t) {
   ctx.fillStyle = C.BG;
   ctx.fillRect(0, 0, W, H);
   // Welt → Bildschirm: sx = x*S + ox, sy = y*S + oy
-  const ox = W / 2 - g.camX * S;
-  const oy = g.skierFrac * H - s.y * S;
+  let ox = W / 2 - g.camX * S;
+  let oy = g.skierFrac * H - s.y * S;
+  // Aufprall: das Bild wackelt kurz und klingt ab (nur die Darstellung, die Simulation steht)
+  if (shattered(g)) {
+    const k = Math.max(0, 1 - g.deadT / C.SHAKE_S);
+    ox += Math.sin(g.deadT * 57) * k * k * C.SHAKE_PX;
+    oy += Math.sin(g.deadT * 73 + 1.3) * k * k * C.SHAKE_PX * 0.8;
+  }
   drawTrack(R, g, ox, oy);
   drawWorld(R, g, ox, oy);
   drawParticles(R, g, ox, oy);
@@ -193,7 +199,11 @@ function drawWorld(R, g, ox, oy) {
   list.sort((a, b) => a.y - b.y);
   for (let i = 0; i < list.length; i++) {
     const o = list[i];
-    if (o.skier) { drawSkier(R, g, g.skier.x * S + ox, g.skier.y * S + oy); continue; }
+    if (o.skier) {
+      if (shattered(g)) drawShards(R, g, ox, oy);
+      else drawSkier(R, g, g.skier.x * S + ox, g.skier.y * S + oy);
+      continue;
+    }
     const sp = o.t === TREE ? R.sprites.trees[o.variant] : R.sprites.rocks[o.variant];
     const sc = (o.h / sp.nominal) * spriteScale;
     ctx.drawImage(sp.img, o.x * S + ox - sp.ax * sc, o.y * S + oy - sp.ay * sc, sp.w * sc, sp.h * sc);
@@ -203,9 +213,8 @@ function drawWorld(R, g, ox, oy) {
 function drawSkier(R, g, sx, sy) {
   const { ctx, Sv: S } = R;
   const s = g.skier;
-  const dead = g.state === 'dead';
   ctx.save();
-  if (dead && g.deadCause === 'avalanche') ctx.globalAlpha = Math.max(0, 1 - g.deadT / 0.7);
+  if (g.state === 'dead' && g.deadCause === 'avalanche') ctx.globalAlpha = Math.max(0, 1 - g.deadT / 0.7);
   // Schatten nach unten rechts
   ctx.fillStyle = `rgba(${C.SHADOW_RGB},0.22)`;
   ctx.beginPath();
@@ -213,7 +222,12 @@ function drawSkier(R, g, sx, sy) {
   ctx.fill();
   ctx.translate(sx, sy);
   ctx.rotate(-s.theta);
-  if (dead && g.deadCause !== 'avalanche') ctx.rotate(Math.min(g.deadT, 0.6) * 9);
+  skierShape(ctx, S, s);
+  ctx.restore();
+}
+
+// Ski, Körper und Kopf um den Ursprung; Position und Drehung setzt der Aufrufer.
+function skierShape(ctx, S, s) {
   // Ski
   ctx.strokeStyle = C.INK;
   ctx.lineWidth = Math.max(1, 0.09 * S);
@@ -228,7 +242,98 @@ function drawSkier(R, g, sx, sy) {
   ctx.beginPath(); ctx.ellipse(lean, 0, 0.26 * S, 0.42 * S, 0, 0, TAU); ctx.fill();
   ctx.fillStyle = C.INK_LIGHT;
   ctx.beginPath(); ctx.arc(lean * 1.3, -0.1 * S, 0.14 * S, 0, TAU); ctx.fill();
-  ctx.restore();
+}
+
+// ---------- Aufprall: der Fahrer zerspringt in Pixel ----------
+
+function shattered(g) {
+  return g.state === 'dead' && g.deadCause !== 'avalanche';
+}
+
+// Einmal pro Aufprall: den Fahrer offscreen zeichnen und in Pixel-Blöcke zerlegen. Jeder Block wird ein
+// Splitter in Weltkoordinaten, der vom Hindernis weg und etwas in Fahrtrichtung fliegt, sich dreht und hüpft.
+function spawnShards(R, g) {
+  const S = R.Sv, s = g.skier, sh = R.shards;
+  sh.run = g.runs;
+  sh.p.length = 0;
+  const half = Math.ceil(S); // 1 m Radius fasst die Ski in jeder Richtung
+  const q = 4;               // Offscreen-Pixel pro CSS-Pixel, zum Mitteln der Kanten
+  const [c, x] = makeCanvas(half * 2, half * 2, q);
+  x.translate(half, half);
+  x.rotate(-s.theta);
+  skierShape(x, S, s);
+  const data = x.getImageData(0, 0, c.width, c.height).data;
+  const b = Math.max(1, Math.round(C.SHATTER_STEP_PX * q)); // Rasterzelle in Offscreen-Pixeln
+  const fx = Math.sin(s.theta), fy = Math.cos(s.theta); // Fahrtrichtung
+  let nx = s.x - g.crashX, ny = s.y - g.crashY;        // weg vom Hindernis
+  const nl = Math.hypot(nx, ny) || 1;
+  nx /= nl; ny /= nl;
+  const boost = 0.8 + 0.5 * Math.min(1, g.crashV / 30); // schneller Aufprall streut weiter
+  for (let by = 0; by < c.height; by += b) {
+    for (let bx = 0; bx < c.width; bx += b) {
+      let a = 0, r = 0, gr = 0, bl = 0;
+      for (let yy = by; yy < Math.min(by + b, c.height); yy++) {
+        for (let xx = bx; xx < Math.min(bx + b, c.width); xx++) {
+          const i = (yy * c.width + xx) * 4, al = data[i + 3];
+          a += al; r += data[i] * al; gr += data[i + 1] * al; bl += data[i + 2] * al;
+        }
+      }
+      if (a < b * b * 255 * 0.3) continue; // Block kaum bedeckt: kein Splitter
+      const px = (bx + b / 2) / q - half, py = (by + b / 2) / q - half; // CSS-Pixel ab Fahrermitte
+      const ang = Math.atan2(py, px) + (Math.random() - 0.5) * 1.2;
+      const sp = C.SHATTER_SPEED * (0.3 + 0.7 * Math.random()) * boost;
+      const carry = g.crashV * (0.04 + 0.12 * Math.random());
+      const away = 0.5 + 2.5 * Math.random();
+      sh.p.push({
+        x: s.x + px / S, y: s.y + py / S,
+        vx: Math.cos(ang) * sp + fx * carry + nx * away,
+        vy: Math.sin(ang) * sp + fy * carry + ny * away,
+        spin: (Math.random() - 0.5) * 30,
+        vz: 1 + 4.5 * Math.random(),
+        size: C.SHATTER_PX / S,
+        life: C.SHATTER_LIFE_S * (0.7 + 0.6 * Math.random()),
+        color: `rgb(${Math.round(r / a)},${Math.round(gr / a)},${Math.round(bl / a)})`,
+      });
+    }
+  }
+}
+
+// Höhe eines Splitters über dem Schnee in m: ein Sprung, dann ein kleiner Nachhüpfer.
+function hop(vz, t) {
+  const G = 20, t1 = (2 * vz) / G;
+  if (t < t1) return vz * t - 0.5 * G * t * t;
+  const u = t - t1, v2 = vz * 0.35;
+  return Math.max(0, v2 * u - 0.5 * G * u * u);
+}
+
+// Splitter aus der Zeit seit dem Aufprall berechnen (kein Zustand pro Frame): Weg und Drehung
+// laufen exponentiell aus, in der Luft werden sie größer und werfen Schatten nach unten rechts.
+function drawShards(R, g, ox, oy) {
+  const sh = R.shards;
+  if (sh.run !== g.runs) spawnShards(R, g);
+  const { ctx, Sv: S, dpr } = R;
+  const t = Math.max(0, g.deadT - C.SHATTER_FREEZE_S);
+  const k = C.SHATTER_DRAG;
+  const f = (1 - Math.exp(-k * t)) / k; // zurückgelegter Weg je m/s Startgeschwindigkeit
+  for (let pass = 0; pass < 2; pass++) {
+    ctx.fillStyle = `rgb(${C.SHADOW_RGB})`;
+    for (const p of sh.p) {
+      const a = Math.min(1, (p.life - t) / C.SHATTER_FADE_S);
+      if (a <= 0) continue;
+      const z = hop(p.vz, t);
+      if (pass === 0 && z < 0.02) continue;
+      const size = p.size * S * (1 + 0.5 * z);
+      let x = (p.x + p.vx * f) * S + ox, y = (p.y + p.vy * f) * S + oy;
+      if (pass === 0) { x += 0.6 * z * S; y += 0.45 * z * S; }
+      const rot = p.spin * f, cs = Math.cos(rot) * dpr, sn = Math.sin(rot) * dpr;
+      ctx.globalAlpha = pass === 0 ? a * 0.22 : a;
+      if (pass === 1) ctx.fillStyle = p.color;
+      ctx.setTransform(cs, sn, -sn, cs, x * dpr, y * dpr);
+      ctx.fillRect(-size / 2, -size / 2, size, size);
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
 function drawParticles(R, g, ox, oy) {
