@@ -1,11 +1,16 @@
-// Bestenliste: Bestweiten aller Spieler in einer Firebase Realtime Database, per REST ohne SDK (fetch).
+// Bestenliste: Bestwerte aller Spieler in einer Firebase Realtime Database, per REST ohne SDK (fetch).
 // Die reine Logik (Schlüssel, Sortierung, Rang, Zulässigkeit) ist exportiert und ohne DOM testbar; createBoard hält
 // Cache, Namen und Upload-Stand, spricht mit dem Server und reicht die Linien an game.js weiter (setMarks).
+// Das Feld m ist je Modus etwas anderes (modes.js): Meter in Classic und Chase, mehr ist besser; im Super-G die
+// Gesamtzeit in Hundertstel, weniger ist besser. Alle Vergleiche laufen über better(), nie direkt über m.
 import { C, VERSION } from './constants.js';
-import { BOARD_MODES } from './modes.js';
+import { BOARD_MODES, lowerIsBetter } from './modes.js';
 import { isTuned } from './tune.js';
-import { loadBest, loadName, saveName, loadBoardCache, saveBoardCache, loadBoardOwn, saveBoardOwn } from './storage.js';
+import { loadName, saveName, loadBoardCache, saveBoardCache, loadBoardOwn, saveBoardOwn } from './storage.js';
 import { setMarks, adoptBest } from './game.js';
+
+// Ist der Wert a im Modus echt besser als b?
+export const better = (mode, a, b) => (lowerIsBetter(mode) ? a < b : a > b);
 
 // Schlüssel eines Eintrags: der Name klein und auf a-z0-9- reduziert, Umlaute ausgeschrieben. Nur ASCII, damit der
 // Regex in den Firebase-Regeln sicher greift und der Pfad ohne Kodierung auskommt. Identität ist der Name: gleicher
@@ -45,21 +50,23 @@ export function sanitizeBoards(raw) {
   return out;
 }
 
-// Rangfolge: Meter absteigend, bei Gleichstand wer früher da war (ts), dann der Schlüssel, damit die Liste stabil bleibt.
-export function sortEntries(byKey) {
+// Rangfolge: der bessere Wert zuerst (Meter absteigend, Zeiten aufsteigend), bei Gleichstand wer früher da war (ts),
+// dann der Schlüssel, damit die Liste stabil bleibt.
+export function sortEntries(byKey, mode) {
+  const sign = lowerIsBetter(mode) ? 1 : -1;
   return Object.entries(byKey || {})
     .map(([key, e]) => ({ key, ...e }))
-    .sort((a, b) => b.m - a.m || a.ts - b.ts || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+    .sort((a, b) => sign * (a.m - b.m) || a.ts - b.ts || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
 }
 
-// Zwei Stände vereinen: je Modus und Schlüssel der Eintrag mit mehr Metern, bei Gleichstand der aus b.
+// Zwei Stände vereinen: je Modus und Schlüssel der bessere Eintrag, bei Gleichstand der aus b.
 export function mergeBoards(a, b) {
   const out = emptyBoards();
   for (const mode of BOARD_MODES) {
     const A = (a && a[mode]) || {}, B = (b && b[mode]) || {};
     for (const key of new Set([...Object.keys(A), ...Object.keys(B)])) {
       const x = A[key], y = B[key];
-      out[mode][key] = !x ? y : !y ? x : y.m >= x.m ? y : x;
+      out[mode][key] = !x ? y : !y ? x : better(mode, x.m, y.m) ? x : y;
     }
   }
   return out;
@@ -67,7 +74,7 @@ export function mergeBoards(a, b) {
 
 // Ansicht für die Fresh-Seite: die ersten rows Einträge und der eigene mit Rang, falls er auf dem Server steht.
 export function viewFor(boards, mode, ownKey, rows = C.BOARD_ROWS) {
-  const list = sortEntries(boards && boards[mode]);
+  const list = sortEntries(boards && boards[mode], mode);
   const top = list.slice(0, rows).map((e, i) => ({ rank: i + 1, key: e.key, name: e.name, m: e.m, own: !!ownKey && e.key === ownKey }));
   const idx = ownKey ? list.findIndex((e) => e.key === ownKey) : -1;
   const own = idx >= 0 ? { rank: idx + 1, key: ownKey, name: list[idx].name, m: list[idx].m } : null;
@@ -75,8 +82,22 @@ export function viewFor(boards, mode, ownKey, rows = C.BOARD_ROWS) {
 }
 
 // Fremde Bestweiten für die Linien im Schnee, Meter absteigend (render.js zeichnet sie von unten nach oben).
+// Zeiten lassen sich nicht als Linie in den Hang legen: im Super-G bleibt der Schnee ohne Namenslinien.
 export function friendMarks(boards, mode, ownKey) {
-  return sortEntries(boards && boards[mode]).filter((e) => e.key !== ownKey).map((e) => ({ name: e.name, m: e.m }));
+  if (lowerIsBetter(mode)) return [];
+  return sortEntries(boards && boards[mode], mode).filter((e) => e.key !== ownKey).map((e) => ({ name: e.name, m: e.m }));
+}
+
+// Was ein beendeter Lauf für die Liste wert ist: Meter beim Sturz, im Super-G die Gesamtzeit in Hundertstel, aber nur
+// nach dem Zieleinlauf (ein Sturz vor dem Ziel hat keine Zeit). 0 = nichts zu melden. Dazu t für den Eintrag:
+// die Laufzeit in Sekunden, im Super-G die reine Fahrzeit ohne Strafen (Strafe = m/100 − t).
+export function runScore(g) {
+  if (lowerIsBetter(g.runMode)) {
+    const cs = g.course;
+    if (g.state !== 'finished' || !cs || !cs.finished) return { m: 0, t: 0 };
+    return { m: Math.round(cs.total * 100), t: Math.round(cs.time * 100) / 100 };
+  }
+  return { m: Math.floor(g.dist), t: Math.round(g.runT * 100) / 100 };
 }
 
 // Zählt der Lauf für die Bestenliste? Debug und fester Seed sind Entwicklerwerkzeuge, Tuning verändert Physik und
@@ -133,13 +154,14 @@ export function createBoard({ url = '', g = null, fetchFn = null, debug = false 
     if (g) setMarks(g, Object.fromEntries(BOARD_MODES.map((mode) => [mode, friendMarks(boards, mode, key())])));
   }
 
-  // Server kennt für den eigenen Namen mehr als dieses Gerät (Zweitgerät, gelöschte Safari-Daten): übernehmen
+  // Server kennt für den eigenen Namen mehr als dieses Gerät (Zweitgerät, gelöschte Safari-Daten): übernehmen,
+  // adoptBest vergleicht selbst mit dem lokalen Bestwert des Modus
   function adoptFromServer() {
     const k = key();
     if (!k || !g) return;
     for (const mode of BOARD_MODES) {
       const e = boards[mode][k];
-      if (e && e.m > loadBest(mode)) adoptBest(g, mode, e.m);
+      if (e) adoptBest(g, mode, e.m);
     }
   }
 
@@ -181,7 +203,7 @@ export function createBoard({ url = '', g = null, fetchFn = null, debug = false 
     const k = key();
     const o = own[mode];
     if (!k || !o || o.sentAs === k || busy[mode]) return;
-    if (boards[mode][k] && boards[mode][k].m >= o.m) { o.sentAs = k; saveBoardOwn(own); return; } // steht schon drüber
+    if (boards[mode][k] && !better(mode, o.m, boards[mode][k].m)) { o.sentAs = k; saveBoardOwn(own); return; } // Server hat schon so gut oder besser
     busy[mode] = true;
     try {
       const body = { name, m: o.m, t: o.t, ts: { '.sv': 'timestamp' }, v: VERSION };
@@ -215,13 +237,15 @@ export function createBoard({ url = '', g = null, fetchFn = null, debug = false 
     await Promise.all(BOARD_MODES.map((mode) => flushMode(mode)));
   }
 
-  // Lauf zu Ende (hud.js beim Übergang nach dead): zulässigen Bestwert vormerken, Liste laden, Ausstehendes senden.
+  // Lauf zu Ende (hud.js beim Übergang nach dead oder finished): zulässigen Bestwert vormerken, Liste laden,
+  // Ausstehendes senden.
   function onRunEnd(game) {
     verdict = runVerdict(game);
     const mode = game.runMode;
-    const m = Math.floor(game.dist);
-    if (!verdict && m >= 1 && BOARD_MODES.includes(mode) && m > ((own[mode] && own[mode].m) || 0)) {
-      own[mode] = { m, t: Math.round(game.runT * 100) / 100, sentAs: null };
+    const { m, t } = runScore(game);
+    const cur = own[mode] ? own[mode].m : 0;
+    if (!verdict && m >= 1 && m <= C.BOARD_MAX_M && BOARD_MODES.includes(mode) && (!cur || better(mode, m, cur))) {
+      own[mode] = { m, t, sentAs: null };
       saveBoardOwn(own);
     }
     return Promise.all([load(), flush()]);

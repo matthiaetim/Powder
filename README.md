@@ -30,19 +30,24 @@ Plain HTML + JavaScript + Canvas, kein Framework, kein Build.
 
 ## Bestenliste
 
-Die Fresh-Seite zeigt die fünf besten Weiten des gewählten Modus (Rang, Name, Meter), der eigene Eintrag voll deckend;
-liegt er außerhalb, steht er nach „…“ mit seinem Rang darunter. Beim ersten Sturz fragt die Seite einmal nach einem
-Namen (2 bis 12 Zeichen), ein Tipp auf den eigenen Eintrag ändert ihn. Die Identität ist der Name: gleiche Namen teilen
-sich einen Eintrag (auch von einem zweiten Gerät), ein Eintrag wird nur nach oben überschrieben, und wer sich umbenennt,
-lässt den alten Eintrag stehen (Aufräumen in der Firebase-Konsole). Die Bestweiten der anderen liegen als graue
-Namenslinien im Schnee, beim Start des Laufs eingefroren; die eigene rote Rekordlinie bleibt. Die Liste gibt es für Classic
-und Chase (`BOARD_MODES` in `src/modes.js`); Super-G wertet Zeiten und hat noch keine, dort bleibt sie weg. Läufe mit Tuning, `?seed=`
-oder `?debug=1` zählen lokal, aber nicht online (Hinweis unter der Liste). Offline zeigt die Liste den letzten bekannten
-Stand, ausstehende Bestweiten werden beim nächsten Start oder Sturz nachgeholt.
+Die Fresh-Seite zeigt die fünf Besten des gewählten Modus (Rang, Name, Wert), der eigene Eintrag voll deckend;
+liegt er außerhalb, steht er nach „…“ mit seinem Rang darunter. In Classic und Chase zählt die Weite in Metern, im
+Super-G die Gesamtzeit (Zeit plus Strafen, schnellste zuerst); dort zählt nur ein Lauf bis ins Ziel, ein Sturz
+davor meldet nichts. Beim ersten Sturz fragt die Seite einmal nach einem Namen (2 bis 12 Zeichen), ein Tipp auf den
+eigenen Eintrag ändert ihn. Die Identität ist der Name: gleiche Namen teilen sich einen Eintrag (auch von einem zweiten
+Gerät), ein Eintrag wird nur durch einen besseren überschrieben, und wer sich umbenennt, lässt den alten Eintrag stehen
+(Aufräumen in der Firebase-Konsole). Die Bestweiten der anderen liegen als graue Namenslinien im Schnee, beim Start des
+Laufs eingefroren; die eigene rote Rekordlinie bleibt. Im Super-G gibt es keine Namenslinien, Zeiten lassen sich nicht in
+den Hang legen. Welche Modi eine Liste haben und wie sie werten, steht in `MODES` (`board: 'm'` oder `'time'`,
+`src/modes.js`). Läufe mit Tuning, `?seed=` oder `?debug=1` zählen lokal, aber nicht online (Hinweis unter der Liste).
+Offline zeigt die Liste den letzten bekannten Stand, ausstehende Bestwerte werden beim nächsten Start oder Lauf nachgeholt.
 
 Technik: Firebase Realtime Database per REST (`src/board.js`, kein SDK). Die Datenbank-URL steht in `BOARD_URL`
-(`src/constants.js`), leer heißt aus. Die Regeln (`tools/firebase-rules.json`) lassen nur gültige Einträge zu, nur nach
-oben und ohne Löschen; sie prüfen Form und Richtung, nicht Ehrlichkeit. Wer die URL kennt, kann per Skript schreiben.
+(`src/constants.js`), leer heißt aus. Ein Eintrag hat die Felder `name`, `m`, `t`, `ts`, `v`; `m` sind Meter, im Super-G
+die Gesamtzeit in Hundertstel (`2712` = 27,12 s), `t` ist die Laufzeit in Sekunden, im Super-G die reine Fahrzeit ohne
+Strafen. Die Regeln (`tools/firebase-rules.json`) lassen nur gültige Einträge zu, nur in Richtung besser (Meter nie
+kleiner, Super-G-Zeit nie größer) und ohne Löschen; sie prüfen Form und Richtung, nicht Ehrlichkeit. Wer die URL kennt,
+kann per Skript schreiben.
 
 ### Einrichtung
 
@@ -54,7 +59,11 @@ oben und ohne Löschen; sie prüfen Form und Richtung, nicht Ehrlichkeit. Wer di
 
 Regeln prüfen (`DB=https://…app`): ein gültiger `PUT` an `$DB/boards/classic/test.json` mit
 `{"name":"Test","m":1234,"t":45.67,"ts":{".sv":"timestamp"},"v":"0.13.0"}` antwortet 200; derselbe mit `"m":1000`,
-`"m":"1234"`, einem Feld mehr oder als `DELETE` antwortet 401 `Permission denied`. Den Testeintrag danach in der Konsole löschen.
+`"m":"1234"`, einem Feld mehr oder als `DELETE` antwortet 401 `Permission denied`. Für den Super-G entsprechend
+`$DB/boards/superg/test.json` mit `"m":2712`: ein zweiter `PUT` mit `"m":2600` antwortet 200, mit `"m":2800` 401.
+Die Testeinträge danach in der Konsole löschen. Nach einer Regeländerung (etwa ein neuer Modus) den Inhalt von
+`tools/firebase-rules.json` erneut im Reiter „Regeln“ einfügen und veröffentlichen; bis dahin lehnt der Server Einträge
+des neuen Modus ab.
 
 Lokal ohne Firebase: `node tools/serve.js 8082 --board` startet einen Mock der Schnittstelle (`tools/board-mock.js`, mit
 Beispielnamen), im Browser dann `?board=local`.

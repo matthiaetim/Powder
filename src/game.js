@@ -8,7 +8,7 @@ import { checkCollision } from './collision.js';
 import { createTrack, clearTrack, pushTrack } from './track.js';
 import { createParticles, clearParticles, spawnParticle, updateParticles } from './particles.js';
 import { loadBest, saveBest, loadMode, saveMode, loadBestTime, saveBestTime, loadBestSplits, saveBestSplits } from './storage.js';
-import { MODES, DEFAULT_MODE } from './modes.js';
+import { MODES, DEFAULT_MODE, lowerIsBetter } from './modes.js';
 import { createCourse, updateCourse } from './gates.js';
 
 const READY_FRAC = 0.78; // Fahrer steht im Intro weit unten im Bild
@@ -411,7 +411,17 @@ export function setMarks(g, byMode) {
 }
 // Der Server kennt für den eigenen Namen mehr als dieses Gerät (Zweitgerät, gelöschte Daten): lokal übernehmen, damit
 // „Bester Lauf“ und die rote Linie zur Bestenliste passen. Die Linie rückt erst beim nächsten Lauf.
+// Im Super-G ist m die Gesamtzeit in Hundertstel; die Zwischenzeiten des fremden Laufs kennt der Server nicht, darum
+// fallen sie weg (die Hinweise zeigen dann die reine Zwischenzeit, bis ein eigener Lauf die Bestzeit unterbietet).
 export function adoptBest(g, mode, m) {
+  if (lowerIsBetter(mode)) {
+    const cur = loadBestTime(mode);
+    if (!(m >= 1) || (cur > 0 && !(m < cur))) return;
+    saveBestTime(mode, m);
+    saveBestSplits(mode, []);
+    if (g.mode === mode) { g.bestTime = m; g.bestSplits = []; g.newBestTime = false; }
+    return;
+  }
   if (!(m > loadBest(mode))) return;
   saveBest(mode, m);
   if (g.mode === mode) { g.best = m; g.newBest = false; }

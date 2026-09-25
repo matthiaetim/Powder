@@ -1,8 +1,10 @@
 // Mock der Firebase-REST-Schnittstelle für die Bestenliste, nur zum lokalen Testen: node tools/serve.js 8082 --board,
 // im Browser ?board=local. Hält die Einträge im Speicher (Neustart = Ausgangsstand) und prüft wie
-// tools/firebase-rules.json: nur classic/chase, Schlüssel a-z0-9- mit 2 bis 24 Zeichen, genau die fünf Felder,
-// m ganz 1..99999 und nie kleiner als der Bestand, kein Löschen. Antwortet wie Firebase: 200 mit Echo, 401 Permission denied.
-const MODES = ['classic', 'chase'];
+// tools/firebase-rules.json: nur classic/chase/superg, Schlüssel a-z0-9- mit 2 bis 24 Zeichen, genau die fünf Felder,
+// m ganz 1..99999 und nie schlechter als der Bestand (Meter nie kleiner, Super-G-Zeit in Hundertstel nie größer),
+// kein Löschen. Antwortet wie Firebase: 200 mit Echo, 401 Permission denied.
+const MODES = ['classic', 'chase', 'superg'];
+const TIME_MODES = ['superg'];
 const FIELDS = ['name', 'm', 't', 'ts', 'v'];
 
 function seed(rows) {
@@ -14,6 +16,7 @@ function seed(rows) {
 const boards = {
   classic: seed([['Luki', 4321, 83.27], ['Mia', 2890, 61.02], ['Jonas', 1750, 40.1], ['Ela', 980, 25.4], ['Tom', 640, 17.9], ['Ida', 150, 6.2]]),
   chase: seed([['Luki', 2210, 52.3], ['Mia', 1430, 38.8], ['Tom', 510, 15.1]]),
+  superg: seed([['Luki', 2712, 27.12], ['Mia', 2980, 26.8], ['Jonas', 3350, 30.5], ['Ela', 4120, 35.2], ['Tom', 5205, 43.05], ['Ida', 6890, 62.9]]),
 };
 
 const CORS = {
@@ -37,7 +40,8 @@ function accept(mode, key, data, existing) {
   const { name, m, t, v } = data;
   let { ts } = data;
   if (typeof name !== 'string' || name.length < 2 || name.length > 12) return null;
-  if (typeof m !== 'number' || !Number.isInteger(m) || m < 1 || m > 99999 || (existing && m < existing.m)) return null;
+  if (typeof m !== 'number' || !Number.isInteger(m) || m < 1 || m > 99999) return null;
+  if (existing && (TIME_MODES.includes(mode) ? m > existing.m : m < existing.m)) return null;
   if (typeof t !== 'number' || t < 0) return null;
   if (ts && typeof ts === 'object' && ts['.sv'] === 'timestamp') ts = Date.now();
   if (typeof ts !== 'number' || ts > Date.now()) return null;
@@ -71,7 +75,7 @@ function handle(req, res) {
       const entry = accept(mode, key, data, boards[mode] && boards[mode][key]);
       if (!entry) { denied(res); return; }
       boards[mode][key] = entry;
-      console.log(`[board] ${mode}/${key} ← ${entry.name} ${entry.m} m`);
+      console.log(`[board] ${mode}/${key} ← ${entry.name} ${entry.m}${TIME_MODES.includes(mode) ? ' Hundertstel' : ' m'}`);
       send(res, 200, entry);
     });
     return true;

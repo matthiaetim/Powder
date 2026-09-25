@@ -5,10 +5,10 @@
       "$mode": {
         ".indexOn": ["m"],
         "$nameKey": {
-          ".write": "($mode == 'classic' || $mode == 'chase') && newData.exists() && $nameKey.length >= 2 && $nameKey.length <= 24 && $nameKey.matches(/^[a-z0-9-]+$/)",
+          ".write": "($mode == 'classic' || $mode == 'chase' || $mode == 'superg') && newData.exists() && $nameKey.length >= 2 && $nameKey.length <= 24 && $nameKey.matches(/^[a-z0-9-]+$/)",
           ".validate": "newData.hasChildren(['name', 'm', 't', 'ts', 'v'])",
           "name": { ".validate": "newData.isString() && newData.val().length >= 2 && newData.val().length <= 12" },
-          "m": { ".validate": "newData.isNumber() && newData.val() % 1 == 0 && newData.val() >= 1 && newData.val() <= 99999 && (!data.exists() || newData.val() >= data.val())" },
+          "m": { ".validate": "newData.isNumber() && newData.val() % 1 == 0 && newData.val() >= 1 && newData.val() <= 99999 && (!data.exists() || ($mode == 'superg' && newData.val() <= data.val()) || ($mode != 'superg' && newData.val() >= data.val()))" },
           "t": { ".validate": "newData.isNumber() && newData.val() >= 0" },
           "ts": { ".validate": "newData.isNumber() && newData.val() <= now" },
           "v": { ".validate": "newData.isString() && newData.val().length <= 16" },

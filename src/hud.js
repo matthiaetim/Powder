@@ -1,11 +1,10 @@
 // DOM-HUD: Tempo, Distanz, Pause, Fresh-Seite mit Laufzeit, Bestenliste samt Namensfeld und Modus-Karten, Debug-Text.
-// DOM-HUD: Tempo, Distanz, Pause, Fresh-Seite mit Laufzeit und Modus-Karten, Debug-Text.
 // Super-G: dazu die laufende Zeit, Hinweise zu Torfehler und Zwischenzeit, der Countdown in der Bildmitte.
 import { C, VERSION } from './constants.js';
 import { overlayReady, togglePause, pauseIfRunning, fresh, selectMode } from './game.js';
 import { createTunePanel, isTuned } from './tune.js';
 import { verdictText } from './board.js';
-import { MODES, BOARD_MODES } from './modes.js';
+import { MODES, lowerIsBetter } from './modes.js';
 import { drawModePreview } from './render.js';
 
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -140,16 +139,18 @@ export function createHud(g, doc, hooks = {}) {
   // Bestenliste (board.js): Top-Zeilen des gewählten Modus, die eigene Zeile trägt das Namensfeld. Ohne Namen steht
   // nur das Feld da, zentriert und unterstrichen; mit Namen wird es zur Namenszelle, ein Tipp darauf öffnet die
   // Tastatur nativ (programmatischer Fokus aus pointerup heraus ist auf iOS unzuverlässig).
+  // Der Wert m ist je Modus Meter oder (Super-G) die Gesamtzeit in Hundertstel, die Spalte zeigt entsprechend.
   const board = hooks.board;
   const boardOn = !!(board && board.enabled);
   const boardEl = $('board'), rowsEl = $('board-rows'), moreEl = $('board-more'), noteEl = $('board-note');
   const ownRow = boardEl.querySelector('.board-own'), nameInput = $('board-name');
   const ownRank = ownRow.querySelector('.board-rank'), ownM = ownRow.querySelector('.board-m');
   doc.body.dataset.board = boardOn ? '1' : '';
+  const scoreText = (m) => (lowerIsBetter(g.mode) ? formatClock(m / 100, true) : nf.format(m) + ' m');
   const rowEl = (rank, name, m) => {
     const row = doc.createElement('div');
     row.className = 'board-row';
-    for (const [cls, text] of [['board-rank', rank], ['board-name', name], ['board-m', nf.format(m) + ' m']]) {
+    for (const [cls, text] of [['board-rank', rank], ['board-name', name], ['board-m', scoreText(m)]]) {
       const span = doc.createElement('span');
       span.className = cls;
       span.textContent = text;
@@ -159,9 +160,7 @@ export function createHud(g, doc, hooks = {}) {
   };
   function renderBoard() {
     if (!boardOn || doc.activeElement === nameInput) return; // ohne Server bleibt #board hidden; nicht unter den Fingern umbauen
-    // Super-G wertet Zeiten, die Liste kennt nur Meter (BOARD_MODES): dort bleibt sie weg
-    boardEl.hidden = !BOARD_MODES.includes(g.mode);
-    if (boardEl.hidden) return;
+    boardEl.hidden = false;
     const name = board.name();
     boardEl.dataset.named = name ? '1' : '';
     rowsEl.replaceChildren();
@@ -174,13 +173,15 @@ export function createHud(g, doc, hooks = {}) {
       if (!e.own) { rowsEl.append(rowEl(e.rank, e.name, e.m)); continue; }
       rowsEl.append(ownRow);
       ownRank.textContent = e.rank;
-      ownM.textContent = nf.format(e.m) + ' m';
+      ownM.textContent = scoreText(e.m);
     }
     if (!v.ownInTop) {
-      // Eigener Eintrag unter den Top-Zeilen mit Rang, oder noch nicht auf dem Server: dann der lokale Bestwert ohne Rang
+      // Eigener Eintrag unter den Top-Zeilen mit Rang, oder noch nicht auf dem Server: dann der lokale Bestwert ohne
+      // Rang (im Super-G ohne Bestzeit ein Strich)
       moreEl.hidden = !v.own;
       ownRank.textContent = v.own ? v.own.rank : '–';
-      ownM.textContent = nf.format(v.own ? v.own.m : g.best) + ' m';
+      const local = lowerIsBetter(g.mode) ? g.bestTime : g.best;
+      ownM.textContent = v.own ? scoreText(v.own.m) : local > 0 ? scoreText(local) : '–';
     }
     const verdict = board.lastVerdict();
     noteEl.textContent = verdict ? verdictText(verdict) : board.stale() ? 'Letzter bekannter Stand' : '';
@@ -224,7 +225,8 @@ export function createHud(g, doc, hooks = {}) {
       lastState = g.state;
       doc.body.dataset.state = g.state;
       doc.body.dataset.intro = g.state === 'ready' && g.intro ? '1' : '';
-      if (g.state === 'dead' && boardOn) board.onRunEnd(g); // Bestwert steht fest: die() lief im Physikschritt davor
+      // Bestwert steht fest: die() bzw. finish() lief im Physikschritt davor
+      if ((g.state === 'dead' || g.state === 'finished') && boardOn) board.onRunEnd(g);
     }
     // Hinweis unter dem Fahrer, verschwindet nach SG_NOTE_S (gates.js zählt note.t hoch)
     const note = cs && cs.note && cs.note.t < C.SG_NOTE_S && g.state !== 'finished' ? cs.note : null;
