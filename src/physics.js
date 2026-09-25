@@ -24,6 +24,7 @@ export function createSkier() {
     brake: 0,      // aktuelle Bremsverzögerung (Debug)
     side: 0,       // -1 links, 1 rechts, 0 losgelassen
     plow: false,   // beide Daumen: Schneepflug, geradeaus bremsen
+    plowK: 0,      // Pflugstellung 0..1: die Ski gehen weich in den Pflug und zurück (Bild, Spur, Spray, Ton)
     alive: true,
   };
 }
@@ -78,6 +79,7 @@ export function updateSkier(s, dt) {
   const brakeAngle = smoothstep(t) * (C.BRAKE_MIN + C.BRAKE_K * s.v);
   const brakeTurn = C.TURN_BRAKE_K * Math.abs(s.omega) * s.v;
   const brakePlow = s.plow ? C.PLOW_MIN + C.PLOW_K * s.v : 0;
+  s.plowK += ((s.plow ? 1 : 0) - s.plowK) * (1 - Math.exp(-dt / C.PLOW_EASE_S));
   s.brake = brakeAngle + brakeTurn + brakePlow;
 
   const cos = Math.cos(s.theta);

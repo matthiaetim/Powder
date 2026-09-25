@@ -1,6 +1,7 @@
 // Ton: alles synthetisch über die Web Audio API, keine Audiodateien. Vier Gruppen mit eigenem Regler im Tuning:
 // Wind (Bergwind als ständiges Grundrauschen mit Böen und Pfeifen, Fahrtwind mit dem Tempo), Ski (Schneezischen mit
-// dem Tempo, Kante beim Carven, Kratzen mit Rattern beim Bremsen, Zischen beim Antippen und Loslassen), Lawine
+// dem Tempo, Kante beim Carven, Kratzen mit Rattern beim Bremsen, im Pflug lauter und tiefer, Zischen beim Antippen
+// und Loslassen), Lawine
 // (Grollen, das mit der Nähe lauter und heller wird, Bass, Knacken, Zischen ganz nah, Krachen beim Losbrechen)
 // und Aufprall (kurzer dumpfer Schlag, an der Lawine schwerer).
 // iOS gibt Ton erst nach einer Berührung frei: der Kontext entsteht beim ersten Tipp, davor bleibt alles still.
@@ -259,6 +260,7 @@ export function createSound(g) {
     const move = clamp(v / 10, 0, 1);
     const carve = running ? s.carve : 0;
     const skid = running ? clamp(s.brake / 28, 0, 1) : 0;
+    const plow = running ? s.plowK * move : 0; // Schneepflug: schiebt und kratzt, nur mit Fahrt
 
     set(n.master.gain, C.SND_MASTER * MASTER_TRIM, 0.1);
     set(n.wind.gain, C.SND_WIND, 0.05);
@@ -272,14 +274,14 @@ export function createSound(g) {
     set(n.rushF.frequency, 250 + 2800 * k, 0.15);
     set(n.amb.gain, g.state === 'dead' ? 0.17 : 0.27, 0.5);
 
-    // Ski: Zischen mit dem Tempo, beim Carven tiefer und lauter; Kratzen aus Kante und Bremse, Rattern beim Rutschen
+    // Ski: Zischen mit dem Tempo, beim Carven tiefer und lauter; Kratzen aus Kante, Bremse und Pflug, Rattern beim Rutschen
     dbg.hiss = 0.34 * Math.pow(k, 1.2) * (1 + 0.5 * carve);
     set(n.hiss.gain, dbg.hiss, 0.08);
     set(n.hissF.frequency, 2700 - 1000 * carve, 0.1);
-    dbg.scrape = Math.min(0.9, (0.45 * carve + 0.7 * skid) * move * 0.8);
+    dbg.scrape = Math.min(0.9, (0.45 * carve + 0.7 * skid) * move * 0.8 + 0.55 * plow);
     set(n.scrape.gain, dbg.scrape, 0.06);
-    set(n.scrapeF.frequency, 1100 - 500 * skid, 0.08);
-    set(n.chatterDepth.gain, 0.75 * skid, 0.08);
+    set(n.scrapeF.frequency, 1100 - 500 * skid - 350 * plow, 0.08);
+    set(n.chatterDepth.gain, 0.75 * Math.max(skid, plow), 0.08);
 
     // Lawine: nur im Chase, solange sie rollt (Lauf oder Erwischt-Moment); nach dem Erwischen klingt sie aus
     const chase = g.mode === 'chase' && (running || (g.state === 'dead' && g.deadCause === 'avalanche'));

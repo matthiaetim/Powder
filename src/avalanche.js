@@ -1,9 +1,13 @@
 // Die Lawine (Chase): eine Front, die von oben nachrückt. Sie hält ein Tempo (Pace), das mit der Laufzeit
 // steigt. Ist der Fahrer schneller, lauert sie knapp über dem oberen Bildrand; ist er langsamer, schließt sie
 // mit der Differenz auf. Steht er, kommt sie nach AV_STALL_S an den Bildrand und rollt mit Pace-Tempo heran.
+// Gnade beim Schuss: fährt er gerade bergab, gewinnt sie nicht auf ihn und fällt langsam zurück; je stärker die
+// Kurve, desto mehr ihres Tempos spielt sie aus. Der Schneepflug zählt nicht als Schuss.
 import { C } from './constants.js';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+const smoothstep = (t) => t * t * (3 - 2 * t);
+const D2R = Math.PI / 180;
 
 export function createAvalanche(skierY) {
   return {
@@ -15,6 +19,7 @@ export function createAvalanche(skierY) {
     t: 0,
     near: 0,                           // 0 = lauert, 1 = beim Fahrer (Warnschnee)
     threat: 0,                         // 0 = außerhalb des Bildes, 1 = beim Fahrer (Beben)
+    mercy: 0,                          // 1 = Schuss, sie gewinnt nicht; 0 = Kurve oder Pflug, volles Tempo (Debug)
     breaks: 0,                         // wie oft sie nach Stillstand an den Bildrand gesprungen ist (Ton: Krachen)
   };
 }
@@ -36,9 +41,19 @@ export function updateAvalanche(av, skier, runT, dt, topDist) {
   const enter = topDist + C.AV_ENTER_M;
   if (av.stallT >= C.AV_STALL_S && av.gap > enter) { av.frontY = skier.y - enter; av.breaks++; }
   // Tempo: mindestens Pace. Hinter dem Lauerabstand rückt sie schneller nach, als der Fahrer fährt.
+  // Im Lauerbereich gilt die Gnade: beim Schuss höchstens so schnell wie der Fahrer minus AV_MERCY_KMH,
+  // mit dem Kurvenanteil (smoothstep zwischen AV_MERCY_DEG und AV_CURVE_DEG) wächst sie zum vollen Pace-Tempo.
   const lurk = topDist + C.AV_LURK_M;
+  const deg = Math.abs(skier.theta) / D2R;
+  const curve = smoothstep(clamp((deg - C.AV_MERCY_DEG) / Math.max(1, C.AV_CURVE_DEG - C.AV_MERCY_DEG), 0, 1));
+  const hard = skier.alive ? Math.max(curve, skier.plowK) : 1;
+  av.mercy = 1 - hard;
   let sp = pace;
   if (skier.alive && av.gap > lurk) sp = Math.max(sp, Math.max(0, down) + C.AV_FOLLOW_MS);
+  else if (skier.alive) {
+    const merciful = Math.max(0, down - C.AV_MERCY_KMH / 3.6);
+    if (pace > merciful) sp = merciful + hard * (pace - merciful);
+  }
   av.speed = sp;
   av.frontY += sp * dt;
   av.roll += sp * dt;

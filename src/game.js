@@ -28,7 +28,7 @@ export function createGame(opts = {}) {
     camX: 0, skierFrac: READY_FRAC, zoom: 1,
     viewWm: C.VIEW_W_M, viewHm: C.VIEW_W_M * C.VIEW_ASPECT,
     debug: !!opts.debug, lastGesture: '–', runs: 0,
-    trackAcc: 0, spawnAcc: 0,
+    trackAcc: 0, spawnAcc: 0, plowAcc: 0,
     onEvent: null, // Haken für den Ton (main.js): press, release, plow, crash
   };
   const saved = loadMode();
@@ -126,11 +126,11 @@ function step(g, dt) {
   g.zoom += (zoomTarget - g.zoom) * ease;
   ensureView(g);
 
-  // Spur: alle 0,4 m ein Punkt, Breite nach Carve
+  // Spur: alle 0,4 m ein Punkt, Breite nach Carve, Abstand nach Pflugstellung
   g.trackAcc += s.v * dt;
   if (g.trackAcc >= C.TRACK_SPACING_M) {
     g.trackAcc = 0;
-    pushTrack(g.track, s.x, s.y, Math.cos(s.theta), -Math.sin(s.theta), s.carve);
+    pushTrack(g.track, s.x, s.y, Math.cos(s.theta), -Math.sin(s.theta), s.carve, s.plowK);
   }
 
   spawnSpray(g, dt);
@@ -180,6 +180,22 @@ function spawnSpray(g, dt) {
     const vy = -dy * (0.15 * s.v) + oy * spread * k + (Math.random() - 0.5) * 2;
     spawnParticle(g.particles, px, py, vx, vy, 0.3 + Math.random() * 0.3, 1 + Math.random() * 1.5, Math.random() < 0.6 ? 1 : 0);
   }
+  // Schneepflug: an beiden gespreizten Ski-Enden spritzt Schnee nach außen
+  if (s.plowK > 0.05) {
+    g.plowAcc += 200 * s.plowK * Math.min(1.5, s.v / 20) * dt;
+    const spread = 0.16 + C.PLOW_SPREAD_M * s.plowK;
+    while (g.plowAcc >= 1) {
+      g.plowAcc -= 1;
+      const sgn = Math.random() < 0.5 ? -1 : 1;
+      const lx = dy * sgn, ly = -dx * sgn; // seitlich nach außen, Seite sgn
+      const px = s.x - dx * 0.7 + lx * spread;
+      const py = s.y - dy * 0.7 + ly * spread;
+      const out = (2 + 4 * s.plowK) * (0.5 + Math.random());
+      const vx = -dx * (0.12 * s.v) + lx * out + (Math.random() - 0.5) * 2;
+      const vy = -dy * (0.12 * s.v) + ly * out + (Math.random() - 0.5) * 2;
+      spawnParticle(g.particles, px, py, vx, vy, 0.3 + Math.random() * 0.3, 1 + Math.random() * 1.5, Math.random() < 0.6 ? 1 : 0);
+    }
+  } else g.plowAcc = 0;
 }
 
 function burst(g, n, speed) {

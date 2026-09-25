@@ -11,7 +11,7 @@ const ROCK_H = 1.4;
 
 export function createRenderer(canvas) {
   const ctx = canvas.getContext('2d', { alpha: false });
-  return { canvas, ctx, W: 0, H: 0, dpr: 1, S: 10, Sv: 10, sprites: null, spriteKey: '', list: [], skierMarker: { skier: true, y: 0 }, frameMs: 16.7, paceMs: 0, trackPts: new Float32Array(C.TRACK_CAP * 6), snow: createSnow(), shards: { p: [], run: -1 } };
+  return { canvas, ctx, W: 0, H: 0, dpr: 1, S: 10, Sv: 10, sprites: null, spriteKey: '', list: [], skierMarker: { skier: true, y: 0 }, frameMs: 16.7, paceMs: 0, trackPts: new Float32Array(C.TRACK_CAP * 7), snow: createSnow(), shards: { p: [], run: -1 } };
 }
 
 export function resize(R) {
@@ -141,31 +141,47 @@ function drawTrack(R, g, ox, oy) {
   const { ctx, Sv: S } = R;
   const tr = g.track;
   if (tr.n < 2) return;
-  // Punkte einmal in Bildschirmkoordinaten sammeln: sx, sy, nx*S, ny*S, Carve, Lücke
+  // Punkte einmal in Bildschirmkoordinaten sammeln: sx, sy, nx*S, ny*S, Carve, Lücke, Pflug
   const pts = R.trackPts;
   let n = 0;
-  forEachTrackPoint(tr, (x, y, nx, ny, w, gap) => {
-    const i = n * 6;
-    pts[i] = x * S + ox; pts[i + 1] = y * S + oy; pts[i + 2] = nx * S; pts[i + 3] = ny * S; pts[i + 4] = w; pts[i + 5] = gap ? 1 : 0;
+  forEachTrackPoint(tr, (x, y, nx, ny, w, gap, plow) => {
+    const i = n * 7;
+    pts[i] = x * S + ox; pts[i + 1] = y * S + oy; pts[i + 2] = nx * S; pts[i + 3] = ny * S; pts[i + 4] = w; pts[i + 5] = gap ? 1 : 0; pts[i + 6] = plow;
     n++;
   });
   const base = Math.max(1, 0.12 * S);
   const buckets = 4;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+  // Schneepflug: zwischen den gespreizten Ski liegt eine breite, flache Bremsspur aus geschobenem Schnee
+  ctx.lineWidth = 2 * (0.16 + C.PLOW_SPREAD_M) * S;
+  ctx.strokeStyle = `rgba(${C.TRACK_RGB},0.07)`;
+  ctx.beginPath();
+  let band = false;
+  for (let i = 1; i < n; i++) {
+    const j = i * 7, k = j - 7;
+    if (pts[j + 5] > 0 || pts[k + 1] < -20 || pts[j + 6] < 0.5) continue;
+    ctx.moveTo(pts[k], pts[k + 1]);
+    ctx.lineTo(pts[j], pts[j + 1]);
+    band = true;
+  }
+  if (band) ctx.stroke();
+  // Ski-Linien: Breite nach Carve (der Pflug zählt wie ein kräftiges Carve), Abstand nach Pflugstellung
   for (let b = 0; b < buckets; b++) {
     ctx.lineWidth = base * (1 + (C.TRACK_WIDTH_MAX - 1) * ((b + 0.5) / buckets));
     ctx.strokeStyle = `rgba(${C.TRACK_RGB},${(0.16 + (0.14 * b) / (buckets - 1)).toFixed(2)})`;
-    for (const off of [-0.16, 0.16]) {
+    for (const side of [-1, 1]) {
       ctx.beginPath();
       let any = false;
       for (let i = 1; i < n; i++) {
-        const j = i * 6, k = j - 6;
+        const j = i * 7, k = j - 7;
         if (pts[j + 5] > 0 || pts[k + 1] < -20) continue;
-        const wb = Math.min(buckets - 1, Math.floor(pts[j + 4] * buckets));
+        const wb = Math.min(buckets - 1, Math.floor(Math.max(pts[j + 4], 0.6 * pts[j + 6]) * buckets));
         if (wb !== b) continue;
-        ctx.moveTo(pts[k] + pts[k + 2] * off, pts[k + 1] + pts[k + 3] * off);
-        ctx.lineTo(pts[j] + pts[j + 2] * off, pts[j + 1] + pts[j + 3] * off);
+        const offK = side * (0.16 + C.PLOW_SPREAD_M * pts[k + 6]);
+        const offJ = side * (0.16 + C.PLOW_SPREAD_M * pts[j + 6]);
+        ctx.moveTo(pts[k] + pts[k + 2] * offK, pts[k + 1] + pts[k + 3] * offK);
+        ctx.lineTo(pts[j] + pts[j + 2] * offJ, pts[j + 1] + pts[j + 3] * offJ);
         any = true;
       }
       if (any) ctx.stroke();
@@ -219,18 +235,20 @@ function drawSkier(R, g, sx, sy) {
 
 // Ski, Körper und Kopf um den Ursprung; Position und Drehung setzt der Aufrufer.
 function skierShape(ctx, S, s) {
-  // Ski
+  // Ski: im Pflug laufen die Spitzen zusammen und die Enden spreizen nach außen
+  const p = s.plowK;
+  const tail = 0.16 + C.PLOW_SPREAD_M * p, tip = 0.16 - 0.11 * p;
   ctx.strokeStyle = C.INK;
   ctx.lineWidth = Math.max(1, 0.09 * S);
   ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(-0.16 * S, -0.85 * S); ctx.lineTo(-0.16 * S, 0.75 * S);
-  ctx.moveTo(0.16 * S, -0.85 * S); ctx.lineTo(0.16 * S, 0.75 * S);
+  ctx.moveTo(-tail * S, -0.85 * S); ctx.lineTo(-tip * S, 0.75 * S);
+  ctx.moveTo(tail * S, -0.85 * S); ctx.lineTo(tip * S, 0.75 * S);
   ctx.stroke();
-  // Körper, leicht in die Kurve gelegt
+  // Körper, leicht in die Kurve gelegt, im Pflug etwas breiter und tiefer (geht in die Knie)
   const lean = Math.sin(s.theta * 0.5) * 0.15 * S * s.carve;
   ctx.fillStyle = C.INK;
-  ctx.beginPath(); ctx.ellipse(lean, 0, 0.26 * S, 0.42 * S, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(lean, 0, (0.26 + 0.04 * p) * S, (0.42 - 0.04 * p) * S, 0, 0, TAU); ctx.fill();
   ctx.fillStyle = C.INK_LIGHT;
   ctx.beginPath(); ctx.arc(lean * 1.3, -0.1 * S, 0.14 * S, 0, TAU); ctx.fill();
 }
