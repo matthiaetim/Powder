@@ -180,8 +180,9 @@ export function draw(R, g, t) {
 }
 
 // ---------- Markierungen im Schnee ----------
-// Alle MARK_M eine blaue Querlinie mit Meterzahl (Welt-y = Meter im HUD), der Bestwert des Modus beim Start des
-// Laufs als rote Rekordlinie. Vor der Spur gezeichnet: Spur, Bäume und Fahrer liegen darüber.
+// Alle MARK_M eine blaue Querlinie mit Meterzahl (Welt-y = Meter im HUD), die Bestweiten der anderen als graue
+// Namenslinien (board.js) und der Bestwert des Modus beim Start des Laufs als rote Rekordlinie. Vor der Spur
+// gezeichnet: Spur, Bäume und Fahrer liegen darüber.
 function drawMarks(R, g, ox, oy) {
   const { ctx, Sv: S, W, H } = R;
   const y0 = -oy / S, y1 = (H - oy) / S;
@@ -192,15 +193,24 @@ function drawMarks(R, g, ox, oy) {
   for (let k = Math.max(1, Math.ceil(y0 / C.MARK_M)); k * C.MARK_M <= y1; k++) {
     markLine(ctx, W, k * C.MARK_M * S + oy, nf.format(k * C.MARK_M) + ' m', C.MARK_RGBA);
   }
+  // Bestweiten der anderen (g.runMarks, beim Start eingefroren, Meter absteigend = im Bild von unten nach oben).
+  // Liegen zwei Weiten dichter als BOARD_LABEL_GAP_PX, weicht das obere Label nach oben aus; die Linie bleibt exakt.
+  let labelY = Infinity;
+  for (const f of g.runMarks) {
+    if (f.m < y0 || f.m > y1) continue;
+    const sy = f.m * S + oy;
+    labelY = Math.min(sy - 3, labelY - C.BOARD_LABEL_GAP_PX);
+    markLine(ctx, W, sy, f.name + ' · ' + nf.format(f.m) + ' m', C.MARK_FRIEND_RGBA, labelY);
+  }
   const b = g.runBest;
   if (b > 0 && b >= y0 && b <= y1) markLine(ctx, W, b * S + oy, 'Rekord · ' + nf.format(b) + ' m', C.MARK_BEST_RGBA);
 }
 
-function markLine(ctx, W, sy, label, color) {
+function markLine(ctx, W, sy, label, color, labelY = sy - 3) {
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
   ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
-  ctx.fillText(label, W - 8, sy - 3);
+  ctx.fillText(label, W - 8, labelY);
 }
 
 // ---------- Signatur im Schnee ----------

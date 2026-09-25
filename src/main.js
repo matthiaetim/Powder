@@ -6,6 +6,7 @@ import { createRenderer, resize, draw } from './render.js';
 import { createHud } from './hud.js';
 import { loadTune } from './tune.js';
 import { createSound } from './audio.js';
+import { createBoard } from './board.js';
 
 loadTune();
 const params = new URLSearchParams(location.search);
@@ -18,6 +19,10 @@ const game = G.createGame({
 });
 const snd = createSound(game);
 game.onEvent = snd.event;
+// Bestenliste (board.js): ?board=local nutzt den Mock des Dev-Servers (node tools/serve.js 8082 --board), ?board=<URL>
+// eine andere Datenbank, sonst BOARD_URL aus constants.js. Leer = aus.
+const boardParam = params.get('board');
+const board = createBoard({ url: boardParam === 'local' ? location.origin : boardParam || C.BOARD_URL, g: game, debug: game.debug });
 
 function onResize() {
   resize(R);
@@ -49,12 +54,12 @@ const input = createInput(canvas, {
   pause: () => { if (G.togglePause(game)) input.cancelAll(); },
   fresh: freshOrUpdate,
 });
-const hud = createHud(game, document, { fresh: freshOrUpdate, onTune: onResize, sound: snd });
+const hud = createHud(game, document, { fresh: freshOrUpdate, onTune: onResize, sound: snd, board });
 
 // Debug-Haken (?debug=1): Simulation gezielt vorspulen, z. B. powder.advance(2) in der Konsole.
 if (game.debug) {
   window.powder = {
-    game, R, C, G, snd,
+    game, R, C, G, snd, board,
     advance(sec) {
       const n = Math.round(sec / C.STEP);
       for (let i = 0; i < n; i++) G.update(game, C.STEP);

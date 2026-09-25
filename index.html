@@ -30,6 +30,17 @@
     <div id="dead-dist">0 m</div>
     <div id="dead-time">in 0,00 Sekunden</div>
     <div id="dead-best">Bester Lauf 0 m</div>
+    <div id="board" hidden>
+      <div id="board-rows"></div>
+      <div id="board-more" hidden>…</div>
+      <label class="board-row board-own" for="board-name">
+        <span class="board-rank"></span>
+        <input id="board-name" type="text" maxlength="12" placeholder="Dein Name" autocomplete="off" autocorrect="off"
+               autocapitalize="words" spellcheck="false" enterkeyhint="done" aria-label="Dein Name für die Bestenliste">
+        <span class="board-m"></span>
+      </label>
+      <div id="board-note"></div>
+    </div>
     <button id="btn-fresh" type="button">Fresh</button>
     <div id="modes">
       <button class="mode-card" type="button" data-mode="classic">

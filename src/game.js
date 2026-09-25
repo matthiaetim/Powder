@@ -22,6 +22,8 @@ export function createGame(opts = {}) {
     track: createTrack(), particles: createParticles(),
     dist: 0, runT: 0, best: 0, newBest: false,
     runBest: 0, // Bestwert beim Start des Laufs: dort steht die Rekordlinie, auch wenn best beim Aufprall schon steigt
+    marks: {}, runMarks: [], // Bestweiten der anderen je Modus (board.js) und der beim Start eingefrorene Satz für die Linien
+    runTainted: false,       // Regler mitten im Lauf verstellt: zählt nicht für die Bestenliste (board.js)
     seed: 0, fixedSeed: opts.fixedSeed ?? null,
     mode: DEFAULT_MODE, runMode: DEFAULT_MODE, intro: true, readyDelayMs: C.READY_AUTO_START_MS,
     readyT: 0, deadT: 0, deadCause: '',
@@ -58,6 +60,8 @@ export function reset(g, seed, intro) {
   clearParticles(g.particles);
   g.dist = 0; g.runT = 0; g.newBest = false;
   g.runBest = g.best;
+  g.runMarks = g.marks[g.mode] || [];
+  g.runTainted = false;
   g.readyT = 0; g.deadT = 0; g.deadCause = '';
   // g.fogT = -1; // Hockeystop deaktiviert
   g.camX = 0; g.zoom = 1;
@@ -112,6 +116,7 @@ function start(g) {
   g.runMode = g.mode;
   g.best = loadBest(g.mode);
   g.runBest = g.best;
+  g.runMarks = g.marks[g.mode] || [];
   g.skier.v = C.START_SPEED_KMH / 3.6;
   g.runs++;
 }
@@ -262,6 +267,19 @@ export function selectMode(g, id) {
   g.best = loadBest(id);
   saveMode(id);
   return true;
+}
+// Bestweiten der anderen (board.js), je Modus für die Linien im Schnee. Im Zustand ready sofort übernehmen (Intro und
+// Wartephase zeigen sie), sonst erst beim nächsten Lauf, damit während der Fahrt nichts springt.
+export function setMarks(g, byMode) {
+  g.marks = byMode || {};
+  if (g.state === 'ready') g.runMarks = g.marks[g.mode] || [];
+}
+// Der Server kennt für den eigenen Namen mehr als dieses Gerät (Zweitgerät, gelöschte Daten): lokal übernehmen, damit
+// „Bester Lauf“ und die rote Linie zur Bestenliste passen. Die Linie rückt erst beim nächsten Lauf.
+export function adoptBest(g, mode, m) {
+  if (!(m > loadBest(mode))) return;
+  saveBest(mode, m);
+  if (g.mode === mode) { g.best = m; g.newBest = false; }
 }
 export function overlayReady(g) {
   return g.state === 'dead' && g.deadT * 1000 >= C.DEATH_OVERLAY_MS;

@@ -1,12 +1,14 @@
 // Winziger statischer Dev-Server ohne Abhängigkeiten, Caching aus.
-// Start: node tools/serve.js [port]   → http://localhost:8080
+// Start: node tools/serve.js [port] [--board]   → http://localhost:8080
+// --board: Mock der Bestenlisten-Schnittstelle (tools/board-mock.js), im Browser mit ?board=local ansprechen.
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
 const root = path.resolve(__dirname, '..');
-const port = Number(process.argv[2] || 8080);
+const port = Number(process.argv.slice(2).find((a) => /^\d+$/.test(a)) || 8080);
+const board = process.argv.includes('--board') ? require('./board-mock.js') : null;
 const types = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -20,6 +22,7 @@ const types = {
 };
 
 http.createServer((req, res) => {
+  if (board && board.handle(req, res)) return;
   let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (p.endsWith('/')) p += 'index.html';
   const file = path.normalize(path.join(root, p));

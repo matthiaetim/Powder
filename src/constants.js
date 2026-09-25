@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.12.3';
+export const VERSION = '0.13.0';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -146,6 +146,18 @@ export const C = {
   // HUD
   HUD_LOCALE: 'de-DE',
   HUD_TEXT_MS: 50,           // Tempo und Distanz höchstens 20× pro Sekunde in den DOM schreiben (Layout kostet pro Bild)
+
+  // Bestenliste (board.js): Firebase Realtime Database per REST ohne SDK. Leer = aus, die App läuft wie bisher.
+  // Nur die Datenbank-URL ohne Pfad und Schluss-Slash, board.js hängt /boards.json an. Regeln: tools/firebase-rules.json,
+  // Einrichtung: README. Die Namensgrenzen stehen in den Regeln noch einmal, beide Stellen zusammen ändern.
+  BOARD_URL: 'https://powder-2d151-default-rtdb.europe-west1.firebasedatabase.app',
+  BOARD_ROWS: 5,             // mehr passt auf dem iPhone SE nicht ohne Scrollen auf die Fresh-Seite
+  BOARD_NAME_MIN: 2,
+  BOARD_NAME_MAX: 12,        // länger sprengt die Zeile Rang | Name | Meter bei 16 px
+  BOARD_MAX_M: 99999,        // Obergrenze der Regeln: darüber ist es kein Lauf mehr, sondern ein Skript
+  BOARD_TIMEOUT_MS: 6000,    // hängender Abruf blockiert sonst das Nachholen; die Liste kommt dann aus dem Cache
+  MARK_FRIEND_RGBA: 'rgba(46,58,69,0.4)', // Namenslinien fremder Bestweiten: blasses Schiefergrau, die eigene bleibt rot
+  BOARD_LABEL_GAP_PX: 14,    // 12-px-Labels brauchen ~14 px Abstand, sonst überlappen Weiten, die ~1 m auseinanderliegen
 
   // Farben: Polarweiß mit leichtem Blaustich, sattes Tannengrün mit braunem Stamm, kühles Schiefergrau für Text und Fahrer
   BG: '#F5F9FD',

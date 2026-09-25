@@ -92,6 +92,53 @@ body[data-state="dead"][data-overlay="1"] #ov-dead { display: flex; }
 #dead-dist { font-size: 56px; line-height: 1; }
 #dead-time { font-size: 16px; opacity: 0.8; margin-top: 10px; }
 #dead-best { font-size: 16px; opacity: 0.8; margin-top: 4px; }
+
+/* Bestenliste (board.js, hud.js): Rang | Name | Meter in der Schrift der Zeilen darüber, andere Zeilen leicht
+   zurückgenommen, die eigene deckend. Die eigene Zeile trägt das Namensfeld; ohne Namen steht nur das Feld da,
+   zentriert und unterstrichen. 16 px, damit iOS beim Fokus nicht zoomt; user-select text, weil body none setzt
+   (sonst bekommt das Feld auf iOS keinen Fokus). */
+#board { width: 250px; margin-top: 14px; font-size: 16px; }
+.board-row {
+  display: grid;
+  grid-template-columns: 2em minmax(0, 1fr) auto;
+  column-gap: 10px;
+  align-items: baseline;
+  line-height: 1.4;
+  opacity: 0.7;
+}
+.board-own { opacity: 1; }
+.board-rank, .board-m { text-align: right; font-variant-numeric: tabular-nums; }
+.board-name { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#board-more { line-height: 1; opacity: 0.7; }
+#board-name {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  font: italic 16px var(--font);
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+  touch-action: manipulation;
+}
+#board-name::placeholder { color: var(--ink); opacity: 0.55; }
+#board-name:focus, #board[data-named=""] #board-name { border-bottom-color: rgba(46, 58, 69, 0.6); }
+#board[data-named=""] .board-own { grid-template-columns: 1fr; width: 160px; margin: 0 auto; }
+#board[data-named=""] .board-rank, #board[data-named=""] .board-m { display: none; }
+#board[data-named=""] #board-name { text-align: center; }
+#board-note { margin: 6px -40px 0; font-size: 13px; opacity: 0.65; } /* breiter als die Liste, damit der Hinweis in einer Zeile bleibt */
+/* Mit Liste rücken die unteren Elemente enger, damit das iPhone SE (667 px) ohne Scrollen reicht */
+body[data-board="1"] #btn-fresh { margin-top: 26px; }
+body[data-board="1"] #modes { margin-top: 34px; }
+body[data-board="1"] #btn-sound { margin-top: 22px; }
 #btn-fresh {
   margin-top: 36px;
   font: italic 22px var(--font);

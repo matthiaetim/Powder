@@ -54,3 +54,45 @@ export function saveSoundOn(on) {
     /* egal */
   }
 }
+
+// Bestenliste (board.js): Spielername, letzter bekannter Stand der Listen und der eigene Upload-Stand je Modus.
+const NAME_KEY = 'powder.name';
+const BOARD_KEY = 'powder.board';
+const BOARD_OWN_KEY = 'powder.board.own';
+
+export function loadName() {
+  try {
+    return localStorage.getItem(NAME_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function saveName(name) {
+  try {
+    localStorage.setItem(NAME_KEY, name);
+  } catch {
+    /* egal */
+  }
+}
+
+function loadJson(key) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || 'null');
+  } catch {
+    return null;
+  }
+}
+
+function saveJson(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* egal */
+  }
+}
+
+export const loadBoardCache = () => loadJson(BOARD_KEY);
+export const saveBoardCache = (v) => saveJson(BOARD_KEY, v);
+export const loadBoardOwn = () => loadJson(BOARD_OWN_KEY);
+export const saveBoardOwn = (v) => saveJson(BOARD_OWN_KEY, v);

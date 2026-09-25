@@ -1,7 +1,8 @@
-// DOM-HUD: Tempo, Distanz, Pause, Fresh-Seite mit Laufzeit und Modus-Karten, Debug-Text.
+// DOM-HUD: Tempo, Distanz, Pause, Fresh-Seite mit Laufzeit, Bestenliste samt Namensfeld und Modus-Karten, Debug-Text.
 import { C, VERSION } from './constants.js';
 import { overlayReady, togglePause, pauseIfRunning, fresh, selectMode } from './game.js';
 import { createTunePanel, isTuned } from './tune.js';
+import { verdictText } from './board.js';
 import { MODES } from './modes.js';
 import { drawModePreview } from './render.js';
 
@@ -55,7 +56,11 @@ export function createHud(g, doc, hooks = {}) {
   // Tuning-Panel: langer Druck auf das Versions-Label öffnet es, Spiel pausiert derweil.
   const tuneEl = $('tune');
   const versionEl = $('version');
-  const markTuned = () => { versionEl.classList.toggle('tuned', isTuned()); if (hooks.onTune) hooks.onTune(); };
+  const markTuned = () => {
+    versionEl.classList.toggle('tuned', isTuned());
+    if (g.state === 'running' || g.state === 'paused') g.runTainted = true; // mitten im Lauf verstellt: zählt nicht online (board.js)
+    if (hooks.onTune) hooks.onTune();
+  };
   const tune = createTunePanel(doc, tuneEl, markTuned);
   markTuned();
   let pressTimer = 0;
@@ -86,13 +91,74 @@ export function createHud(g, doc, hooks = {}) {
     onTap(card, () => {
       if (!m || m.soon) return;
       if (id === g.mode) { doFresh(); return; }
-      if (selectMode(g, id)) { markActive(); refreshDead(); }
+      if (selectMode(g, id)) { markActive(); refreshDead(); renderBoard(); }
     });
   }
   function markActive() {
     for (const card of cards) card.classList.toggle('active', card.dataset.mode === g.mode);
   }
   markActive();
+
+  // Bestenliste (board.js): Top-Zeilen des gewählten Modus, die eigene Zeile trägt das Namensfeld. Ohne Namen steht
+  // nur das Feld da, zentriert und unterstrichen; mit Namen wird es zur Namenszelle, ein Tipp darauf öffnet die
+  // Tastatur nativ (programmatischer Fokus aus pointerup heraus ist auf iOS unzuverlässig).
+  const board = hooks.board;
+  const boardOn = !!(board && board.enabled);
+  const boardEl = $('board'), rowsEl = $('board-rows'), moreEl = $('board-more'), noteEl = $('board-note');
+  const ownRow = boardEl.querySelector('.board-own'), nameInput = $('board-name');
+  const ownRank = ownRow.querySelector('.board-rank'), ownM = ownRow.querySelector('.board-m');
+  doc.body.dataset.board = boardOn ? '1' : '';
+  const rowEl = (rank, name, m) => {
+    const row = doc.createElement('div');
+    row.className = 'board-row';
+    for (const [cls, text] of [['board-rank', rank], ['board-name', name], ['board-m', nf.format(m) + ' m']]) {
+      const span = doc.createElement('span');
+      span.className = cls;
+      span.textContent = text;
+      row.append(span);
+    }
+    return row;
+  };
+  function renderBoard() {
+    if (!boardOn || doc.activeElement === nameInput) return; // ohne Server bleibt #board hidden; nicht unter den Fingern umbauen
+    const name = board.name();
+    boardEl.hidden = false;
+    boardEl.dataset.named = name ? '1' : '';
+    rowsEl.replaceChildren();
+    moreEl.after(ownRow);
+    moreEl.hidden = true;
+    nameInput.value = name;
+    if (!name) { noteEl.textContent = 'für die Bestenliste'; return; }
+    const v = board.view(g.mode);
+    for (const e of v.top) {
+      if (!e.own) { rowsEl.append(rowEl(e.rank, e.name, e.m)); continue; }
+      rowsEl.append(ownRow);
+      ownRank.textContent = e.rank;
+      ownM.textContent = nf.format(e.m) + ' m';
+    }
+    if (!v.ownInTop) {
+      // Eigener Eintrag unter den Top-Zeilen mit Rang, oder noch nicht auf dem Server: dann der lokale Bestwert ohne Rang
+      moreEl.hidden = !v.own;
+      ownRank.textContent = v.own ? v.own.rank : '–';
+      ownM.textContent = nf.format(v.own ? v.own.m : g.best) + ' m';
+    }
+    const verdict = board.lastVerdict();
+    noteEl.textContent = verdict ? verdictText(verdict) : board.stale() ? 'Letzter bekannter Stand' : '';
+  }
+  if (boardOn) {
+    let nameBefore = '';
+    nameInput.addEventListener('focus', () => { nameBefore = nameInput.value; });
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); nameInput.blur(); }
+      else if (e.key === 'Escape') { nameInput.value = nameBefore; nameInput.blur(); }
+    });
+    // iOS „Fertig“ wie ein Tipp daneben enden im blur: hier wird gespeichert, Ungültiges fällt auf den alten Namen zurück
+    nameInput.addEventListener('blur', () => {
+      if (!board.setName(nameInput.value)) nameInput.value = board.name();
+      renderBoard();
+    });
+    board.onChange(() => { if (doc.body.dataset.overlay === '1') { refreshDead(); renderBoard(); } });
+  }
 
   function sync(now, R, force) {
     const m = Math.floor(g.dist);
@@ -107,13 +173,14 @@ export function createHud(g, doc, hooks = {}) {
       lastState = g.state;
       doc.body.dataset.state = g.state;
       doc.body.dataset.intro = g.state === 'ready' && g.intro ? '1' : '';
+      if (g.state === 'dead' && boardOn) board.onRunEnd(g); // Bestwert steht fest: die() lief im Physikschritt davor
     }
     const ov = overlayReady(g) ? '1' : '';
     if (ov !== lastOverlay) {
       lastOverlay = ov;
       doc.body.dataset.overlay = ov;
       if (themeEl) themeEl.content = ov ? C.BG_DIM : C.BG;
-      if (ov) { refreshDead(); markActive(); }
+      if (ov) { refreshDead(); markActive(); renderBoard(); }
     }
     if (g.debug && (force || now - lastDebug > 250)) {
       lastDebug = now;
