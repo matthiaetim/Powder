@@ -26,6 +26,7 @@ export function createGame(opts = {}) {
     mode: DEFAULT_MODE, runMode: DEFAULT_MODE, intro: true, readyDelayMs: C.READY_AUTO_START_MS,
     readyT: 0, deadT: 0, deadCause: '',
     crashV: 0, crashX: 0, crashY: 0, crashPush: 0, // Tempo, Hindernis und Schub beim Aufprall (für die Splitter)
+    fogT: -1, // < 0 = kein Nebel; sonst verstrichene Zeit seit dem Hockeystop (render.js)
     camX: 0, skierFrac: READY_FRAC, zoom: 1,
     viewWm: C.VIEW_W_M, viewHm: C.VIEW_W_M * C.VIEW_ASPECT,
     debug: !!opts.debug, lastGesture: '–', runs: 0,
@@ -58,6 +59,7 @@ export function reset(g, seed, intro) {
   g.dist = 0; g.runT = 0; g.newBest = false;
   g.runBest = g.best;
   g.readyT = 0; g.deadT = 0; g.deadCause = '';
+  g.fogT = -1;
   g.camX = 0; g.zoom = 1;
   g.intro = !!intro;
   g.skierFrac = intro ? READY_FRAC : C.SKIER_SCREEN_Y_FRAC;
@@ -117,7 +119,13 @@ function start(g) {
 function step(g, dt) {
   const s = g.skier;
   g.runT += dt;
+  const wasHockey = s.hockeyT >= 0;
   P.updateSkier(s, dt);
+  if (!wasHockey && s.hockeyT >= 0) hockeyStop(g);
+  if (g.fogT >= 0) {
+    g.fogT += dt;
+    if (g.fogT >= C.HOCKEY_FOG_IN_S + C.HOCKEY_FOG_HOLD_S + C.HOCKEY_FOG_OUT_S) g.fogT = -1;
+  }
   if (s.y - s.y0 > g.dist) g.dist = s.y - s.y0;
   // Kamera: x folgt weich; bei Tempo rückt der Fahrer nach oben und die Sicht zoomt heraus
   const k = lookahead(s.v);
@@ -199,6 +207,12 @@ function spawnSpray(g, dt) {
       spawnParticle(g.particles, px, py, vx, vy, 0.3 + Math.random() * 0.3, 1 + Math.random() * 1.5, Math.random() < 0.6 ? 1 : 0);
     }
   } else g.plowAcc = 0;
+}
+
+// Schneewolke und Nebel-Timer beim Auslösen des Hockeystops (physics.js hat gerade hockeyT auf 0 gesetzt).
+function hockeyStop(g) {
+  burst(g, 16, 7);
+  g.fogT = 0;
 }
 
 function burst(g, n, speed) {
