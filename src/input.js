@@ -51,7 +51,12 @@ export function createInput(canvas, h) {
       return;
     }
     if (e.code === 'KeyP' || e.code === 'Escape') h.pause();
-    else if (e.code === 'KeyR' || e.code === 'Enter') h.fresh();
+    else if (e.code === 'KeyR' || e.code === 'Enter' || e.code === 'Space') {
+      // preventDefault: kein Scrollen durch die Leertaste, und ein noch fokussierter Button (z. B. Fresh nach
+      // Mausklick) löst nicht zusätzlich seinen eigenen click aus, sonst käme Fresh doppelt.
+      e.preventDefault();
+      h.fresh();
+    }
   });
   window.addEventListener('keyup', (e) => {
     const side = keySide[e.code];
