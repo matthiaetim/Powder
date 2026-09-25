@@ -21,7 +21,7 @@ Plain HTML + JavaScript + Canvas, kein Framework, kein Build.
 ## Modi
 
 - **Classic**: freie Abfahrt, so weit es geht.
-- **Chase**: eine Lawine hält ein Tempo (Pace), das mit der Laufzeit steigt (Standard 30 → 145 km/h in 90 Sekunden). Wer schneller ist, hält sie knapp über dem oberen Bildrand; wer langsamer wird, holt sie sich ins Bild. Wer langsamer als 40 km/h wird, etwa quergestellt, sieht sie nach 0,8 s am Bildrand erscheinen und heranrollen. Eine optionale Gnade beim Schuss (Regler „Gnade beim Schuss“, Standard 0 % = aus) lässt sie beim geraden Bergabfahren (bis 25° Fahrwinkel) nur einen Teil ihres Tempo-Vorsprungs ausspielen; je stärker die Kurve, desto weniger Gnade, ab 60° keine; der Schneepflug zählt nicht als Schuss. Bei 100 % gewinnt sie beim Schuss gar nicht mehr, das war in v0.10.0 zu leicht. Erwischt sie den Fahrer, zerspringt er wie beim Aufprall. Die Steuerung ist dieselbe wie in Classic.
+- **Chase**: eine Lawine hält ein Tempo (Pace), das mit der Laufzeit steigt (Standard 30 → 145 km/h in 90 Sekunden). Wer schneller ist, hält sie knapp über dem oberen Bildrand; wer langsamer wird, holt sie sich ins Bild. Gewertet wird das Tempo entlang der Ski (Regler „Schräg zählt Tempo“, Standard 100 %), nicht nur der Höhenverlust: wer schräg fährt und schneller als ihr Pace ist, bleibt sicher; bei 0 % zählt nur das Tempo hangabwärts. Wer langsamer als 40 km/h wird, etwa quergestellt, sieht sie nach 0,8 s am Bildrand erscheinen und heranrollen. Eine optionale Gnade beim Schuss (Regler „Gnade beim Schuss“, Standard 0 % = aus) lässt sie beim geraden Bergabfahren (bis 25° Fahrwinkel) nur einen Teil ihres Tempo-Vorsprungs ausspielen; je stärker die Kurve, desto weniger Gnade, ab 60° keine; der Schneepflug zählt nicht als Schuss. Bei 100 % gewinnt sie beim Schuss gar nicht mehr, das war in v0.10.0 zu leicht. Erwischt sie den Fahrer, zerspringt er wie beim Aufprall. Die Steuerung ist dieselbe wie in Classic.
 - Die Lawine ist ein Schatten (`src/avalanche-view.js`): ein Schleier aus Schiefergrau, dessen Rand mit weichen dunklen Wülsten wogt, davor züngeln dünne Schattenfahnen. Je näher sie kommt, desto dämmriger wird das ganze Bild.
 
 ## Ton
@@ -45,7 +45,7 @@ Nützliche Parameter: `?debug=1` (Overlay mit fps, Hitboxen, Safe Lane), `?seed=
 
 ## Tuning
 
-Alle Stellschrauben stehen in `src/constants.js`; die Liste `TUNABLES` dort bestimmt die Regler im Panel (Abschnitte „Fahren“, „Lawine (Chase)“: Tempo am Start und Ende, Anstiegsdauer, Lauerabstand, Stillstand-Schwelle und -Wartezeit, Fangabstand, Beben, Gnade beim Schuss, Gnade bis Winkel, volle Härte ab Winkel, Schuss schüttelt ab, und „Ton“: Lautstärke gesamt, Wind, Ski und Kurven, Lawine, Aufprall).
+Alle Stellschrauben stehen in `src/constants.js`; die Liste `TUNABLES` dort bestimmt die Regler im Panel (Abschnitte „Fahren“, „Lawine (Chase)“: Tempo am Start und Ende, Anstiegsdauer, Lauerabstand, Stillstand-Schwelle und -Wartezeit, Fangabstand, Beben, Schräg zählt Tempo, Gnade beim Schuss, Gnade bis Winkel, volle Härte ab Winkel, Schuss schüttelt ab, und „Ton“: Lautstärke gesamt, Wind, Ski und Kurven, Lawine, Aufprall).
 Ändern sich die Standardwerte, den Schlüssel `KEY` in `src/tune.js` hochzählen, sonst bleiben alte Regler-Werte auf dem iPhone aktiv.
 
 ## Deploy (GitHub Pages)

@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.11.1';
+export const VERSION = '0.11.2';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -74,6 +74,11 @@ export const C = {
   AV_CATCH_M: 0,             // (Tuning) Abstand, bei dem sie den Fahrer erwischt
   AV_START_GAP_M: 60,        // Abstand beim Start des Laufs
   AV_RUMBLE_PX: 0.5,         // (Tuning) Bildbeben in px, wenn sie nah ist
+  // Schrägfahrt: die Front vergleicht ihren Pace nicht mit dem reinen Höhenverlust (Tempo × cos Winkel), sondern
+  // mit Höhenverlust plus AV_DIAG_K des Rests bis zum vollen Tempo. Bei 1 zählt das Tempo entlang der Ski, wer
+  // schneller als der Pace ist, ist also auch schräg sicher; bei 0 zählt nur der Höhenverlust (bis v0.11.1).
+  // Gilt auch für die Stillstand-Schwelle. Kurven bremsen ohnehin über die Winkelbremse.
+  AV_DIAG_K: 1,              // (Tuning) Anteil der Schrägfahrt, der als Tempo zählt
   // Gnade beim Schuss: fährt der Fahrer gerade bergab, spielt die Front nur den Anteil 1 - AV_MERCY_K ihres
   // Tempo-Vorsprungs aus. Bei 0 ist die Gnade aus und sie rollt immer mit vollem Pace (Verhalten bis v0.9.1);
   // bei 1 rollt sie beim Schuss AV_MERCY_KMH langsamer als er und fällt zurück (v0.10.0, zu leicht). Je stärker
@@ -196,6 +201,7 @@ export const TUNABLES = [
   { key: 'AV_STALL_KMH', label: 'Stillstand unter', unit: 'km/h', min: 0, max: 80, step: 1 },
   { key: 'AV_CATCH_M', label: 'Erwischt ab Abstand', unit: 'm', min: 0, max: 6, step: 0.5 },
   { key: 'AV_RUMBLE_PX', label: 'Beben bei Nähe', unit: 'px', min: 0, max: 8, step: 0.5 },
+  { key: 'AV_DIAG_K', label: 'Schräg zählt Tempo', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
   { key: 'AV_MERCY_K', label: 'Gnade beim Schuss', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
   { key: 'AV_MERCY_DEG', label: 'Gnade bis Winkel', unit: '°', min: 0, max: 60, step: 5 },
   { key: 'AV_CURVE_DEG', label: 'Volle Härte ab Winkel', unit: '°', min: 20, max: 95, step: 5 },
