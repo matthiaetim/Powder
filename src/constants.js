@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.12.1';
+export const VERSION = '0.12.2';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -198,7 +198,7 @@ export const C = {
   HOCKEY_SNAP_T: 0.05,       // Ansprechzeit des Winkels beim Hockeystop (statt TURN_T)
   HOCKEY_DECEL_T: 0.12,      // Zeitkonstante des Tempo-Abfalls beim Hockeystop
   HOCKEY_DUR_S: 0.6,         // Sicherheitsdeckel: spätestens danach zurück zur normalen Physik
-  HOCKEY_FOG_OFFSET_PX: 50,  // (Tuning) Größe (Breite und Höhe) des Nebelfelds unterhalb des Fahrers
+  HOCKEY_FOG_OFFSET_PX: 100, // (Tuning) Größe (Breite und Höhe) des Nebelfelds unterhalb des Fahrers
   HOCKEY_FOG_IN_S: 0.5,      // Einblendzeit
   HOCKEY_FOG_HOLD_S: 1.0,    // so lange bleibt der Nebel voll stehen
   HOCKEY_FOG_OUT_S: 0.5,     // Ausblendzeit
