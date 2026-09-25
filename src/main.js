@@ -43,8 +43,7 @@ function applyUpdate() {
   return true;
 }
 function freshOrUpdate() {
-  const overlayDone = game.state === 'dead' && game.deadT * 1000 >= C.DEATH_OVERLAY_MS + C.FRESH_GUARD_MS;
-  if (overlayDone && applyUpdate()) return;
+  if (G.freshReady(game) && applyUpdate()) return;
   G.fresh(game);
 }
 const input = createInput(canvas, {
@@ -134,6 +133,6 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
     if (!hadController) return; // Erstinstallation: Seite ist schon aktuell
     updateReady = true;
     document.getElementById('version').classList.add('update');
-    if (game.state === 'ready' || game.state === 'paused') applyUpdate();
+    if (game.state === 'ready' || game.state === 'paused' || game.state === 'count') applyUpdate();
   });
 }

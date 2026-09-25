@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.13.0';
+export const VERSION = '0.14.0';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -95,6 +95,7 @@ export const C = {
   SND_SKI: 0.85,             // (Tuning) Ski: Zischen, Kanten, Kratzen
   SND_AV: 0.5,               // (Tuning) Lawine
   SND_CRASH: 0.8,            // (Tuning) Aufprall
+  SND_RACE: 0.7,             // (Tuning) Super-G: Countdown, Tore, Stangen, Ziel
   SND_SPEED_REF_KMH: 150,
 
   // Welt
@@ -173,6 +174,12 @@ export const C = {
   TRACK_RGB: '60,80,100',
   TRACK: 'rgba(60,80,100,0.16)',
   AVALANCHE: [46, 58, 69],
+  // Super-G: Fähnchen der Tore abwechselnd rot und blau, gedeckt wie der Rest der Palette, mit hellerer Oberkante
+  GATE_RED: '#C8433B',
+  GATE_RED_LIGHT: '#DA6A63',
+  GATE_BLUE: '#3568B5',
+  GATE_BLUE_LIGHT: '#5F8ACB',
+  FINISH_RGBA: 'rgba(46,58,69,0.5)', // karierte Ziellinie
 
   // Markierungen im Schnee (render.js): alle MARK_M eine blaue Querlinie mit Meterzahl, der Bestwert des Modus
   // als rote Rekordlinie. Dünn in CSS-Pixeln, unabhängig vom Zoom; Spur, Bäume und Fahrer liegen darüber.
@@ -198,6 +205,38 @@ export const C = {
   SIGN_SPRAY_ALPHA: 0.2,     // breiter, schwacher zweiter Strich: der aufgewirbelte Schnee neben den Ski
   SIGN_SPRAY_W_M: 0.6,       // so viel breiter als der Radierstrich
   SIGN_MAX_PX: 2048,         // Deckel für die Breite des Offscreen-Canvas in Gerätepixeln
+
+  // Super-G (nur superg; gates.js, game.js, render.js, hud.js): Zeitfahren bis SG_FINISH_M durch Tore, abwechselnd
+  // rot und blau. Der Kurs ist fest (SG_SEED, ?seed= überschreibt), damit Bestzeiten vergleichbar bleiben. Tore
+  // stehen ab SG_GATE_FIRST_M alle SG_GATE_SPACING_M abwechselnd links und rechts der Pistenmitte (Versatz
+  // SG_GATE_OFFSET_M, davon zufällig 1 - SG_GATE_JITTER bis 1). Die Pistenmitte ist eine flache Sinuskurve
+  // (SG_LANE_AMP_M, SG_LANE_WAVE_M): der Korridor der anderen Modi schwingt mit seiner 97-m-Komponente zu schnell,
+  // mit Torversatz wären das Bögen über 45°. Die Piste ist SG_PISTE_HALF_M je Seite frei, außen stehen Bäume wie
+  // in Classic (Aufprall beendet den Lauf ohne Zeit). Ein verpasstes Tor kostet SG_PENALTY_S, eine berührte Stange
+  // SG_POLE_KMH Tempo, kein Sturz. Zwischenzeiten bei SG_SPLITS_M gegen die Bestzeit. Start mit Countdown
+  // (SG_COUNT_BEEPS kurze Pieptöne im Abstand SG_COUNT_STEP_S, dann der lange = Go). Nach dem Ziel gleitet der
+  // Fahrer aus (SG_COAST_DECEL zusätzlich zur Physik), dann kommt die Fresh-Seite.
+  SG_FINISH_M: 1000,
+  SG_SEED: 20260925,         // fester Kurs
+  SG_GATE_FIRST_M: 50,
+  SG_GATE_SPACING_M: 45,     // (Tuning) Abstand der Tore
+  SG_GATE_WIDTH_M: 8,        // (Tuning) Durchfahrt zwischen den Stangen
+  SG_GATE_OFFSET_M: 9,       // (Tuning) Versatz der Tore zur Pistenmitte, abwechselnd links und rechts
+  SG_GATE_JITTER: 0.5,       // zufälliger Anteil am Versatz: jedes Tor steht bei 50–100 % des vollen Versatzes
+  SG_LAST_GATE_GAP_M: 30,    // so weit steht das letzte Tor mindestens vor dem Ziel
+  SG_LANE_AMP_M: 8,          // Pistenmitte: Amplitude der Sinuskurve
+  SG_LANE_WAVE_M: 400,       // Pistenmitte: Wellenlänge
+  SG_PISTE_HALF_M: 15,       // (Tuning) freie Piste je Seite der Mitte, außerhalb Bäume und Felsen
+  SG_PENALTY_S: 3,           // (Tuning) Zeitstrafe pro verpasstem Tor
+  SG_POLE_KMH: 8,            // (Tuning) Tempoverlust beim Berühren einer Stange
+  SG_POLE_R: 0.12,           // Radius der Stange für die Berührung
+  SG_SPLITS_M: [250, 500, 750], // Zwischenzeiten
+  SG_NOTE_S: 2,              // so lange stehen Zwischenzeit und Torfehler im HUD
+  SG_COUNT_STEP_S: 0.6,      // Abstand der Pieptöne im Countdown
+  SG_COUNT_BEEPS: 3,         // kurze Pieptöne vor dem Go
+  SG_GO_SHOW_S: 0.6,         // so lange steht „Go“ im Bild
+  SG_COAST_DECEL: 8,         // Auslauf nach dem Ziel: zusätzliche Verzögerung in m/s²
+  SG_FINISH_OVERLAY_MS: 1200, // nach dem Ziel so lange Auslauf, dann die Fresh-Seite
 
   // Hockeystop deaktiviert (Tim und Jürgen wollen ihn nicht) — auskommentiert statt gelöscht, physics.js/
   // game.js/render.js haben die zugehörigen Blöcke ebenfalls auskommentiert.
@@ -253,6 +292,13 @@ export const TUNABLES = [
   { key: 'AV_MERCY_DEG', label: 'Gnade bis Winkel', unit: '°', min: 0, max: 60, step: 5 },
   { key: 'AV_CURVE_DEG', label: 'Volle Härte ab Winkel', unit: '°', min: 20, max: 95, step: 5 },
   { key: 'AV_MERCY_KMH', label: 'Schuss schüttelt ab', unit: 'km/h', min: 0, max: 30, step: 1 },
+  { heading: 'Super-G' },
+  { key: 'SG_GATE_SPACING_M', label: 'Torabstand', unit: 'm', min: 25, max: 80, step: 5 },
+  { key: 'SG_GATE_WIDTH_M', label: 'Torbreite', unit: 'm', min: 4, max: 14, step: 0.5, decimals: 1 },
+  { key: 'SG_GATE_OFFSET_M', label: 'Torversatz', unit: 'm', min: 0, max: 16, step: 1 },
+  { key: 'SG_PISTE_HALF_M', label: 'Piste frei je Seite', unit: 'm', min: 12, max: 40, step: 1 },
+  { key: 'SG_PENALTY_S', label: 'Zeitstrafe pro Tor', unit: 's', min: 0, max: 10, step: 0.5, decimals: 1 },
+  { key: 'SG_POLE_KMH', label: 'Stange kostet', unit: 'km/h', min: 0, max: 30, step: 1 },
   { heading: 'Schriftzug' },
   { key: 'SIGN_ALPHA', label: 'Deckkraft', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
   { key: 'SIGN_WIDTH_FRAC', label: 'Breite', unit: '%', min: 0.4, max: 1, step: 0.02, scale: 100, decimals: 0 },
@@ -263,4 +309,5 @@ export const TUNABLES = [
   { key: 'SND_SKI', label: 'Ski und Kurven', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
   { key: 'SND_AV', label: 'Lawine', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
   { key: 'SND_CRASH', label: 'Aufprall', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
+  { key: 'SND_RACE', label: 'Super-G: Start und Tore', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
 ];

@@ -9,6 +9,8 @@
 :root {
   --bg: #F5F9FD;
   --ink: #2E3A45;
+  --slow: #C8433B; /* Super-G: Torfehler und Zwischenzeit langsamer, wie GATE_RED in constants.js */
+  --fast: #2F8A4E; /* Zwischenzeit schneller */
   --font: 'Playfair Display', Georgia, 'Times New Roman', serif;
 }
 
@@ -58,7 +60,27 @@ canvas#game {
 }
 #hud-speed { font-size: 18px; }
 #hud-dist { font-size: 28px; }
-body[data-state="dead"] #hud { display: none; }
+#hud-time { font-size: 28px; display: none; }
+body[data-mode="superg"] #hud-time { display: block; }
+body[data-mode="superg"] #hud-dist { font-size: 18px; }
+body[data-state="dead"] #hud, body[data-state="finished"][data-overlay="1"] #hud { display: none; }
+
+/* Super-G: Hinweis unter dem Fahrer (Torfehler, Zwischenzeit), blendet über die Klasse ein */
+#hud-note {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 46%;
+  text-align: center;
+  font-size: 30px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+#hud-note.miss, #hud-note.slow { color: var(--slow); opacity: 1; }
+#hud-note.fast { color: var(--fast); opacity: 1; }
+#hud-note.split { opacity: 0.8; }
 
 #hint {
   position: fixed;
@@ -87,8 +109,13 @@ body[data-state="paused"] #ov-pause { display: flex; }
 .ov-title { font-size: 40px; }
 .ov-sub { font-size: 16px; opacity: 0.7; margin-top: 8px; }
 
+/* Super-G: Countdown 3 · 2 · 1 in der Mitte, dann kurz „Go“; Tipps gehen durch auf den Canvas */
+#ov-count { font-size: 96px; line-height: 1; pointer-events: none; }
+#ov-count.go { font-size: 64px; }
+body[data-state="count"] #ov-count, #ov-count.go { display: flex; }
+
 #ov-dead { background: rgba(46, 58, 69, 0.45); }
-body[data-state="dead"][data-overlay="1"] #ov-dead { display: flex; }
+body[data-state="dead"][data-overlay="1"] #ov-dead, body[data-state="finished"][data-overlay="1"] #ov-dead { display: flex; }
 #dead-dist { font-size: 56px; line-height: 1; }
 #dead-time { font-size: 16px; opacity: 0.8; margin-top: 10px; }
 #dead-best { font-size: 16px; opacity: 0.8; margin-top: 4px; }
@@ -153,7 +180,7 @@ body[data-board="1"] #btn-sound { margin-top: 22px; }
 
 #modes {
   display: flex;
-  gap: 18px;
+  gap: 12px; /* drei Karten zu 104 px passen so auf 375 px */
   margin-top: 48px;
 }
 .mode-card {
@@ -175,8 +202,8 @@ body[data-board="1"] #btn-sound { margin-top: 22px; }
 .mode-card.soon { opacity: 0.32; cursor: default; }
 .mode-preview {
   display: block;
-  width: 130px;
-  height: 72px;
+  width: 104px;
+  height: 58px;
   border: 1px solid rgba(46, 58, 69, 0.55);
   box-sizing: border-box;
 }

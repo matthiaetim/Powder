@@ -1,4 +1,5 @@
 // Unendlicher Hang aus 40-m-Zellen. Deterministisch pro Seed, mit unsichtbarem Safe-Lane-Korridor.
+// Super-G gibt der Welt eine flachere Korridor-Mitte (lane) und eine hindernisfreie Piste darum (pisteHalf) mit.
 import { C } from './constants.js';
 import { TREE, ROCK } from './physics.js';
 
@@ -22,14 +23,22 @@ export function mulberry32(a) {
   };
 }
 
-export function createWorld(seed) {
+export function createWorld(seed, opts = {}) {
   const rng = mulberry32(seed);
-  return { seed, cells: new Map(), phase: rng() * TAU, phase2: rng() * TAU, objCount: 0 };
+  const phase = rng() * TAU, phase2 = rng() * TAU;
+  return {
+    seed, cells: new Map(), objCount: 0,
+    phase: opts.phase ?? phase, phase2,
+    // Korridor-Mitte: zwei überlagerte Sinuswellen; Super-G nur die flache erste, damit die Tore fahrbar bleiben
+    lane: opts.lane || { amp: C.LANE_AMP, wave: C.LANE_WAVELENGTH, amp2: 6, wave2: 97 },
+    pisteHalf: opts.pisteHalf || 0, // > 0: so weit ist die Piste um die Mitte frei von Hindernissen (Super-G)
+  };
 }
 
 // Mittellinie des garantiert freien Korridors.
 export function laneX(w, y) {
-  return C.LANE_AMP * Math.sin((TAU * y) / C.LANE_WAVELENGTH + w.phase) + 6 * Math.sin((TAU * y) / 97 + w.phase2);
+  const l = w.lane;
+  return l.amp * Math.sin((TAU * y) / l.wave + w.phase) + l.amp2 * Math.sin((TAU * y) / l.wave2 + w.phase2);
 }
 function laneHalf(y) {
   return lerp(C.LANE_HALF0, C.LANE_HALF1, clamp(y / C.RAMP_M, 0, 1));
@@ -73,6 +82,7 @@ function genCell(w, cx, cy) {
     if (x * x + y * y < C.START_CLEAR_M * C.START_CLEAR_M) continue;
     if (Math.abs(y - C.SIGN_Y_M) < C.SIGN_BAND_M) continue; // Schriftzug: kein Hindernis im ganzen Streifen
     if (Math.abs(x - laneX(w, y)) < laneHalf(y) + r) continue;
+    if (w.pisteHalf > 0 && Math.abs(x - laneX(w, y)) < w.pisteHalf + r) continue; // Super-G: freie Piste
     let ok = true;
     for (let i = 0; i < objs.length && ok; i++) {
       const o = objs[i];

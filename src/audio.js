@@ -3,7 +3,8 @@
 // dem Tempo, Kante beim Carven, Kratzen mit Rattern beim Bremsen, im Pflug lauter und tiefer, Zischen beim Antippen
 // und Loslassen), Lawine
 // (Grollen, das mit der Nähe lauter und heller wird, Bass, Knacken, Zischen ganz nah, Krachen beim Losbrechen)
-// und Aufprall (kurzer dumpfer Schlag, an der Lawine schwerer).
+// und Aufprall (kurzer dumpfer Schlag, an der Lawine schwerer). Super-G hat einen eigenen Bus: Pieptöne des
+// Countdowns, Fähnchen beim Durchfahren, Buzzer beim Torfehler, Klacken an der Stange, Doppelton im Ziel.
 // iOS gibt Ton erst nach einer Berührung frei: der Kontext entsteht beim ersten Tipp, davor bleibt alles still.
 // Der Klingelschalter gilt wie bei nativen Spielen: steht er auf lautlos, bleibt die App stumm.
 import { C } from './constants.js';
@@ -120,7 +121,7 @@ export function createSound(g) {
     n.an = ctx.createAnalyser();
     n.an.fftSize = 1024;
     chain(n.master, n.comp, n.an, ctx.destination);
-    for (const b of ['wind', 'ski', 'av', 'fx']) { n[b] = gain(0); n[b].connect(n.master); }
+    for (const b of ['wind', 'ski', 'av', 'fx', 'race']) { n[b] = gain(0); n[b].connect(n.master); }
     n.white = makeNoise('white');
     const pink = makeNoise('pink'), brown = makeNoise('brown');
 
@@ -157,6 +158,25 @@ export function createSound(g) {
     n.avHissF = filt('bandpass', 1800, 0.6);
     n.avHiss = gain(0);
     chain(loop(n.white), n.avHissF, n.avHiss, n.av);
+  }
+
+  // Ton mit fester Höhe (Countdown, Torfehler, Ziel): kurzer Anstieg, gehalten, kurzer Abfall. delay schiebt den
+  // Start nach hinten, für Doppeltöne aus einem Ereignis.
+  function tone(bus, type, f, dur, peak, delay = 0) {
+    const t0 = ctx.currentTime + delay;
+    const o = ctx.createOscillator();
+    o.type = type;
+    o.frequency.value = f;
+    const gn = gain(0);
+    const p = gn.gain;
+    p.setValueAtTime(0.0001, t0);
+    p.linearRampToValueAtTime(peak, t0 + 0.006);
+    p.setValueAtTime(peak, t0 + Math.max(0.006, dur - 0.03));
+    p.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    chain(o, gn, bus);
+    o.start(t0);
+    o.stop(t0 + dur + 0.05);
+    o.onended = () => { o.disconnect(); gn.disconnect(); };
   }
 
   // ---------- Einmal-Klänge ----------
@@ -245,6 +265,14 @@ export function createSound(g) {
       case 'plow': if (d && g.state === 'running') swish(s.v * 0.6, false); break;
       case 'release': if (g.state === 'running' && s.carve > 0.25 && s.v > 3) swish(s.v, true); break;
       case 'crash': crash(d.cause, d.v); break;
+      // Super-G
+      case 'beep': if (d.go) tone(n.race, 'sine', 1175, 0.4, 0.5); else tone(n.race, 'sine', 880, 0.1, 0.4); break;
+      case 'gate':
+        if (d.ok) shot(n.race, 'bandpass', 900, 1.2, 0.3, 0.004, 0.07); // das Fähnchen schlägt kurz
+        else { tone(n.race, 'square', 220, 0.12, 0.2); tone(n.race, 'square', 220, 0.12, 0.2, 0.17); } // Buzzer
+        break;
+      case 'pole': shot(n.race, 'bandpass', 1400, 3, 0.6, 0.002, 0.05); thud(n.race, 'triangle', 700, 250, 0.05, 0.3, 0.08); break;
+      case 'finish': tone(n.race, 'sine', 660, 0.15, 0.45); tone(n.race, 'sine', 990, 0.4, 0.45, 0.17); break;
       default: break;
     }
   }
@@ -255,18 +283,20 @@ export function createSound(g) {
     if (!ctx || !on || ctx.state !== 'running') return;
     const s = g.skier, av = g.av;
     const running = g.state === 'running';
-    const v = running ? s.v : 0;
+    const moving = running || g.state === 'finished'; // Auslauf nach dem Ziel (Super-G) klingt aus
+    const v = moving ? s.v : 0;
     const k = clamp(v / (C.SND_SPEED_REF_KMH / 3.6), 0, 1); // Tempo 0..1
     const move = clamp(v / 10, 0, 1);
-    const carve = running ? s.carve : 0;
-    const skid = running ? clamp(s.brake / 28, 0, 1) : 0;
-    const plow = running ? s.plowK * move : 0; // Schneepflug: schiebt und kratzt, nur mit Fahrt
+    const carve = moving ? s.carve : 0;
+    const skid = moving ? clamp(s.brake / 28, 0, 1) : 0;
+    const plow = moving ? s.plowK * move : 0; // Schneepflug: schiebt und kratzt, nur mit Fahrt
 
     set(n.master.gain, C.SND_MASTER * MASTER_TRIM, 0.1);
     set(n.wind.gain, C.SND_WIND, 0.05);
     set(n.ski.gain, C.SND_SKI, 0.05);
     set(n.av.gain, C.SND_AV, 0.05);
     set(n.fx.gain, C.SND_CRASH, 0.05);
+    set(n.race.gain, C.SND_RACE, 0.05);
 
     // Wind: Fahrtwind öffnet und wächst mit dem Tempo, der Bergwind bleibt, auf der Fresh-Seite etwas leiser
     dbg.rush = Math.pow(k, 0.9);

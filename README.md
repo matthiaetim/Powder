@@ -15,6 +15,8 @@ Plain HTML + JavaScript + Canvas, kein Framework, kein Build.
 - **Markierungen im Schnee**: alle 1000 m eine dünne blaue Linie mit Meterzahl, der bisherige Bestwert des Modus als rote Rekordlinie, die Bestweiten der anderen aus der Bestenliste als graue Namenslinien (alle beim Start des Laufs eingefroren).
 - **Credit bei 333 m**: ein Schriftzug, wie in den Schnee gefräst, quer über die Korridor-Mitte. Wer darüberfährt, radiert ihn mit den Ski aus, bis zum nächsten Lauf. Deckkraft, Breite und Verwischen sind Regler im Tuning-Panel.
 - **Fresh-Seite**: Meter und Laufzeit des letzten Laufs (unter einer Minute in Sekunden, sonst `1:34:07 Minuten`), Bestwert je Modus, Bestenliste (siehe unten), Moduswahl.
+- **Fresh-Seite**: Meter und Laufzeit des letzten Laufs (unter einer Minute in Sekunden, sonst `1:34:07 Minuten`), Bestwert je Modus, Moduswahl.
+- **Super-G**: Countdown mit drei kurzen und einem langen Piepton, ab dem langen läuft die Zeit. Beim App-Start wartet der Modus auf einen Tipp („Tippen zum Start“), nach Fresh zählt er von selbst. Das HUD zeigt die wirksame Zeit (Laufzeit plus Strafen), unter dem Fahrer erscheint kurz „Torfehler +3 s“ oder bei 250, 500 und 750 m die Differenz zur Bestzeit (grün schneller, rot langsamer). `P` pausiert auch den Countdown, der dann von vorn beginnt.
 - Tastatur: `A`/`D` oder Pfeile, `P` Pause, `R`, Enter oder Leertaste Fresh (neuer Lauf). Auf dem iPhone gibt es keine Pause-Taste: anhalten heißt querstellen; beim Wechsel in den Hintergrund pausiert die App von selbst.
 - **Tuning-Panel**: langer Druck auf das Versions-Label unten links. Werte bleiben gespeichert, „Standard“ setzt zurück.
 - **Ton an/aus**: Schalter unten auf der Fresh-Seite, bleibt gespeichert.
@@ -23,6 +25,7 @@ Plain HTML + JavaScript + Canvas, kein Framework, kein Build.
 
 - **Classic**: freie Abfahrt, so weit es geht.
 - **Chase**: eine Lawine hält ein Tempo (Pace), das mit der Laufzeit steigt (Standard 30 → 145 km/h in 90 Sekunden). Wer schneller ist, hält sie knapp über dem oberen Bildrand; wer langsamer wird, holt sie sich ins Bild. Gewertet wird das Tempo entlang der Ski (Regler „Schräg zählt Tempo“, Standard 100 %), nicht nur der Höhenverlust: wer schräg fährt und schneller als ihr Pace ist, bleibt sicher; bei 0 % zählt nur das Tempo hangabwärts. Wer langsamer als 40 km/h wird, etwa quergestellt, sieht sie nach 0,8 s am Bildrand erscheinen und heranrollen. Eine optionale Gnade beim Schuss (Regler „Gnade beim Schuss“, Standard 0 % = aus) lässt sie beim geraden Bergabfahren (bis 25° Fahrwinkel) nur einen Teil ihres Tempo-Vorsprungs ausspielen; je stärker die Kurve, desto weniger Gnade, ab 60° keine; der Schneepflug zählt nicht als Schuss. Bei 100 % gewinnt sie beim Schuss gar nicht mehr, das war in v0.10.0 zu leicht. Erwischt sie den Fahrer, zerspringt er wie beim Aufprall. Die Steuerung ist dieselbe wie in Classic.
+- **Super-G**: Zeitfahren durch 21 Tore auf einer festen Strecke (fester Seed, `?seed=` überschreibt), Ziel nach 1000 m. Die Tore stehen ab 50 m alle 45 m abwechselnd links und rechts der Pistenmitte, abwechselnd rot und blau, mit 8 m Durchfahrt zwischen den beiden Stangen. Gewertet wird beim Kreuzen der Torlinie: außen vorbei kostet 3 s Zeitstrafe (Regler), der Lauf geht weiter. Eine berührte Stange kostet 8 km/h (Regler), kein Sturz. Die Piste ist 15 m je Seite (Regler) frei, außen stehen Bäume wie in Classic; wer sie trifft, hat keine Zeit („kein Ziel“). Nach dem Ziel gleitet der Fahrer aus, dann kommt die Fresh-Seite mit Gesamtzeit (Zeit plus Strafen), verpassten Toren und Bestzeit. Die Bestzeit und die Zwischenzeiten des besten Laufs bleiben gespeichert (`powder.besttime.superg`, `powder.bestsplits.superg`). Die Kurs-Regler (Torabstand, Torbreite, Torversatz, Pistenbreite) wirken ab dem nächsten Lauf und machen Zeiten untereinander unvergleichbar. Steuerung wie in Classic; die Tore und die Wertung stehen in `src/gates.js`.
 - Die Lawine ist ein Schatten (`src/avalanche-view.js`): ein Schleier aus Schiefergrau, dessen Rand mit weichen dunklen Wülsten wogt, davor züngeln dünne Schattenfahnen. Je näher sie kommt, desto dämmriger wird das ganze Bild.
 
 ## Bestenliste
@@ -32,7 +35,8 @@ liegt er außerhalb, steht er nach „…“ mit seinem Rang darunter. Beim erst
 Namen (2 bis 12 Zeichen), ein Tipp auf den eigenen Eintrag ändert ihn. Die Identität ist der Name: gleiche Namen teilen
 sich einen Eintrag (auch von einem zweiten Gerät), ein Eintrag wird nur nach oben überschrieben, und wer sich umbenennt,
 lässt den alten Eintrag stehen (Aufräumen in der Firebase-Konsole). Die Bestweiten der anderen liegen als graue
-Namenslinien im Schnee, beim Start des Laufs eingefroren; die eigene rote Rekordlinie bleibt. Läufe mit Tuning, `?seed=`
+Namenslinien im Schnee, beim Start des Laufs eingefroren; die eigene rote Rekordlinie bleibt. Die Liste gibt es für Classic
+und Chase (`BOARD_MODES` in `src/modes.js`); Super-G wertet Zeiten und hat noch keine, dort bleibt sie weg. Läufe mit Tuning, `?seed=`
 oder `?debug=1` zählen lokal, aber nicht online (Hinweis unter der Liste). Offline zeigt die Liste den letzten bekannten
 Stand, ausstehende Bestweiten werden beim nächsten Start oder Sturz nachgeholt.
 
@@ -63,6 +67,7 @@ Alles synthetisch über die Web Audio API (`src/audio.js`), keine Audiodateien. 
 - **Ski**: Schneezischen mit dem Tempo, beim Carven tiefer und lauter. Antippen und Loslassen zischen kurz, Bremsen kratzt mit Rattern, der Schneepflug lauter und tiefer.
 - **Lawine (Chase)**: Grollen, das mit der Nähe lauter und heller wird, Knacken und Zischen, sobald sie im Bild ist, Krachen, wenn sie nach dem Stillstand losbricht. Nach dem Erwischen klingt sie aus.
 - **Aufprall**: kurzer dumpfer Schlag, am Baum mit knappem Knacken, am Fels mit Klonk, an der Lawine schwerer.
+- **Super-G**: Pieptöne des Countdowns (der lange ist das Go), ein kurzes Schlagen des Fähnchens beim Durchfahren, ein doppelter Buzzer beim Torfehler, Klacken an der Stange, Doppelton im Ziel. Beim App-Start ist der Ton erst nach dem ersten Tipp frei, deshalb wartet der Modus dort auf den Tipp.
 - Lautstärke gesamt und je Gruppe im Tuning-Panel, Abschnitt „Ton“.
 
 ## Lokal starten
@@ -71,13 +76,13 @@ Alles synthetisch über die Web Audio API (`src/audio.js`), keine Audiodateien. 
 node tools/serve.js
 ```
 
-Dann `http://localhost:8080` öffnen. Auf dem iPhone im selben WLAN die angezeigte IP-Adresse öffnen.
+Dann `http://localhost:8080` öffnen. Liefert 8080 einen alten Server aus einem anderen Checkout aus (`curl -s localhost:8080/src/constants.js | grep VERSION`), `node tools/serve.js 8090` nehmen; im Browser-Preview von Claude Code heißt diese Konfiguration `powder-8090`. Auf dem iPhone im selben WLAN die angezeigte IP-Adresse öffnen.
 Nützliche Parameter: `?debug=1` (Overlay mit fps, Hitboxen, Safe Lane), `?seed=42` (reproduzierbare Welt),
 `?board=local` (Bestenliste gegen den Mock, siehe oben).
 
 ## Tuning
 
-Alle Stellschrauben stehen in `src/constants.js`; die Liste `TUNABLES` dort bestimmt die Regler im Panel (Abschnitte „Fahren“, „Lawine (Chase)“: Tempo am Start und Ende, Anstiegsdauer, Lauerabstand, Stillstand-Schwelle und -Wartezeit, Fangabstand, Beben, Schräg zählt Tempo, Gnade beim Schuss, Gnade bis Winkel, volle Härte ab Winkel, Schuss schüttelt ab, und „Ton“: Lautstärke gesamt, Wind, Ski und Kurven, Lawine, Aufprall).
+Alle Stellschrauben stehen in `src/constants.js`; die Liste `TUNABLES` dort bestimmt die Regler im Panel (Abschnitte „Fahren“, „Lawine (Chase)“: Tempo am Start und Ende, Anstiegsdauer, Lauerabstand, Stillstand-Schwelle und -Wartezeit, Fangabstand, Beben, Schräg zählt Tempo, Gnade beim Schuss, Gnade bis Winkel, volle Härte ab Winkel, Schuss schüttelt ab, „Super-G“: Torabstand, Torbreite, Torversatz, Piste frei je Seite, Zeitstrafe pro Tor, Stange kostet, „Schriftzug“: Deckkraft, Breite, Verwischen, und „Ton“: Lautstärke gesamt, Wind, Ski und Kurven, Lawine, Aufprall, Super-G).
 Ändern sich die Standardwerte, den Schlüssel `KEY` in `src/tune.js` hochzählen, sonst bleiben alte Regler-Werte auf dem iPhone aktiv.
 
 ## Deploy (GitHub Pages)

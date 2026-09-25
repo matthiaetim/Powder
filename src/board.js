@@ -2,7 +2,7 @@
 // Die reine Logik (Schlüssel, Sortierung, Rang, Zulässigkeit) ist exportiert und ohne DOM testbar; createBoard hält
 // Cache, Namen und Upload-Stand, spricht mit dem Server und reicht die Linien an game.js weiter (setMarks).
 import { C, VERSION } from './constants.js';
-import { MODE_ORDER } from './modes.js';
+import { BOARD_MODES } from './modes.js';
 import { isTuned } from './tune.js';
 import { loadBest, loadName, saveName, loadBoardCache, saveBoardCache, loadBoardOwn, saveBoardOwn } from './storage.js';
 import { setMarks, adoptBest } from './game.js';
@@ -25,14 +25,14 @@ export function validName(raw) {
   return nameKey(name) ? name : '';
 }
 
-const emptyBoards = () => Object.fromEntries(MODE_ORDER.map((mode) => [mode, {}]));
+const emptyBoards = () => Object.fromEntries(BOARD_MODES.map((mode) => [mode, {}]));
 
 // Server- oder Cache-JSON (auch null: leere Datenbank) → je Modus nur plausible Einträge. Was die Regeln nicht
 // durchlassen würden, fliegt auch hier raus, damit ein alter Cache oder ein fremder Eintrag nichts kaputt macht.
 export function sanitizeBoards(raw) {
   const out = emptyBoards();
   if (!raw || typeof raw !== 'object') return out;
-  for (const mode of MODE_ORDER) {
+  for (const mode of BOARD_MODES) {
     const src = raw[mode];
     if (!src || typeof src !== 'object') continue;
     for (const [key, e] of Object.entries(src)) {
@@ -55,7 +55,7 @@ export function sortEntries(byKey) {
 // Zwei Stände vereinen: je Modus und Schlüssel der Eintrag mit mehr Metern, bei Gleichstand der aus b.
 export function mergeBoards(a, b) {
   const out = emptyBoards();
-  for (const mode of MODE_ORDER) {
+  for (const mode of BOARD_MODES) {
     const A = (a && a[mode]) || {}, B = (b && b[mode]) || {};
     for (const key of new Set([...Object.keys(A), ...Object.keys(B)])) {
       const x = A[key], y = B[key];
@@ -102,7 +102,7 @@ export function verdictText(verdict) {
 function normalizeOwn(raw) {
   const out = {};
   if (!raw || typeof raw !== 'object') return out;
-  for (const mode of MODE_ORDER) {
+  for (const mode of BOARD_MODES) {
     const o = raw[mode];
     if (o && Number.isInteger(o.m) && o.m >= 1) {
       out[mode] = { m: o.m, t: typeof o.t === 'number' ? o.t : 0, sentAs: typeof o.sentAs === 'string' ? o.sentAs : null };
@@ -130,14 +130,14 @@ export function createBoard({ url = '', g = null, fetchFn = null, debug = false 
   const key = () => nameKey(name);
 
   function pushMarks() {
-    if (g) setMarks(g, Object.fromEntries(MODE_ORDER.map((mode) => [mode, friendMarks(boards, mode, key())])));
+    if (g) setMarks(g, Object.fromEntries(BOARD_MODES.map((mode) => [mode, friendMarks(boards, mode, key())])));
   }
 
   // Server kennt für den eigenen Namen mehr als dieses Gerät (Zweitgerät, gelöschte Safari-Daten): übernehmen
   function adoptFromServer() {
     const k = key();
     if (!k || !g) return;
-    for (const mode of MODE_ORDER) {
+    for (const mode of BOARD_MODES) {
       const e = boards[mode][k];
       if (e && e.m > loadBest(mode)) adoptBest(g, mode, e.m);
     }
@@ -212,7 +212,7 @@ export function createBoard({ url = '', g = null, fetchFn = null, debug = false 
   // Ausstehende Bestweiten senden, sobald ein Name da ist. Läuft beim Start, beim Sturz und nach dem Speichern des Namens.
   async function flush() {
     if (!enabled) return;
-    await Promise.all(MODE_ORDER.map((mode) => flushMode(mode)));
+    await Promise.all(BOARD_MODES.map((mode) => flushMode(mode)));
   }
 
   // Lauf zu Ende (hud.js beim Übergang nach dead): zulässigen Bestwert vormerken, Liste laden, Ausstehendes senden.
@@ -220,7 +220,7 @@ export function createBoard({ url = '', g = null, fetchFn = null, debug = false 
     verdict = runVerdict(game);
     const mode = game.runMode;
     const m = Math.floor(game.dist);
-    if (!verdict && m >= 1 && MODE_ORDER.includes(mode) && m > ((own[mode] && own[mode].m) || 0)) {
+    if (!verdict && m >= 1 && BOARD_MODES.includes(mode) && m > ((own[mode] && own[mode].m) || 0)) {
       own[mode] = { m, t: Math.round(game.runT * 100) / 100, sentAs: null };
       saveBoardOwn(own);
     }

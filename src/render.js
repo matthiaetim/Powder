@@ -8,6 +8,7 @@ import { laneX } from './world.js';
 const TAU = Math.PI * 2;
 const TREE_H = 3.2; // nominale Sprite-Höhe in Metern
 const ROCK_H = 1.4;
+const POLE_H = 1.8; // Torstange (Super-G)
 const MARK_FONT = "italic 12px 'Playfair Display', Georgia, 'Times New Roman', serif"; // wie --font in styles.css
 const SIGN_FONT_STACK = "'Playfair Display', Georgia, 'Times New Roman', serif"; // nur italic 400 liegt in fonts/
 const SIGN_PAD_M = 0.3; // Rand des Offscreen-Canvas um den Schriftzug, für kursive Überhänge und das Relief
@@ -135,10 +136,36 @@ function makeRock(S, dpr, v) {
   return { img: c, w, h, ax, ay, nominal: ROCK_H };
 }
 
+// Torstange (Super-G): stehend wie die Bäume mit Fußpunkt unten in der Mitte, oben ein Fähnchen nach außen (dir)
+// in der Torfarbe mit hellerer Oberkante (Licht von oben-links wie beim Relief), weicher Schatten nach rechts.
+function makePole(S, dpr, red, dir) {
+  const H = POLE_H * S, fw = 0.9 * S, fh = 0.6 * S, pad = 0.8 * S;
+  const w = fw * 2 + pad * 2, h = H + pad * 2;
+  const [c, x] = makeCanvas(w, h, dpr);
+  const ax = w / 2, ay = pad + H; // Fußpunkt
+  softEllipse(x, ax + 0.4 * S, ay - 0.05 * S, 0.5 * S, 0.2 * S, C.SHADOW_RGB, 0.28);
+  const fx = dir > 0 ? ax : ax - fw, fy = ay - H;
+  x.fillStyle = red ? C.GATE_RED : C.GATE_BLUE;
+  x.fillRect(fx, fy, fw, fh);
+  x.fillStyle = red ? C.GATE_RED_LIGHT : C.GATE_BLUE_LIGHT;
+  x.fillRect(fx, fy, fw, fh * 0.3);
+  x.strokeStyle = C.INK;
+  x.lineWidth = Math.max(1, 0.08 * S);
+  x.lineCap = 'round';
+  x.beginPath(); x.moveTo(ax, fy); x.lineTo(ax, ay); x.stroke();
+  return { img: c, w, h, ax, ay, nominal: POLE_H };
+}
+
+// Stangen als [blau, rot][links, rechts]
+function makePoles(S, dpr) {
+  return [false, true].map((red) => [-1, 1].map((dir) => makePole(S, dpr, red, dir)));
+}
+
 function makeSprites(S, dpr) {
   return {
     trees: [0, 1, 2].map((v) => makeTree(S, dpr, v)),
     rocks: [0, 1, 2].map((v) => makeRock(S, dpr, v)),
+    poles: makePoles(S, dpr),
     av: makeAvSprites(),
   };
 }
@@ -190,6 +217,7 @@ function drawMarks(R, g, ox, oy) {
   ctx.font = MARK_FONT;
   ctx.textAlign = 'right';
   ctx.textBaseline = 'bottom';
+  if (g.course) { drawCourseLines(R, g, ox, oy, y0, y1); return; }
   for (let k = Math.max(1, Math.ceil(y0 / C.MARK_M)); k * C.MARK_M <= y1; k++) {
     markLine(ctx, W, k * C.MARK_M * S + oy, nf.format(k * C.MARK_M) + ' m', C.MARK_RGBA);
   }
@@ -204,6 +232,22 @@ function drawMarks(R, g, ox, oy) {
   }
   const b = g.runBest;
   if (b > 0 && b >= y0 && b <= y1) markLine(ctx, W, b * S + oy, 'Rekord · ' + nf.format(b) + ' m', C.MARK_BEST_RGBA);
+}
+
+// Super-G: Startlinie bei 0 und karierte Ziellinie bei SG_FINISH_M statt Meter- und Rekordlinien (die blaue
+// 1000-m-Linie läge genau auf dem Ziel). Die Zeit wird auf der Fuge zwischen den beiden Karo-Reihen genommen.
+function drawCourseLines(R, g, ox, oy, y0, y1) {
+  const { ctx, Sv: S, W } = R;
+  if (y0 <= 0 && 0 <= y1) markLine(ctx, W, oy, 'Start', C.MARK_RGBA);
+  const fy = g.course.finishY;
+  const cell = Math.max(4, 0.7 * S);
+  if (fy + cell / S < y0 || fy - cell / S > y1) return;
+  const sy = fy * S + oy;
+  ctx.fillStyle = C.FINISH_RGBA;
+  for (let row = 0; row < 2; row++) {
+    for (let i = row; i * cell < W; i += 2) ctx.fillRect(i * cell, sy - cell + row * cell, cell, cell);
+  }
+  ctx.fillText('Ziel', W - 8, sy - cell - 3);
 }
 
 function markLine(ctx, W, sy, label, color, labelY = sy - 3) {
@@ -314,6 +358,9 @@ function updateSignature(R, g) {
 function drawSignature(R, g, ox, oy) {
   updateSignature(R, g);
   const { ctx, Sv: S, H } = R, sg = R.sign;
+  // Ohne Canvas-Maße (Tab noch unsichtbar, S = 0) wäre der Offscreen-Canvas leer und drawImage würfe: das
+  // beendete den ganzen Bildtakt. Sobald es Maße gibt, ändert sich der Schlüssel und der Schriftzug wird neu gebaut.
+  if (!sg.c.width || !sg.c.height) return;
   const sy = sg.y0 * S + oy, sh = sg.hM * S;
   if (sy + sh < 0 || sy > H) return;
   ctx.globalAlpha = C.SIGN_ALPHA;
@@ -386,6 +433,15 @@ function drawWorld(R, g, ox, oy) {
       list.push(o);
     }
   }
+  // Super-G: Torstangen wie Hindernisse einsortieren, damit der Fahrer vor oder hinter ihnen steht
+  if (g.course) {
+    const gates = g.course.gates;
+    for (let i = 0; i < gates.length; i++) {
+      const sy = gates[i].y * S + oy;
+      if (sy < -40 || sy > H + 40) continue;
+      list.push(gates[i].poles[0], gates[i].poles[1]);
+    }
+  }
   R.skierMarker.y = g.skier.y;
   list.push(R.skierMarker);
   list.sort((a, b) => a.y - b.y);
@@ -394,6 +450,11 @@ function drawWorld(R, g, ox, oy) {
     if (o.skier) {
       if (shattered(g)) drawShards(R, g, ox, oy);
       else drawSkier(R, g, g.skier.x * S + ox, g.skier.y * S + oy);
+      continue;
+    }
+    if (o.pole) {
+      const sp = R.sprites.poles[o.red ? 1 : 0][o.dir > 0 ? 1 : 0];
+      ctx.drawImage(sp.img, o.x * S + ox - sp.ax * spriteScale, o.y * S + oy - sp.ay * spriteScale, sp.w * spriteScale, sp.h * spriteScale);
       continue;
     }
     const sp = o.t === TREE ? R.sprites.trees[o.variant] : R.sprites.rocks[o.variant];
@@ -603,6 +664,20 @@ function drawDebug(R, g, ox, oy) {
     if (y === y0) ctx.moveTo(x, y * S + oy); else ctx.lineTo(x, y * S + oy);
   }
   ctx.stroke();
+  // Super-G: Durchfahrt je Tor (blau offen, grün durchfahren, rot verpasst) und die Berührungszonen der Stangen
+  if (g.course) {
+    const rr = (C.SKIER_R + C.SG_POLE_R) * S;
+    for (const gt of g.course.gates) {
+      const sy = gt.y * S + oy;
+      if (sy < -40 || sy > H + 40) continue;
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = gt.state === 2 ? 'rgba(220,40,40,0.8)' : gt.state === 1 ? 'rgba(40,160,90,0.8)' : 'rgba(40,120,220,0.6)';
+      ctx.beginPath(); ctx.moveTo((gt.x - gt.half) * S + ox, sy); ctx.lineTo((gt.x + gt.half) * S + ox, sy); ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(220,40,40,0.6)';
+      for (const px of [gt.x - gt.half, gt.x + gt.half]) { ctx.beginPath(); ctx.arc(px * S + ox, sy, rr, 0, TAU); ctx.stroke(); }
+    }
+  }
   ctx.strokeStyle = 'rgba(220,40,40,0.8)';
   ctx.lineWidth = 1;
   const fy = g.av.frontY * S + oy;
@@ -675,7 +750,9 @@ function drawWhiteout(R, g) {
 // ---------- Modus-Vorschau (kleine stille Szene für die Karten) ----------
 
 export function drawModePreview(canvas, modeId) {
-  const W = canvas.clientWidth || 130, H = canvas.clientHeight || 72;
+  // Beim Start ist die Fresh-Seite versteckt (clientWidth 0): Fallback auf die Kartenmaße aus styles.css
+  const W = canvas.clientWidth || 104, H = canvas.clientHeight || 58;
+  const superg = modeId === 'superg';
   const dpr = Math.min(window.devicePixelRatio || 1, C.MAX_DPR);
   canvas.width = Math.round(W * dpr);
   canvas.height = Math.round(H * dpr);
@@ -684,24 +761,39 @@ export function drawModePreview(canvas, modeId) {
   const S = 5.5;
   ctx.fillStyle = C.BG;
   ctx.fillRect(0, 0, W, H);
-  // Spur: leichte Schlangenlinie von oben bis zum Fahrer
+  // Spur: leichte Schlangenlinie von oben bis zum Fahrer; im Super-G schwingt sie weiter, durch die beiden Tore
   const sx = W * 0.5, sy = H * 0.62;
+  const trackX = (y) => (superg ? sx + Math.sin((y / H) * 9 + 0.5) * W * 0.14 : sx + Math.sin((y / H) * 4.5) * W * 0.09);
   ctx.strokeStyle = C.TRACK;
   ctx.lineWidth = 1.2;
   for (const off of [-1, 1]) {
     ctx.beginPath();
     for (let y = -4; y <= sy; y += 2) {
-      const x = sx + Math.sin((y / H) * 4.5) * W * 0.09 + off;
+      const x = trackX(y) + off;
       y < 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
     ctx.stroke();
   }
-  const trees = [[0.16, 0.42, 0], [0.8, 0.3, 1], [0.66, 0.9, 2], [0.3, 0.98, 1], [0.9, 0.7, 0]];
+  // Bäume; im Super-G nur am Rand der Piste
+  const trees = superg
+    ? [[0.04, 0.55, 0], [0.97, 0.38, 1], [0.03, 1.0, 2], [0.96, 0.92, 0]]
+    : [[0.16, 0.42, 0], [0.8, 0.3, 1], [0.66, 0.9, 2], [0.3, 0.98, 1], [0.9, 0.7, 0]];
   const sprites = [0, 1, 2].map((v) => makeTree(S, dpr, v));
   trees.forEach(([fx, fy, v]) => {
     const sp = sprites[v];
     ctx.drawImage(sp.img, fx * W - sp.ax, fy * H - sp.ay, sp.w, sp.h);
   });
+  if (superg) {
+    // Zwei Tore, rot und blau, je zwei Stangen mit Fähnchen um die Spur
+    const poles = makePoles(S, dpr);
+    for (const [fy, red] of [[0.2, true], [0.44, false]]) {
+      const y = fy * H, cx = trackX(y);
+      for (const dir of [-1, 1]) {
+        const sp = poles[red ? 1 : 0][dir > 0 ? 1 : 0];
+        ctx.drawImage(sp.img, cx + dir * 0.19 * W - sp.ax, y - sp.ay, sp.w, sp.h);
+      }
+    }
+  }
   // Fahrer
   ctx.save();
   ctx.translate(sx, sy);

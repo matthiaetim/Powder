@@ -1,9 +1,11 @@
 // DOM-HUD: Tempo, Distanz, Pause, Fresh-Seite mit Laufzeit, Bestenliste samt Namensfeld und Modus-Karten, Debug-Text.
+// DOM-HUD: Tempo, Distanz, Pause, Fresh-Seite mit Laufzeit und Modus-Karten, Debug-Text.
+// Super-G: dazu die laufende Zeit, Hinweise zu Torfehler und Zwischenzeit, der Countdown in der Bildmitte.
 import { C, VERSION } from './constants.js';
 import { overlayReady, togglePause, pauseIfRunning, fresh, selectMode } from './game.js';
 import { createTunePanel, isTuned } from './tune.js';
 import { verdictText } from './board.js';
-import { MODES } from './modes.js';
+import { MODES, BOARD_MODES } from './modes.js';
 import { drawModePreview } from './render.js';
 
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -17,15 +19,30 @@ export function formatRunTime(sec) {
   return m === 0 ? `${s},${hh} Sekunden` : `${m}:${pad2(s)}:${hh} Minuten`;
 }
 
+// Uhr im Super-G: „41,27“ (Hundertstel), ab einer Minute „1:02,47“; mit unit hängt unter einer Minute „ s“ an.
+export function formatClock(sec, unit) {
+  const cs = Math.max(0, Math.round(sec * 100));
+  const hh = pad2(cs % 100);
+  const total = Math.floor(cs / 100);
+  const m = Math.floor(total / 60), s = total % 60;
+  if (m > 0) return `${m}:${pad2(s)},${hh}`;
+  return `${s},${hh}${unit ? ' s' : ''}`;
+}
+
 export function createHud(g, doc, hooks = {}) {
   const $ = (id) => doc.getElementById(id);
   const doFresh = hooks.fresh || (() => fresh(g));
-  const speedEl = $('hud-speed'), distEl = $('hud-dist');
+  const speedEl = $('hud-speed'), distEl = $('hud-dist'), timeEl = $('hud-time'), raceNoteEl = $('hud-note');
+  const countEl = $('ov-count'), hintEl = $('hint');
   const deadDist = $('dead-dist'), deadTime = $('dead-time'), deadBest = $('dead-best'), debugEl = $('debug');
   const themeEl = doc.querySelector('meta[name="theme-color"]'); // färbt die iOS-Statusleiste (Safari-Tab) mit
   $('version').textContent = 'v' + VERSION;
   const nf = new Intl.NumberFormat(C.HUD_LOCALE, { maximumFractionDigits: 0 });
-  let lastSpeed = -1, lastDist = -1, lastState = '', lastOverlay = '', lastDebug = 0, lastText = -1e9;
+  const nf1 = new Intl.NumberFormat(C.HUD_LOCALE, { maximumFractionDigits: 1 });
+  const nf2 = new Intl.NumberFormat(C.HUD_LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const hintDefault = hintEl.textContent;
+  let lastSpeed = -1, lastDist = -1, lastTime = '', lastState = '', lastOverlay = '', lastDebug = 0, lastText = -1e9;
+  let lastMode = '', lastNote = '', lastCount = '';
 
   // Tipp auf Buttons und Overlay: Maus und Tastatur über click, Touch über pointerup (input.js bricht touchstart
   // gegen die iOS-Lupe ab, dann kommt kein click). Nur wenn der Finger auf dem Element losgelassen wird.
@@ -74,11 +91,32 @@ export function createHud(g, doc, hooks = {}) {
   tune.closeButton.addEventListener('click', closeTune);
   onTap($('ov-pause'), () => { togglePause(g); closeTune(); });
 
-  // Fresh-Seite: Meter und Laufzeit des letzten Laufs, Bestwert des gewählten Modus
+  // Fresh-Seite: Ergebnis des Laufs nach runMode (Meter und Laufzeit; im Super-G Zeit und Tore), darunter der
+  // Bestwert des gewählten Modus (ein Kartenwechsel ruft erneut auf): Bestzeit im Super-G, sonst Meter
   function refreshDead() {
-    deadDist.textContent = nf.format(Math.floor(g.dist)) + ' m';
-    deadTime.textContent = 'in ' + formatRunTime(g.runT);
-    deadBest.textContent = g.newBest && g.mode === g.runMode ? 'Neuer Rekord' : 'Bester Lauf ' + nf.format(g.best) + ' m';
+    const cs = g.course;
+    if (g.runMode === 'superg' && g.state === 'finished') {
+      deadDist.textContent = formatClock(cs.total, true);
+      deadTime.textContent = cs.misses === 0
+        ? `alle ${nf.format(cs.gates.length)} Tore`
+        : `${cs.misses === 1 ? '1 Tor' : nf.format(cs.misses) + ' Tore'} verpasst · +${nf1.format(cs.penalty)} s`;
+    } else {
+      deadDist.textContent = nf.format(Math.floor(g.dist)) + ' m';
+      deadTime.textContent = g.runMode === 'superg' ? 'kein Ziel' : 'in ' + formatRunTime(g.runT);
+    }
+    if (g.mode === 'superg') {
+      deadBest.textContent = g.newBestTime && g.mode === g.runMode ? 'Neue Bestzeit'
+        : g.bestTime > 0 ? 'Bestzeit ' + formatClock(g.bestTime / 100, true) : 'Noch keine Bestzeit';
+    } else {
+      deadBest.textContent = g.newBest && g.mode === g.runMode ? 'Neuer Rekord' : 'Bester Lauf ' + nf.format(g.best) + ' m';
+    }
+  }
+
+  // Hinweis im HUD (Super-G): Torfehler mit Strafe, Zwischenzeit als Differenz zur Bestzeit oder als Zeit
+  function noteText(n) {
+    if (n.kind === 'miss') return `Torfehler +${nf1.format(n.value)} s`;
+    if (n.kind === 'split') return formatClock(n.value, true);
+    return (n.value < 0 ? '−' : n.value > 0 ? '+' : '±') + nf2.format(Math.abs(n.value)) + ' s';
   }
 
   // Modus-Karten: Vorschau einmal zeichnen, aktive Karte markieren, Tipp startet
@@ -121,8 +159,10 @@ export function createHud(g, doc, hooks = {}) {
   };
   function renderBoard() {
     if (!boardOn || doc.activeElement === nameInput) return; // ohne Server bleibt #board hidden; nicht unter den Fingern umbauen
+    // Super-G wertet Zeiten, die Liste kennt nur Meter (BOARD_MODES): dort bleibt sie weg
+    boardEl.hidden = !BOARD_MODES.includes(g.mode);
+    if (boardEl.hidden) return;
     const name = board.name();
-    boardEl.hidden = false;
     boardEl.dataset.named = name ? '1' : '';
     rowsEl.replaceChildren();
     moreEl.after(ownRow);
@@ -162,18 +202,46 @@ export function createHud(g, doc, hooks = {}) {
 
   function sync(now, R, force) {
     const m = Math.floor(g.dist);
+    const cs = g.course;
     // Tempo und Distanz nur alle HUD_TEXT_MS schreiben: jede Textänderung kostet Layout und Neuzeichnen des HUD
     if (force || now - lastText >= C.HUD_TEXT_MS) {
       lastText = now;
       const kmh = Math.round(g.skier.v * 3.6);
       if (kmh !== lastSpeed) { lastSpeed = kmh; speedEl.textContent = nf.format(kmh) + ' km/h'; }
       if (m !== lastDist) { lastDist = m; distEl.textContent = nf.format(m) + ' m'; }
+      if (cs) {
+        // Wirksame Zeit: Laufzeit plus Strafen, nach dem Ziel die Gesamtzeit
+        const txt = formatClock(cs.finished ? cs.total : g.runT + cs.penalty, false);
+        if (txt !== lastTime) { lastTime = txt; timeEl.textContent = txt; }
+      }
+    }
+    if (g.mode !== lastMode) {
+      lastMode = g.mode;
+      doc.body.dataset.mode = g.mode;
+      hintEl.textContent = g.mode === 'superg' ? 'Tippen zum Start' : hintDefault;
     }
     if (g.state !== lastState) {
       lastState = g.state;
       doc.body.dataset.state = g.state;
       doc.body.dataset.intro = g.state === 'ready' && g.intro ? '1' : '';
       if (g.state === 'dead' && boardOn) board.onRunEnd(g); // Bestwert steht fest: die() lief im Physikschritt davor
+    }
+    // Hinweis unter dem Fahrer, verschwindet nach SG_NOTE_S (gates.js zählt note.t hoch)
+    const note = cs && cs.note && cs.note.t < C.SG_NOTE_S && g.state !== 'finished' ? cs.note : null;
+    const noteKey = note ? `${note.kind}:${note.value}` : '';
+    if (noteKey !== lastNote) {
+      lastNote = noteKey;
+      raceNoteEl.className = note ? note.kind : '';
+      raceNoteEl.textContent = note ? noteText(note) : '';
+    }
+    // Countdown 3 · 2 · 1 in der Mitte, nach dem Start kurz „Go“
+    let count = '';
+    if (g.state === 'count') count = String(Math.max(1, C.SG_COUNT_BEEPS - Math.floor(g.countT / C.SG_COUNT_STEP_S)));
+    else if (g.state === 'running' && cs && g.runT < C.SG_GO_SHOW_S) count = 'Go';
+    if (count !== lastCount) {
+      lastCount = count;
+      countEl.textContent = count;
+      countEl.classList.toggle('go', count === 'Go');
     }
     const ov = overlayReady(g) ? '1' : '';
     if (ov !== lastOverlay) {
@@ -193,7 +261,9 @@ export function createHud(g, doc, hooks = {}) {
         `tap=${C.TURN_TAP_DEG}°+${C.TURN_DEEPEN_DEG_S}°/s  T=${C.TURN_T}-${C.TURN_T_FAST}/${C.RETURN_T}s  target=${deg(s.target)}°  brake=turn ${C.TURN_BRAKE_K} + ${C.BRAKE_K}@${C.BRAKE_START_DEG}-${C.BRAKE_FULL_DEG}° + plow ${C.PLOW_MIN}  g=${C.G_SLOPE}  v0=${C.START_SPEED_KMH}  vmax=${C.MAX_SPEED_KMH}`,
         g.mode === 'chase'
           ? `lawine gap=${av.gap.toFixed(1)} m  v=${(av.speed * 3.6).toFixed(0)} km/h  pace=${(av.pace * 3.6).toFixed(0)} km/h  stall=${av.stallT.toFixed(1)} s  near=${av.near.toFixed(2)}  threat=${av.threat.toFixed(2)}  gnade=${av.mercy.toFixed(2)}`
-          : 'lawine: aus (Classic)',
+          : cs
+            ? `super-g tor=${cs.next}/${cs.gates.length}  verpasst=${cs.misses}  strafe=${cs.penalty} s  stangen=${cs.hits}  splits=${cs.splits.map((c) => (c / 100).toFixed(2)).join('/')}  best=${(g.bestTime / 100).toFixed(2)} [${g.bestSplits.map((c) => (c / 100).toFixed(2)).join('/')}]  ziel=${cs.finished ? cs.total.toFixed(2) : '-'}`
+            : 'lawine: aus (Classic)',
         `objs=${g.world.objCount}  cells=${g.world.cells.size}  track=${g.track.n}`,
         `gesture=${g.lastGesture}`,
         snd ? snd.debugLine() : '',

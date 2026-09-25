@@ -1,4 +1,5 @@
 // Spielzustand und Ablauf: ready → running → dead → (Fresh) → ready. Pause jederzeit.
+// Super-G (gates.js): ready → count (Countdown) → running → finished (Auslauf) → (Fresh) → ready.
 import { C } from './constants.js';
 import * as P from './physics.js';
 import { createWorld, ensureCells } from './world.js';
@@ -6,8 +7,9 @@ import { createAvalanche, updateAvalanche } from './avalanche.js';
 import { checkCollision } from './collision.js';
 import { createTrack, clearTrack, pushTrack } from './track.js';
 import { createParticles, clearParticles, spawnParticle, updateParticles } from './particles.js';
-import { loadBest, saveBest, loadMode, saveMode } from './storage.js';
+import { loadBest, saveBest, loadMode, saveMode, loadBestTime, saveBestTime, loadBestSplits, saveBestSplits } from './storage.js';
 import { MODES, DEFAULT_MODE } from './modes.js';
+import { createCourse, updateCourse } from './gates.js';
 
 const READY_FRAC = 0.78; // Fahrer steht im Intro weit unten im Bild
 
@@ -19,31 +21,52 @@ export function createGame(opts = {}) {
   const g = {
     state: 'ready',
     skier: P.createSkier(), world: null, av: null,
+    course: null, // Super-G: Tore und Wertung (gates.js), in den anderen Modi null
     track: createTrack(), particles: createParticles(),
     dist: 0, runT: 0, best: 0, newBest: false,
     runBest: 0, // Bestwert beim Start des Laufs: dort steht die Rekordlinie, auch wenn best beim Aufprall schon steigt
     marks: {}, runMarks: [], // Bestweiten der anderen je Modus (board.js) und der beim Start eingefrorene Satz für die Linien
     runTainted: false,       // Regler mitten im Lauf verstellt: zählt nicht für die Bestenliste (board.js)
+    bestTime: 0, bestSplits: [], newBestTime: false, // Super-G: Bestzeit in Hundertstel, ihre Zwischenzeiten, neue Bestzeit im Lauf
     seed: 0, fixedSeed: opts.fixedSeed ?? null,
     mode: DEFAULT_MODE, runMode: DEFAULT_MODE, intro: true, readyDelayMs: C.READY_AUTO_START_MS,
     readyT: 0, deadT: 0, deadCause: '',
+    countT: 0, countBeeps: 0, finT: 0, pausedFrom: 'running', // Super-G: Countdown-Zeit und -Töne, Auslauf-Zeit, woher die Pause kam
     crashV: 0, crashX: 0, crashY: 0, crashPush: 0, // Tempo, Hindernis und Schub beim Aufprall (für die Splitter)
     // fogT: -1, // < 0 = kein Nebel; sonst verstrichene Zeit seit dem Hockeystop (render.js) — deaktiviert
     camX: 0, skierFrac: READY_FRAC, zoom: 1,
     viewWm: C.VIEW_W_M, viewHm: C.VIEW_W_M * C.VIEW_ASPECT,
     debug: !!opts.debug, lastGesture: '–', runs: 0,
     trackAcc: 0, spawnAcc: 0, plowAcc: 0,
-    onEvent: null, // Haken für den Ton (main.js): press, release, plow, crash
+    onEvent: null, // Haken für den Ton (main.js): press, release, plow, crash, beep, gate, pole, split, finish
+    onCourse: null, // Rückruf des Torlaufs (einmal gebunden, keine Allokation pro Schritt)
   };
+  g.onCourse = (type, data) => courseEvent(g, type, data);
   const saved = loadMode();
   if (MODES[saved] && !MODES[saved].soon) g.mode = saved;
-  g.best = loadBest(g.mode);
-  reset(g, g.fixedSeed ?? randomSeed(), true);
+  loadBests(g);
+  reset(g, seedFor(g), true);
   return g;
 }
 
 export function hasAvalanche(g) {
   return g.mode === 'chase';
+}
+
+export function isSuperG(g) {
+  return g.mode === 'superg';
+}
+
+// Super-G fährt immer denselben Kurs (SG_SEED), damit Bestzeiten vergleichbar sind; ?seed= gilt für alle Modi.
+function seedFor(g) {
+  return g.fixedSeed ?? (isSuperG(g) ? C.SG_SEED : randomSeed());
+}
+
+// Bestwerte des gewählten Modus: Meter (Classic, Chase) und Bestzeit mit Zwischenzeiten (Super-G)
+function loadBests(g) {
+  g.best = loadBest(g.mode);
+  g.bestTime = loadBestTime(g.mode);
+  g.bestSplits = loadBestSplits(g.mode);
 }
 
 function emit(g, type, data) {
@@ -54,15 +77,21 @@ function emit(g, type, data) {
 export function reset(g, seed, intro) {
   g.seed = seed;
   g.skier = P.createSkier();
-  g.world = createWorld(seed);
+  const sg = isSuperG(g);
+  // Super-G: flache Pistenmitte, die bei 0 in der Mitte beginnt, und ein hindernisfreier Streifen um sie herum
+  g.world = sg
+    ? createWorld(seed, { lane: { amp: C.SG_LANE_AMP_M, wave: C.SG_LANE_WAVE_M, amp2: 0, wave2: 97 }, phase: 0, pisteHalf: C.SG_PISTE_HALF_M })
+    : createWorld(seed);
+  g.course = sg ? createCourse(seed, g.world) : null;
   g.av = createAvalanche(0);
   clearTrack(g.track);
   clearParticles(g.particles);
-  g.dist = 0; g.runT = 0; g.newBest = false;
+  g.dist = 0; g.runT = 0; g.newBest = false; g.newBestTime = false;
   g.runBest = g.best;
   g.runMarks = g.marks[g.mode] || [];
   g.runTainted = false;
   g.readyT = 0; g.deadT = 0; g.deadCause = '';
+  g.countT = 0; g.countBeeps = 0; g.finT = 0;
   // g.fogT = -1; // Hockeystop deaktiviert
   g.camX = 0; g.zoom = 1;
   g.intro = !!intro;
@@ -95,10 +124,19 @@ export function update(g, dt) {
   switch (g.state) {
     case 'ready':
       g.readyT += dt;
-      if (g.readyT * 1000 >= g.readyDelayMs) start(g);
+      // Super-G wartet im Intro auf den Tipp: der gibt zugleich den Ton frei, sonst wäre der erste Countdown stumm
+      if (g.readyT * 1000 >= g.readyDelayMs && !(isSuperG(g) && g.intro)) launch(g);
+      break;
+    case 'count':
+      g.countT += dt;
+      updateCamera(g, dt);
+      countdown(g);
       break;
     case 'running':
       step(g, dt);
+      break;
+    case 'finished':
+      coast(g, dt);
       break;
     case 'dead':
       g.deadT += dt;
@@ -110,11 +148,29 @@ export function update(g, dt) {
   }
 }
 
-function start(g) {
+// Aus ready heraus: Super-G in den Countdown, die anderen Modi sofort los.
+function launch(g) {
   if (g.state !== 'ready') return;
+  if (isSuperG(g)) { g.state = 'count'; g.countT = 0; g.countBeeps = 0; } else start(g);
+}
+
+// Countdown: SG_COUNT_BEEPS kurze Pieptöne im Abstand SG_COUNT_STEP_S (der erste sofort), dann der lange = Go.
+function countdown(g) {
+  const due = Math.floor(g.countT / C.SG_COUNT_STEP_S) + 1; // so viele Töne sind bis jetzt fällig
+  while (g.countBeeps < due) {
+    const k = g.countBeeps++;
+    if (k < C.SG_COUNT_BEEPS) { emit(g, 'beep', { n: C.SG_COUNT_BEEPS - k }); continue; }
+    emit(g, 'beep', { go: true });
+    start(g);
+    return;
+  }
+}
+
+function start(g) {
+  if (g.state !== 'ready' && g.state !== 'count') return;
   g.state = 'running';
   g.runMode = g.mode;
-  g.best = loadBest(g.mode);
+  loadBests(g);
   g.runBest = g.best;
   g.runMarks = g.marks[g.mode] || [];
   g.skier.v = C.START_SPEED_KMH / 3.6;
@@ -124,6 +180,7 @@ function start(g) {
 function step(g, dt) {
   const s = g.skier;
   g.runT += dt;
+  const px = s.x, py = s.y; // Position vor dem Schritt: Super-G wertet Tor-, Zwischenzeit- und Ziellinie dazwischen
   // Hockeystop deaktiviert (Tim und Jürgen wollen ihn nicht) — auskommentiert statt gelöscht.
   // const wasHockey = s.hockeyT >= 0;
   P.updateSkier(s, dt);
@@ -133,7 +190,18 @@ function step(g, dt) {
   //   if (g.fogT >= C.HOCKEY_FOG_IN_S + C.HOCKEY_FOG_HOLD_S + C.HOCKEY_FOG_OUT_S) g.fogT = -1;
   // }
   if (s.y - s.y0 > g.dist) g.dist = s.y - s.y0;
-  // Kamera: x folgt weich; bei Tempo rückt der Fahrer nach oben und die Sicht zoomt heraus
+  updateCamera(g, dt);
+  advanceTrail(g, dt);
+
+  const hit = checkCollision(g.world, s);
+  if (hit) { die(g, hit.t === P.TREE ? 'tree' : 'rock', hit); return; }
+  if (hasAvalanche(g) && updateAvalanche(g.av, s, g.runT, dt, topDist(g))) { die(g, 'avalanche'); return; }
+  if (g.course && updateCourse(g.course, s, px, py, g.runT, dt, g.bestSplits, g.onCourse)) finish(g);
+}
+
+// Kamera: x folgt weich; bei Tempo rückt der Fahrer nach oben und die Sicht zoomt heraus
+function updateCamera(g, dt) {
+  const s = g.skier;
   const k = lookahead(s.v);
   const fracTarget = C.SKIER_SCREEN_Y_FRAC + (C.CAM_Y_FRAC_FAST - C.SKIER_SCREEN_Y_FRAC) * k;
   const zoomTarget = 1 + (C.CAM_ZOOM_FAST - 1) * k;
@@ -142,20 +210,54 @@ function step(g, dt) {
   g.skierFrac += (fracTarget - g.skierFrac) * ease;
   g.zoom += (zoomTarget - g.zoom) * ease;
   ensureView(g);
+}
 
-  // Spur: alle 0,4 m ein Punkt, Breite nach Carve, Abstand nach Pflugstellung
+// Spur (alle 0,4 m ein Punkt, Breite nach Carve, Abstand nach Pflugstellung), Spray und Partikel
+function advanceTrail(g, dt) {
+  const s = g.skier;
   g.trackAcc += s.v * dt;
   if (g.trackAcc >= C.TRACK_SPACING_M) {
     g.trackAcc = 0;
     pushTrack(g.track, s.x, s.y, Math.cos(s.theta), -Math.sin(s.theta), s.carve, s.plowK);
   }
-
   spawnSpray(g, dt);
   updateParticles(g.particles, dt);
+}
 
-  const hit = checkCollision(g.world, s);
-  if (hit) { die(g, hit.t === P.TREE ? 'tree' : 'rock', hit); return; }
-  if (hasAvalanche(g) && updateAvalanche(g.av, s, g.runT, dt, topDist(g))) die(g, 'avalanche');
+// Auslauf nach dem Ziel (Super-G): die Physik läuft ohne Eingabe weiter, so gehen Winkel, Carve und Ton sauber
+// auf null, dazu bremst SG_COAST_DECEL den Fahrer aus. Hindernisse zählen nicht mehr, der Lauf ist gewertet.
+function coast(g, dt) {
+  const s = g.skier;
+  g.finT += dt;
+  P.updateSkier(s, dt);
+  s.v = Math.max(0, s.v - C.SG_COAST_DECEL * dt);
+  if (s.y - s.y0 > g.dist) g.dist = s.y - s.y0;
+  updateCamera(g, dt);
+  advanceTrail(g, dt);
+}
+
+// Ziel gekreuzt (Super-G): Zeit steht, Bestzeit samt Zwischenzeiten speichern, Fahrer in den Auslauf
+function finish(g) {
+  const s = g.skier, cs = g.course;
+  g.state = 'finished';
+  g.finT = 0;
+  s.side = 0;
+  s.plow = false;
+  const total = Math.round(cs.total * 100);
+  if (g.bestTime === 0 || total < g.bestTime) {
+    g.bestTime = total;
+    g.bestSplits = cs.splits.slice();
+    g.newBestTime = true;
+    saveBestTime(g.runMode, total);
+    saveBestSplits(g.runMode, g.bestSplits);
+  }
+  emit(g, 'finish', { total: cs.total, misses: cs.misses, best: g.newBestTime });
+}
+
+// Ereignisse aus dem Torlauf: Ton über den Haken, an einer berührten Stange stiebt Schnee
+function courseEvent(g, type, data) {
+  if (type === 'pole') burstAt(g, data.x, data.y, 10, 3);
+  emit(g, type, data);
 }
 
 function die(g, cause, hit) {
@@ -175,7 +277,8 @@ function die(g, cause, hit) {
   burst(g, 24, 4);
   s.v = 0;
   const m = Math.floor(g.dist);
-  if (m > g.best) { g.best = m; g.newBest = true; saveBest(g.runMode, m); }
+  // Super-G wertet nur Zeiten: ein Aufprall vor dem Ziel setzt keinen Meter-Bestwert
+  if (g.runMode !== 'superg' && m > g.best) { g.best = m; g.newBest = true; saveBest(g.runMode, m); }
 }
 
 function spawnSpray(g, dt) {
@@ -222,11 +325,14 @@ function spawnSpray(g, dt) {
 // }
 
 function burst(g, n, speed) {
-  const s = g.skier;
+  burstAt(g, g.skier.x, g.skier.y, n, speed);
+}
+
+function burstAt(g, x, y, n, speed) {
   for (let i = 0; i < n; i++) {
     const a = Math.random() * Math.PI * 2;
     const v = speed * (0.4 + Math.random());
-    spawnParticle(g.particles, s.x, s.y, Math.cos(a) * v, Math.sin(a) * v, 0.3 + Math.random() * 0.4, 1 + Math.random() * 2, Math.random() < 0.6 ? 1 : 0);
+    spawnParticle(g.particles, x, y, Math.cos(a) * v, Math.sin(a) * v, 0.3 + Math.random() * 0.4, 1 + Math.random() * 2, Math.random() < 0.6 ? 1 : 0);
   }
 }
 
@@ -234,8 +340,8 @@ function burst(g, n, speed) {
 
 export function onPress(g, side) {
   g.lastGesture = side < 0 ? 'hold L' : 'hold R';
-  if (g.state === 'ready') start(g);
-  if (g.state === 'running') P.press(g.skier, side);
+  if (g.state === 'ready') launch(g);
+  if (g.state === 'running' || g.state === 'count') P.press(g.skier, side); // im Countdown steht die Seite schon beim Go
   emit(g, 'press', side);
 }
 export function onRelease(g) {
@@ -244,27 +350,56 @@ export function onRelease(g) {
 }
 export function onPlow(g, on) {
   if (on) g.lastGesture = 'plow';
-  if (g.state === 'ready' && on) start(g);
-  if (g.state === 'running') P.setPlow(g.skier, on);
+  if (g.state === 'ready' && on) launch(g);
+  if (g.state === 'running' || g.state === 'count') P.setPlow(g.skier, on);
   emit(g, 'plow', on);
 }
+// Pause aus dem Lauf oder aus dem Countdown. Ein unterbrochener Countdown beginnt beim Weiterspielen von vorn,
+// sonst liefe er hinter dem Tuning-Panel oder im Hintergrund weiter und der Lauf startete ohne Spieler.
 export function togglePause(g) {
-  if (g.state === 'running') { g.state = 'paused'; g.skier.side = 0; g.skier.plow = false; return true; }
-  if (g.state === 'paused') g.state = 'running';
+  if (g.state === 'running' || g.state === 'count') { pause(g); return true; }
+  if (g.state === 'paused') resume(g);
   return false;
 }
 export function pauseIfRunning(g) {
-  if (g.state === 'running') { g.state = 'paused'; g.skier.side = 0; g.skier.plow = false; }
+  if (g.state === 'running' || g.state === 'count') pause(g);
+}
+function pause(g) {
+  g.pausedFrom = g.state;
+  g.state = 'paused';
+  g.skier.side = 0;
+  g.skier.plow = false;
+}
+function resume(g) {
+  if (g.pausedFrom === 'count') { g.state = 'count'; g.countT = 0; g.countBeeps = 0; } else g.state = 'running';
+}
+// Ende eines Laufs: nach dem Aufprall (dead) oder nach dem Ziel (finished, Super-G). Bis zur Fresh-Seite dauert es
+// nach dem Ziel etwas länger, der Fahrer läuft aus.
+function ended(g) {
+  return g.state === 'dead' || g.state === 'finished';
+}
+function endedMs(g) {
+  return (g.state === 'finished' ? g.finT : g.deadT) * 1000;
+}
+function overlayMs(g) {
+  return g.state === 'finished' ? C.SG_FINISH_OVERLAY_MS : C.DEATH_OVERLAY_MS;
+}
+export function overlayReady(g) {
+  return ended(g) && endedMs(g) >= overlayMs(g);
+}
+// Fresh darf, sobald die Fresh-Seite steht und die Schonfrist gegen Doppeltipps um ist (main.js nutzt es fürs Update)
+export function freshReady(g) {
+  return ended(g) && endedMs(g) >= overlayMs(g) + C.FRESH_GUARD_MS;
 }
 export function fresh(g) {
-  if (g.state === 'dead' && g.deadT * 1000 >= C.DEATH_OVERLAY_MS + C.FRESH_GUARD_MS) reset(g, g.fixedSeed ?? randomSeed(), false);
+  if (freshReady(g)) reset(g, seedFor(g), false);
 }
-// Modus wechseln (auf der Fresh-Seite): Bestwert gehört zum Modus.
+// Modus wechseln (auf der Fresh-Seite): Bestwerte gehören zum Modus.
 export function selectMode(g, id) {
   const m = MODES[id];
   if (!m || m.soon) return false;
   g.mode = id;
-  g.best = loadBest(id);
+  loadBests(g);
   saveMode(id);
   return true;
 }
@@ -280,7 +415,4 @@ export function adoptBest(g, mode, m) {
   if (!(m > loadBest(mode))) return;
   saveBest(mode, m);
   if (g.mode === mode) { g.best = m; g.newBest = false; }
-}
-export function overlayReady(g) {
-  return g.state === 'dead' && g.deadT * 1000 >= C.DEATH_OVERLAY_MS;
 }

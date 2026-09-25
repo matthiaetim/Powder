@@ -12,6 +12,12 @@
       "runtimeExecutable": "node",
       "runtimeArgs": ["tools/serve.js", "8082", "--board"],
       "port": 8082
+    },
+    {
+      "name": "powder-8090",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["tools/serve.js", "8090"],
+      "port": 8090
     }
   ]
 }

@@ -20,8 +20,11 @@
   <div id="hud" aria-live="off">
     <div id="hud-speed">0 km/h</div>
     <div id="hud-dist">0 m</div>
+    <div id="hud-time">0,00</div>
   </div>
+  <div id="hud-note"></div>
   <div id="hint">Tippen lenkt · Halten carvt</div>
+  <div id="ov-count" class="overlay"></div>
   <div id="ov-pause" class="overlay">
     <div class="ov-title">Pause</div>
     <div class="ov-sub">Tippen zum Weiterfahren</div>
@@ -44,13 +47,18 @@
     <button id="btn-fresh" type="button">Fresh</button>
     <div id="modes">
       <button class="mode-card" type="button" data-mode="classic">
-        <canvas class="mode-preview" width="130" height="72"></canvas>
+        <canvas class="mode-preview" width="104" height="58"></canvas>
         <span class="mode-name">Classic</span>
         <span class="mode-cta"></span>
       </button>
       <button class="mode-card" type="button" data-mode="chase">
-        <canvas class="mode-preview" width="130" height="72"></canvas>
+        <canvas class="mode-preview" width="104" height="58"></canvas>
         <span class="mode-name">Chase</span>
+        <span class="mode-cta"></span>
+      </button>
+      <button class="mode-card" type="button" data-mode="superg">
+        <canvas class="mode-preview" width="104" height="58"></canvas>
+        <span class="mode-name">Super-G</span>
         <span class="mode-cta"></span>
       </button>
     </div>

@@ -1,4 +1,4 @@
-// Bestwert je Modus und gewählter Modus im localStorage. Fällt still auf 0 bzw. '' zurück, wenn Speicher fehlt.
+// Bestwert je Modus (Meter), Bestzeit (Super-G) und gewählter Modus im localStorage. Fällt still auf 0 bzw. '' zurück, wenn Speicher fehlt.
 const bestKey = (mode) => (mode === 'classic' || !mode ? 'powder.best' : 'powder.best.' + mode);
 
 export function loadBest(mode) {
@@ -15,6 +15,45 @@ export function saveBest(mode, v) {
     localStorage.setItem(bestKey(mode), String(v));
   } catch {
     /* privater Modus o. ä. */
+  }
+}
+
+// Super-G: Bestzeit je Modus in ganzen Hundertstelsekunden (0 = keine) und die Zwischenzeiten des besten Laufs
+// (Hundertstel, eine je SG_SPLITS_M), damit das HUD unterwegs den Vergleich zeigen kann.
+const timeKey = (mode) => 'powder.besttime.' + mode;
+const splitsKey = (mode) => 'powder.bestsplits.' + mode;
+
+export function loadBestTime(mode) {
+  try {
+    const v = parseInt(localStorage.getItem(timeKey(mode)), 10);
+    return Number.isFinite(v) && v > 0 ? v : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function saveBestTime(mode, cs) {
+  try {
+    localStorage.setItem(timeKey(mode), String(cs));
+  } catch {
+    /* egal */
+  }
+}
+
+export function loadBestSplits(mode) {
+  try {
+    const arr = JSON.parse(localStorage.getItem(splitsKey(mode)) || '[]');
+    return Array.isArray(arr) ? arr.map((v) => (Number.isFinite(v) && v > 0 ? v : 0)) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveBestSplits(mode, arr) {
+  try {
+    localStorage.setItem(splitsKey(mode), JSON.stringify(arr));
+  } catch {
+    /* egal */
   }
 }
 

@@ -67,7 +67,7 @@ Versionen, die mit anderen geteilt werden. Nicht entfernen und nicht „aufräum
   Konfiguration `powder` in `.claude/launch.json`.
 - Port 8080 kann von einem alten Server aus einem anderen Checkout belegt sein, der eine alte Version ausliefert.
   Vor dem Test `curl -s localhost:8080/src/constants.js | grep VERSION` mit der eigenen `src/constants.js`
-  vergleichen. Weicht es ab, einen anderen Port nehmen.
+  vergleichen. Weicht es ab, einen anderen Port nehmen; im Preview gibt es dafür die Konfiguration `powder-8090`.
 - Nützliche Parameter: `?debug=1` (Overlay mit fps, Hitboxen, Lawinen-Werten), `?seed=42` (reproduzierbare Welt).
 - Bestenliste ohne Firebase testen: `node tools/serve.js 8082 --board` startet den Mock der Datenbank-Schnittstelle
   (`tools/board-mock.js`, Preview-Konfiguration `powder-board`), im Browser dann `?board=local`. Die echte
