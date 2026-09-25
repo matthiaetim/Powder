@@ -12,28 +12,29 @@ const MARK_FONT = "italic 12px 'Playfair Display', Georgia, 'Times New Roman', s
 const SIGN_FONT_STACK = "'Playfair Display', Georgia, 'Times New Roman', serif"; // nur italic 400 liegt in fonts/
 const SIGN_PAD_M = 0.3; // Rand des Offscreen-Canvas um den Schriftzug, für kursive Überhänge und das Relief
 
+// Hockeystop deaktiviert (Tim und Jürgen wollen ihn nicht) — auskommentiert statt gelöscht.
 // Organischer Blob-Umriss fürs Hockeystop-Nebelfeld, normiert auf ±0.5 um den Mittelpunkt (mit `size`
 // multipliziert gezeichnet). Start- plus 7 Kurven-Tripel (je 2 Kontrollpunkte + Endpunkt).
-const FOG_BLOB = [
-  [0.0889, -0.5],
-  [-0.1333, -0.5], [-0.2778, -0.3636], [-0.2778, -0.1591],
-  [-0.4333, -0.1364], [-0.5, 0], [-0.4333, 0.1364],
-  [-0.5, 0.2727], [-0.3889, 0.4091], [-0.2111, 0.3864],
-  [-0.1444, 0.4773], [0.0111, 0.5], [0.1, 0.4091],
-  [0.2778, 0.4545], [0.4333, 0.3182], [0.3889, 0.1364],
-  [0.5, 0.0455], [0.4778, -0.1364], [0.3222, -0.2045],
-  [0.3, -0.3864], [0.2111, -0.5], [0.0889, -0.5],
-];
-
-function fogBlobPath(ctx, cx, cy, size) {
-  ctx.beginPath();
-  ctx.moveTo(cx + FOG_BLOB[0][0] * size, cy + FOG_BLOB[0][1] * size);
-  for (let i = 1; i < FOG_BLOB.length; i += 3) {
-    const [x1, y1] = FOG_BLOB[i], [x2, y2] = FOG_BLOB[i + 1], [x3, y3] = FOG_BLOB[i + 2];
-    ctx.bezierCurveTo(cx + x1 * size, cy + y1 * size, cx + x2 * size, cy + y2 * size, cx + x3 * size, cy + y3 * size);
-  }
-  ctx.closePath();
-}
+// const FOG_BLOB = [
+//   [0.0889, -0.5],
+//   [-0.1333, -0.5], [-0.2778, -0.3636], [-0.2778, -0.1591],
+//   [-0.4333, -0.1364], [-0.5, 0], [-0.4333, 0.1364],
+//   [-0.5, 0.2727], [-0.3889, 0.4091], [-0.2111, 0.3864],
+//   [-0.1444, 0.4773], [0.0111, 0.5], [0.1, 0.4091],
+//   [0.2778, 0.4545], [0.4333, 0.3182], [0.3889, 0.1364],
+//   [0.5, 0.0455], [0.4778, -0.1364], [0.3222, -0.2045],
+//   [0.3, -0.3864], [0.2111, -0.5], [0.0889, -0.5],
+// ];
+//
+// function fogBlobPath(ctx, cx, cy, size) {
+//   ctx.beginPath();
+//   ctx.moveTo(cx + FOG_BLOB[0][0] * size, cy + FOG_BLOB[0][1] * size);
+//   for (let i = 1; i < FOG_BLOB.length; i += 3) {
+//     const [x1, y1] = FOG_BLOB[i], [x2, y2] = FOG_BLOB[i + 1], [x3, y3] = FOG_BLOB[i + 2];
+//     ctx.bezierCurveTo(cx + x1 * size, cy + y1 * size, cx + x2 * size, cy + y2 * size, cx + x3 * size, cy + y3 * size);
+//   }
+//   ctx.closePath();
+// }
 const nf = new Intl.NumberFormat(C.HUD_LOCALE);
 
 export function createRenderer(canvas) {
@@ -170,7 +171,7 @@ export function draw(R, g, t) {
   drawSignature(R, g, ox, oy);
   drawTrack(R, g, ox, oy);
   drawWorld(R, g, ox, oy);
-  drawHockeyFog(R, g, ox, oy);
+  // drawHockeyFog(R, g, ox, oy); // Hockeystop deaktiviert
   drawParticles(R, g, ox, oy);
   if (g.mode === 'chase') drawAvalanche(R, g, ox, oy, t);
   drawWhiteout(R, g);
@@ -520,40 +521,41 @@ function drawShards(R, g, ox, oy) {
 }
 
 // ---------- Hockeystop: Nebel ----------
+// Deaktiviert (Tim und Jürgen wollen ihn nicht) — auskommentiert statt gelöscht.
 // Drei Phasen über g.fogT: HOCKEY_FOG_IN_S rein, HOCKEY_FOG_HOLD_S voll deckend, HOCKEY_FOG_OUT_S raus.
 // Deckt den Fahrer selbst ab (Kern auf der Fahrerposition, nach S skaliert) und zusätzlich ein organischer
 // Blob (FOG_BLOB) direkt darunter, HOCKEY_FOG_OFFSET_PX × HOCKEY_FOG_OFFSET_PX groß, mit echtem Weichzeichner.
-function hockeyFogAlpha(g) {
-  const t = g.fogT;
-  if (t < C.HOCKEY_FOG_IN_S) return t / C.HOCKEY_FOG_IN_S;
-  const hold = C.HOCKEY_FOG_IN_S + C.HOCKEY_FOG_HOLD_S;
-  if (t < hold) return 1;
-  return Math.max(0, 1 - (t - hold) / C.HOCKEY_FOG_OUT_S);
-}
-
-function drawHockeyFog(R, g, ox, oy) {
-  if (g.fogT < 0) return;
-  const a = hockeyFogAlpha(g);
-  if (a <= 0) return;
-  const { ctx, Sv: S } = R;
-  const sx = g.skier.x * S + ox, sy = g.skier.y * S + oy;
-  const base = 1.3 * S;
-  const rgb = '255,255,255';
-  // Kern direkt auf dem Fahrer, deckt ihn ab
-  softEllipse(ctx, sx, sy, base, base * 0.85, rgb, a * 0.95);
-  softEllipse(ctx, sx - 0.5 * S, sy + 0.1 * S, base * 0.6, base * 0.5, rgb, a * 0.6);
-  softEllipse(ctx, sx + 0.5 * S, sy + 0.15 * S, base * 0.6, base * 0.5, rgb, a * 0.6);
-  // Nebelfeld darunter: organischer Blob (FOG_BLOB), feste Größe HOCKEY_FOG_OFFSET_PX, echter Weichzeichner.
-  // Start knapp unter der sichtbaren Fahrer-Sprite (Ski-Spitzen enden bei ca. 0.75*S), sonst überlappt es den
-  // Fahrer statt klar darunter zu sitzen.
-  const size = C.HOCKEY_FOG_OFFSET_PX;
-  const bx = sx, by = sy + 0.75 * S + size / 2;
-  ctx.filter = `blur(${(size * 0.12).toFixed(1)}px)`;
-  ctx.fillStyle = `rgba(255,255,255,${(a * 0.9).toFixed(3)})`;
-  fogBlobPath(ctx, bx, by, size);
-  ctx.fill();
-  ctx.filter = 'none';
-}
+// function hockeyFogAlpha(g) {
+//   const t = g.fogT;
+//   if (t < C.HOCKEY_FOG_IN_S) return t / C.HOCKEY_FOG_IN_S;
+//   const hold = C.HOCKEY_FOG_IN_S + C.HOCKEY_FOG_HOLD_S;
+//   if (t < hold) return 1;
+//   return Math.max(0, 1 - (t - hold) / C.HOCKEY_FOG_OUT_S);
+// }
+//
+// function drawHockeyFog(R, g, ox, oy) {
+//   if (g.fogT < 0) return;
+//   const a = hockeyFogAlpha(g);
+//   if (a <= 0) return;
+//   const { ctx, Sv: S } = R;
+//   const sx = g.skier.x * S + ox, sy = g.skier.y * S + oy;
+//   const base = 1.3 * S;
+//   const rgb = '255,255,255';
+//   // Kern direkt auf dem Fahrer, deckt ihn ab
+//   softEllipse(ctx, sx, sy, base, base * 0.85, rgb, a * 0.95);
+//   softEllipse(ctx, sx - 0.5 * S, sy + 0.1 * S, base * 0.6, base * 0.5, rgb, a * 0.6);
+//   softEllipse(ctx, sx + 0.5 * S, sy + 0.15 * S, base * 0.6, base * 0.5, rgb, a * 0.6);
+//   // Nebelfeld darunter: organischer Blob (FOG_BLOB), feste Größe HOCKEY_FOG_OFFSET_PX, echter Weichzeichner.
+//   // Start knapp unter der sichtbaren Fahrer-Sprite (Ski-Spitzen enden bei ca. 0.75*S), sonst überlappt es den
+//   // Fahrer statt klar darunter zu sitzen.
+//   const size = C.HOCKEY_FOG_OFFSET_PX;
+//   const bx = sx, by = sy + 0.75 * S + size / 2;
+//   ctx.filter = `blur(${(size * 0.12).toFixed(1)}px)`;
+//   ctx.fillStyle = `rgba(255,255,255,${(a * 0.9).toFixed(3)})`;
+//   fogBlobPath(ctx, bx, by, size);
+//   ctx.fill();
+//   ctx.filter = 'none';
+// }
 
 function drawParticles(R, g, ox, oy) {
   const { ctx, Sv: S } = R;

@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.12.2';
+export const VERSION = '0.12.3';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -187,21 +187,17 @@ export const C = {
   SIGN_SPRAY_W_M: 0.6,       // so viel breiter als der Radierstrich
   SIGN_MAX_PX: 2048,         // Deckel für die Breite des Offscreen-Canvas in Gerätepixeln
 
-  // Hockeystop (physics.js/game.js/render.js): wird beim Halten (kein Pflug) ausgelöst, sobald HOCKEY_MIN_KMH
-  // erreicht und die Bremse schon HOCKEY_HOLD_S lang gehalten ist. Statt der normalen weichen Physik springt der
-  // Winkel schlagartig auf quer (Zeitkonstante HOCKEY_SNAP_T) und das Tempo fällt scharf ab (HOCKEY_DECEL_T,
-  // Deckel HOCKEY_DUR_S), dazu ein Spray-Burst und ein Nebel: deckt den Fahrer ab und ein HOCKEY_FOG_OFFSET_PX ×
-  // HOCKEY_FOG_OFFSET_PX großes Feld darunter, in drei Phasen (HOCKEY_FOG_IN_S rein, HOCKEY_FOG_HOLD_S voll,
-  // HOCKEY_FOG_OUT_S raus).
-  HOCKEY_MIN_KMH: 70,        // (Tuning) ab diesem Tempo kann der Hockeystop auslösen
-  HOCKEY_HOLD_S: 0.45,       // (Tuning) so lange muss die Bremse dafür gehalten werden
-  HOCKEY_SNAP_T: 0.05,       // Ansprechzeit des Winkels beim Hockeystop (statt TURN_T)
-  HOCKEY_DECEL_T: 0.12,      // Zeitkonstante des Tempo-Abfalls beim Hockeystop
-  HOCKEY_DUR_S: 0.6,         // Sicherheitsdeckel: spätestens danach zurück zur normalen Physik
-  HOCKEY_FOG_OFFSET_PX: 100, // (Tuning) Größe (Breite und Höhe) des Nebelfelds unterhalb des Fahrers
-  HOCKEY_FOG_IN_S: 0.5,      // Einblendzeit
-  HOCKEY_FOG_HOLD_S: 1.0,    // so lange bleibt der Nebel voll stehen
-  HOCKEY_FOG_OUT_S: 0.5,     // Ausblendzeit
+  // Hockeystop deaktiviert (Tim und Jürgen wollen ihn nicht) — auskommentiert statt gelöscht, physics.js/
+  // game.js/render.js haben die zugehörigen Blöcke ebenfalls auskommentiert.
+  // HOCKEY_MIN_KMH: 70,        // (Tuning) ab diesem Tempo kann der Hockeystop auslösen
+  // HOCKEY_HOLD_S: 0.45,       // (Tuning) so lange muss die Bremse dafür gehalten werden
+  // HOCKEY_SNAP_T: 0.05,       // Ansprechzeit des Winkels beim Hockeystop (statt TURN_T)
+  // HOCKEY_DECEL_T: 0.12,      // Zeitkonstante des Tempo-Abfalls beim Hockeystop
+  // HOCKEY_DUR_S: 0.6,         // Sicherheitsdeckel: spätestens danach zurück zur normalen Physik
+  // HOCKEY_FOG_OFFSET_PX: 100, // (Tuning) Größe (Breite und Höhe) des Nebelfelds unterhalb des Fahrers
+  // HOCKEY_FOG_IN_S: 0.5,      // Einblendzeit
+  // HOCKEY_FOG_HOLD_S: 1.0,    // so lange bleibt der Nebel voll stehen
+  // HOCKEY_FOG_OUT_S: 0.5,     // Ausblendzeit
 };
 
 // Regler im Tuning-Panel (langer Druck auf das Versions-Label). Einträge mit heading sind Zwischentitel,
@@ -226,10 +222,11 @@ export const TUNABLES = [
   { key: 'VIEW_W_M', label: 'Sichtbreite', unit: 'm', min: 22, max: 48, step: 1 },
   { key: 'TREE_D1', label: 'Dichte am Ende', unit: '/100 m²', min: 0.01, max: 0.045, step: 0.001, scale: 100, decimals: 1 },
   { key: 'RAMP_M', label: 'Anstieg bis', unit: 'm', min: 1000, max: 15000, step: 500 },
-  { heading: 'Hockeystop' },
-  { key: 'HOCKEY_MIN_KMH', label: 'Mindesttempo', unit: 'km/h', min: 20, max: 180, step: 5 },
-  { key: 'HOCKEY_HOLD_S', label: 'Haltezeit', unit: 's', min: 0.1, max: 1.5, step: 0.05 },
-  { key: 'HOCKEY_FOG_OFFSET_PX', label: 'Nebelgröße', unit: 'px', min: 0, max: 150, step: 5 },
+  // Hockeystop deaktiviert, siehe Kommentar bei den HOCKEY_*-Konstanten oben.
+  // { heading: 'Hockeystop' },
+  // { key: 'HOCKEY_MIN_KMH', label: 'Mindesttempo', unit: 'km/h', min: 20, max: 180, step: 5 },
+  // { key: 'HOCKEY_HOLD_S', label: 'Haltezeit', unit: 's', min: 0.1, max: 1.5, step: 0.05 },
+  // { key: 'HOCKEY_FOG_OFFSET_PX', label: 'Nebelgröße', unit: 'px', min: 0, max: 150, step: 5 },
   { heading: 'Lawine (Chase)' },
   { key: 'AV_PACE0_KMH', label: 'Tempo am Start', unit: 'km/h', min: 5, max: 120, step: 5 },
   { key: 'AV_PACE1_KMH', label: 'Tempo am Ende', unit: 'km/h', min: 20, max: 250, step: 5 },

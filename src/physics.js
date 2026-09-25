@@ -26,7 +26,7 @@ export function createSkier() {
     plow: false,   // beide Daumen: Schneepflug, geradeaus bremsen
     plowK: 0,      // Pflugstellung 0..1: die Ski gehen weich in den Pflug und zurück (Bild, Spur, Spray, Ton)
     alive: true,
-    hockeyT: -1,   // < 0 = kein Hockeystop; sonst verstrichene Zeit seit dem Auslösen (game.js/render.js)
+    // hockeyT: -1,   // < 0 = kein Hockeystop; sonst verstrichene Zeit seit dem Auslösen (game.js/render.js) — deaktiviert
   };
 }
 
@@ -55,28 +55,26 @@ function turnT(v) {
 export function updateSkier(s, dt) {
   const maxHead = C.MAX_HEADING_DEG * D2R;
 
-  // Hockeystop: bei genug Tempo und lang genug gehaltener Bremse (kein Pflug) schlagartiger Stopp statt der
-  // normalen weichen Physik. Winkel springt schnell auf quer (HOCKEY_SNAP_T), Tempo fällt scharf ab
-  // (HOCKEY_DECEL_T), bis er fast steht oder der Sicherheitsdeckel HOCKEY_DUR_S erreicht ist.
-  if (s.hockeyT < 0 && s.side !== 0 && !s.plow && s.v >= C.HOCKEY_MIN_KMH / 3.6 && s.holdT >= C.HOCKEY_HOLD_S) {
-    s.hockeyT = 0;
-  }
-  if (s.hockeyT >= 0) {
-    s.target = s.side * maxHead;
-    const T = C.HOCKEY_SNAP_T;
-    s.omega += ((s.target - s.theta) / (T * T) - (2 * s.omega) / T) * dt;
-    s.theta += s.omega * dt;
-    if (s.theta > maxHead) { s.theta = maxHead; s.omega = 0; }
-    else if (s.theta < -maxHead) { s.theta = -maxHead; s.omega = 0; }
-    s.carve = clamp(Math.abs(s.theta) / D2R / 90, 0, 1);
-    s.plowK += (0 - s.plowK) * (1 - Math.exp(-dt / C.PLOW_EASE_S));
-    s.v *= Math.exp(-dt / C.HOCKEY_DECEL_T);
-    s.x += s.v * Math.sin(s.theta) * dt;
-    s.y += s.v * Math.cos(s.theta) * dt;
-    s.hockeyT += dt;
-    if (s.hockeyT >= C.HOCKEY_DUR_S || s.v < 0.15) s.hockeyT = -1;
-    return;
-  }
+  // Hockeystop deaktiviert (Tim und Jürgen wollen ihn nicht) — auskommentiert statt gelöscht.
+  // if (s.hockeyT < 0 && s.side !== 0 && !s.plow && s.v >= C.HOCKEY_MIN_KMH / 3.6 && s.holdT >= C.HOCKEY_HOLD_S) {
+  //   s.hockeyT = 0;
+  // }
+  // if (s.hockeyT >= 0) {
+  //   s.target = s.side * maxHead;
+  //   const T = C.HOCKEY_SNAP_T;
+  //   s.omega += ((s.target - s.theta) / (T * T) - (2 * s.omega) / T) * dt;
+  //   s.theta += s.omega * dt;
+  //   if (s.theta > maxHead) { s.theta = maxHead; s.omega = 0; }
+  //   else if (s.theta < -maxHead) { s.theta = -maxHead; s.omega = 0; }
+  //   s.carve = clamp(Math.abs(s.theta) / D2R / 90, 0, 1);
+  //   s.plowK += (0 - s.plowK) * (1 - Math.exp(-dt / C.PLOW_EASE_S));
+  //   s.v *= Math.exp(-dt / C.HOCKEY_DECEL_T);
+  //   s.x += s.v * Math.sin(s.theta) * dt;
+  //   s.y += s.v * Math.cos(s.theta) * dt;
+  //   s.hockeyT += dt;
+  //   if (s.hockeyT >= C.HOCKEY_DUR_S || s.v < 0.15) s.hockeyT = -1;
+  //   return;
+  // }
 
   // Zielwinkel: Halten = Tipp-Winkel + Vertiefung, Loslassen oder Schneepflug = Falllinie
   let T;
