@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.11.0';
+export const VERSION = '0.11.1';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -74,9 +74,11 @@ export const C = {
   AV_CATCH_M: 0,             // (Tuning) Abstand, bei dem sie den Fahrer erwischt
   AV_START_GAP_M: 60,        // Abstand beim Start des Laufs
   AV_RUMBLE_PX: 0.5,         // (Tuning) Bildbeben in px, wenn sie nah ist
-  // Gnade beim Schuss: fährt der Fahrer gerade bergab, gewinnt die Front nicht auf ihn, sie rollt AV_MERCY_KMH
-  // langsamer als er und fällt zurück. Je stärker die Kurve, desto mehr ihres Tempos spielt sie aus: volle Gnade
-  // bis AV_MERCY_DEG, keine ab AV_CURVE_DEG. Der Schneepflug zählt nicht als Schuss.
+  // Gnade beim Schuss: fährt der Fahrer gerade bergab, spielt die Front nur den Anteil 1 - AV_MERCY_K ihres
+  // Tempo-Vorsprungs aus. Bei 0 ist die Gnade aus und sie rollt immer mit vollem Pace (Verhalten bis v0.9.1);
+  // bei 1 rollt sie beim Schuss AV_MERCY_KMH langsamer als er und fällt zurück (v0.10.0, zu leicht). Je stärker
+  // die Kurve, desto weniger Gnade: voll bis AV_MERCY_DEG, keine ab AV_CURVE_DEG. Der Schneepflug zählt nicht als Schuss.
+  AV_MERCY_K: 0,             // (Tuning) Stärke der Gnade, 0 = aus
   AV_MERCY_DEG: 25,          // (Tuning) bis zu diesem Fahrwinkel volle Gnade
   AV_CURVE_DEG: 60,          // (Tuning) ab diesem Fahrwinkel keine Gnade mehr
   AV_MERCY_KMH: 5,           // (Tuning) so viel langsamer als der Fahrer rollt sie beim Schuss
@@ -194,6 +196,7 @@ export const TUNABLES = [
   { key: 'AV_STALL_KMH', label: 'Stillstand unter', unit: 'km/h', min: 0, max: 80, step: 1 },
   { key: 'AV_CATCH_M', label: 'Erwischt ab Abstand', unit: 'm', min: 0, max: 6, step: 0.5 },
   { key: 'AV_RUMBLE_PX', label: 'Beben bei Nähe', unit: 'px', min: 0, max: 8, step: 0.5 },
+  { key: 'AV_MERCY_K', label: 'Gnade beim Schuss', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
   { key: 'AV_MERCY_DEG', label: 'Gnade bis Winkel', unit: '°', min: 0, max: 60, step: 5 },
   { key: 'AV_CURVE_DEG', label: 'Volle Härte ab Winkel', unit: '°', min: 20, max: 95, step: 5 },
   { key: 'AV_MERCY_KMH', label: 'Schuss schüttelt ab', unit: 'km/h', min: 0, max: 30, step: 1 },
