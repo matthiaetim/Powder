@@ -5,6 +5,7 @@ import { createInput } from './input.js';
 import { createRenderer, resize, draw } from './render.js';
 import { createHud } from './hud.js';
 import { loadTune } from './tune.js';
+import { createSound } from './audio.js';
 
 loadTune();
 const params = new URLSearchParams(location.search);
@@ -15,6 +16,8 @@ const game = G.createGame({
   fixedSeed: seedParam != null ? parseInt(seedParam, 10) >>> 0 : null,
   debug: params.get('debug') === '1',
 });
+const snd = createSound(game);
+game.onEvent = snd.event;
 
 function onResize() {
   resize(R);
@@ -46,15 +49,16 @@ const input = createInput(canvas, {
   pause: () => { if (G.togglePause(game)) input.cancelAll(); },
   fresh: freshOrUpdate,
 });
-const hud = createHud(game, document, { fresh: freshOrUpdate, onTune: onResize });
+const hud = createHud(game, document, { fresh: freshOrUpdate, onTune: onResize, sound: snd });
 
 // Debug-Haken (?debug=1): Simulation gezielt vorspulen, z. B. powder.advance(2) in der Konsole.
 if (game.debug) {
   window.powder = {
-    game, R, C, G,
+    game, R, C, G, snd,
     advance(sec) {
       const n = Math.round(sec / C.STEP);
       for (let i = 0; i < n; i++) G.update(game, C.STEP);
+      snd.update(game, C.STEP);
       draw(R, game, performance.now() / 1000);
       hud.sync(performance.now(), R, true);
     },
@@ -99,6 +103,7 @@ function frame(now) {
   const n = Math.max(1, Math.min(C.MAX_STEPS, Math.ceil(dt / C.STEP - 0.05)));
   const h = dt / n;
   for (let i = 0; i < n; i++) G.update(game, h);
+  snd.update(game, dt);
   draw(R, game, now / 1000);
   hud.sync(now, R);
   requestAnimationFrame(frame);

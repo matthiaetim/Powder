@@ -15,6 +15,7 @@ export function createAvalanche(skierY) {
     t: 0,
     near: 0,                           // 0 = lauert, 1 = beim Fahrer (Warnschnee)
     threat: 0,                         // 0 = außerhalb des Bildes, 1 = beim Fahrer (Beben)
+    breaks: 0,                         // wie oft sie nach Stillstand an den Bildrand gesprungen ist (Ton: Krachen)
   };
 }
 
@@ -33,7 +34,7 @@ export function updateAvalanche(av, skier, runT, dt, topDist) {
   // Stillstand: nach AV_STALL_S wird die Front an den Bildrand geholt und rollt herein
   if (skier.alive && down < C.AV_STALL_KMH / 3.6) av.stallT += dt; else av.stallT = 0;
   const enter = topDist + C.AV_ENTER_M;
-  if (av.stallT >= C.AV_STALL_S && av.gap > enter) av.frontY = skier.y - enter;
+  if (av.stallT >= C.AV_STALL_S && av.gap > enter) { av.frontY = skier.y - enter; av.breaks++; }
   // Tempo: mindestens Pace. Hinter dem Lauerabstand rückt sie schneller nach, als der Fahrer fährt.
   const lurk = topDist + C.AV_LURK_M;
   let sp = pace;

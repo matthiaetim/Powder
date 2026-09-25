@@ -41,6 +41,17 @@ export function createHud(g, doc, hooks = {}) {
   onTap($('btn-fresh'), doFresh);
   if (g.debug) debugEl.hidden = false;
 
+  // Ton an/aus auf der Fresh-Seite (audio.js), bleibt gespeichert
+  const snd = hooks.sound;
+  const soundEl = $('btn-sound');
+  const syncSound = () => {
+    const on = !snd || snd.isOn();
+    soundEl.textContent = on ? 'Ton an' : 'Ton aus';
+    soundEl.classList.toggle('off', !on);
+  };
+  onTap(soundEl, () => { if (snd) { snd.toggle(); syncSound(); } });
+  syncSound();
+
   // Tuning-Panel: langer Druck auf das Versions-Label öffnet es, Spiel pausiert derweil.
   const tuneEl = $('tune');
   const versionEl = $('version');
@@ -118,6 +129,7 @@ export function createHud(g, doc, hooks = {}) {
           : 'lawine: aus (Classic)',
         `objs=${g.world.objCount}  cells=${g.world.cells.size}  track=${g.track.n}`,
         `gesture=${g.lastGesture}`,
+        snd ? snd.debugLine() : '',
       ].join('\n');
     }
   }

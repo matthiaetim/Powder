@@ -29,6 +29,7 @@ export function createGame(opts = {}) {
     viewWm: C.VIEW_W_M, viewHm: C.VIEW_W_M * C.VIEW_ASPECT,
     debug: !!opts.debug, lastGesture: '–', runs: 0,
     trackAcc: 0, spawnAcc: 0,
+    onEvent: null, // Haken für den Ton (main.js): press, release, plow, crash
   };
   const saved = loadMode();
   if (MODES[saved] && !MODES[saved].soon) g.mode = saved;
@@ -39,6 +40,10 @@ export function createGame(opts = {}) {
 
 export function hasAvalanche(g) {
   return g.mode === 'chase';
+}
+
+function emit(g, type, data) {
+  if (g.onEvent) g.onEvent(type, data);
 }
 
 // intro = true: Kamerafahrt von unten (nur beim App-Start). Sonst direkt beim Fahrer.
@@ -146,6 +151,7 @@ function die(g, cause, hit) {
   g.crashX = hit ? hit.x : s.x;
   g.crashY = hit ? hit.y : s.y - 1.5;
   g.crashPush = hit ? 0 : g.av.speed * 0.5;
+  emit(g, 'crash', { cause, v: g.crashV });
   s.alive = false;
   s.side = 0;
   s.plow = false;
@@ -191,14 +197,17 @@ export function onPress(g, side) {
   g.lastGesture = side < 0 ? 'hold L' : 'hold R';
   if (g.state === 'ready') start(g);
   if (g.state === 'running') P.press(g.skier, side);
+  emit(g, 'press', side);
 }
 export function onRelease(g) {
+  emit(g, 'release');
   P.release(g.skier);
 }
 export function onPlow(g, on) {
   if (on) g.lastGesture = 'plow';
   if (g.state === 'ready' && on) start(g);
   if (g.state === 'running') P.setPlow(g.skier, on);
+  emit(g, 'plow', on);
 }
 export function togglePause(g) {
   if (g.state === 'running') { g.state = 'paused'; g.skier.side = 0; g.skier.plow = false; return true; }

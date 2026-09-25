@@ -35,3 +35,22 @@ export function saveMode(id) {
     /* egal */
   }
 }
+
+// Ton an/aus (Schalter auf der Fresh-Seite). Standard: an.
+const SOUND_KEY = 'powder.sound';
+
+export function loadSoundOn() {
+  try {
+    return localStorage.getItem(SOUND_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+
+export function saveSoundOn(on) {
+  try {
+    localStorage.setItem(SOUND_KEY, on ? '1' : '0');
+  } catch {
+    /* egal */
+  }
+}

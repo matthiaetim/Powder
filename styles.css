@@ -143,6 +143,19 @@ body[data-state="dead"][data-overlay="1"] #ov-dead { display: flex; }
 }
 .mode-card.active .mode-cta, .mode-card.soon .mode-cta { visibility: visible; }
 
+#btn-sound {
+  margin-top: 30px;
+  padding: 8px 14px;
+  font: italic 13px var(--font);
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  opacity: 0.65;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+#btn-sound.off { opacity: 0.4; }
+
 #version {
   position: fixed;
   left: 0;

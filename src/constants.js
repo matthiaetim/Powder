@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.8.0';
+export const VERSION = '0.9.0';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -74,6 +74,14 @@ export const C = {
   AV_START_GAP_M: 60,        // Abstand beim Start des Laufs
   AV_RUMBLE_PX: 2,           // (Tuning) Bildbeben in px, wenn sie nah ist
   AV_WHITEOUT_DELAY_S: 0.3,  // nach dem Erwischen: kurz die Front über dem Fahrer zeigen, dann Weiß
+
+  // Ton (audio.js): Lautstärke gesamt und je Gruppe, 0..1. Fahrtwind und Schneezischen sind ab SND_SPEED_REF_KMH voll.
+  SND_MASTER: 0.8,           // (Tuning) Lautstärke
+  SND_WIND: 0.7,             // (Tuning) Bergwind und Fahrtwind
+  SND_SKI: 0.8,              // (Tuning) Ski: Zischen, Kanten, Kratzen
+  SND_AV: 0.9,               // (Tuning) Lawine
+  SND_CRASH: 0.9,            // (Tuning) Aufprall
+  SND_SPEED_REF_KMH: 150,
 
   // Welt
   CELL_M: 40,
@@ -173,4 +181,10 @@ export const TUNABLES = [
   { key: 'AV_STALL_KMH', label: 'Stillstand unter', unit: 'km/h', min: 0, max: 40, step: 1 },
   { key: 'AV_CATCH_M', label: 'Erwischt ab Abstand', unit: 'm', min: 0, max: 6, step: 0.5 },
   { key: 'AV_RUMBLE_PX', label: 'Beben bei Nähe', unit: 'px', min: 0, max: 8, step: 0.5 },
+  { heading: 'Ton' },
+  { key: 'SND_MASTER', label: 'Lautstärke', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
+  { key: 'SND_WIND', label: 'Wind', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
+  { key: 'SND_SKI', label: 'Ski und Kurven', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
+  { key: 'SND_AV', label: 'Lawine', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
+  { key: 'SND_CRASH', label: 'Aufprall', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
 ];
