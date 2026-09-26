@@ -254,8 +254,7 @@ export function createHud(g, doc, hooks = {}) {
       );
       return row;
     }));
-    statsNote.textContent = !list.length ? 'Noch keine Einträge'
-      : time ? `Fahrzeit ohne Strafen, Tempo auf ${nf.format(C.SG_FINISH_M)} m` : 'Zeit und Tempo des besten Laufs';
+    statsNote.textContent = list.length ? '' : 'Noch keine Einträge';
   }
   function openStats() {
     if (!boardOn || !board.name()) return;
