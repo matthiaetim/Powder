@@ -1,11 +1,12 @@
 // DOM-HUD: Tempo, Distanz, Pause, Fresh-Seite mit Laufzeit, Bestenliste samt Namensfeld und Modus-Karten, Debug-Text.
 // Super-G: dazu die laufende Zeit, Hinweise zu Torfehler und Zwischenzeit, der Countdown in der Bildmitte.
 import { C, VERSION } from './constants.js';
-import { overlayReady, togglePause, pauseIfRunning, fresh, selectMode } from './game.js';
+import { overlayReady, togglePause, pauseIfRunning, fresh, selectMode, selectRider } from './game.js';
 import { createTunePanel, isTuned } from './tune.js';
 import { verdictText } from './board.js';
 import { MODES, lowerIsBetter } from './modes.js';
-import { drawModePreview } from './render.js';
+import { RIDERS, RIDER_ORDER } from './riders.js';
+import { drawModePreview, drawRiderPreview } from './render.js';
 
 const pad2 = (n) => String(n).padStart(2, '0');
 
@@ -118,12 +119,13 @@ export function createHud(g, doc, hooks = {}) {
     return (n.value < 0 ? '−' : n.value > 0 ? '+' : '±') + nf2.format(Math.abs(n.value)) + ' s';
   }
 
-  // Modus-Karten: Vorschau einmal zeichnen, aktive Karte markieren, Tipp startet
-  const cards = Array.from(doc.querySelectorAll('.mode-card'));
+  // Modus-Karten: Vorschau zeichnen (neu, wenn der Fahrer wechselt), aktive Karte markieren, Tipp startet
+  const cards = Array.from(doc.querySelectorAll('#modes .mode-card'));
+  const drawModes = () => { for (const card of cards) drawModePreview(card.querySelector('.mode-preview'), card.dataset.mode, g.rider); };
+  drawModes();
   for (const card of cards) {
     const id = card.dataset.mode;
     const m = MODES[id];
-    drawModePreview(card.querySelector('.mode-preview'), id);
     card.querySelector('.mode-cta').textContent = m && m.soon ? 'bald' : 'Tap to play';
     onTap(card, () => {
       if (!m || m.soon) return;
@@ -135,6 +137,37 @@ export function createHud(g, doc, hooks = {}) {
     for (const card of cards) card.classList.toggle('active', card.dataset.mode === g.mode);
   }
   markActive();
+
+  // Fahrerwahl: das Icon oben links zeigt den gewählten Fahrer, ein Tipp tauscht die Ergebniskarte gegen die
+  // Auswahl. Ein Tipp auf eine Kachel wählt und führt zurück; auch das Icon und „Zurück“ schließen.
+  const riderBtn = $('btn-rider'), riderIcon = riderBtn.querySelector('.rider-preview'), ridersEl = $('riders');
+  const showRiders = (on) => { doc.body.dataset.riders = on ? '1' : ''; };
+  const riderTiles = RIDER_ORDER.map((id) => {
+    const tile = doc.createElement('button');
+    tile.type = 'button';
+    tile.className = 'mode-card';
+    tile.dataset.rider = id;
+    const cv = doc.createElement('canvas');
+    cv.className = 'rider-preview';
+    const name = doc.createElement('span');
+    name.className = 'mode-name';
+    name.textContent = RIDERS[id].name;
+    tile.append(cv, name);
+    drawRiderPreview(cv, id, 82);
+    onTap(tile, () => {
+      if (id !== g.rider && selectRider(g, id)) { markRider(); drawModes(); }
+      showRiders(false);
+    });
+    ridersEl.append(tile);
+    return tile;
+  });
+  function markRider() {
+    for (const tile of riderTiles) tile.classList.toggle('active', tile.dataset.rider === g.rider);
+    drawRiderPreview(riderIcon, g.rider, 40);
+  }
+  markRider();
+  onTap(riderBtn, () => showRiders(doc.body.dataset.riders !== '1'));
+  onTap($('btn-rider-back'), () => showRiders(false));
 
   // Bestenliste (board.js): Top-Zeilen des gewählten Modus, die eigene Zeile trägt das Namensfeld. Ohne Namen steht
   // nur das Feld da, zentriert und unterstrichen; mit Namen wird es zur Namenszelle, ein Tipp darauf öffnet die
@@ -250,7 +283,7 @@ export function createHud(g, doc, hooks = {}) {
       lastOverlay = ov;
       doc.body.dataset.overlay = ov;
       if (themeEl) themeEl.content = ov ? C.BG_DIM : C.BG;
-      if (ov) { refreshDead(); markActive(); renderBoard(); }
+      if (ov) { refreshDead(); markActive(); renderBoard(); } else showRiders(false);
     }
     if (g.debug && (force || now - lastDebug > 250)) {
       lastDebug = now;

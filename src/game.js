@@ -7,8 +7,9 @@ import { createAvalanche, updateAvalanche } from './avalanche.js';
 import { checkCollision } from './collision.js';
 import { createTrack, clearTrack, pushTrack } from './track.js';
 import { createParticles, clearParticles, spawnParticle, updateParticles } from './particles.js';
-import { loadBest, saveBest, loadBestTime, saveBestTime, loadBestSplits, saveBestSplits } from './storage.js';
+import { loadBest, saveBest, loadBestTime, saveBestTime, loadBestSplits, saveBestSplits, loadRider, saveRider } from './storage.js';
 import { MODES, DEFAULT_MODE, lowerIsBetter } from './modes.js';
+import { RIDERS, validRider } from './riders.js';
 import { createCourse, updateCourse, tickCourse } from './gates.js';
 
 const READY_FRAC = 0.78; // Fahrer steht im Intro weit unten im Bild
@@ -30,6 +31,7 @@ export function createGame(opts = {}) {
     bestTime: 0, bestSplits: [], newBestTime: false, // Super-G: Bestzeit in Hundertstel, ihre Zwischenzeiten, neue Bestzeit im Lauf
     seed: 0, fixedSeed: opts.fixedSeed ?? null,
     mode: DEFAULT_MODE, runMode: DEFAULT_MODE, intro: true, readyDelayMs: C.READY_AUTO_START_MS,
+    rider: validRider(loadRider()), // Fahrer (riders.js), nur Aussehen und Spur
     readyT: 0, deadT: 0, deadCause: '',
     countT: 0, countBeeps: 0, finT: 0, pausedFrom: 'running', // Super-G: Countdown-Zeit und -Töne, Auslauf-Zeit, woher die Pause kam
     crashV: 0, crashX: 0, crashY: 0, crashPush: 0, // Tempo, Hindernis und Schub beim Aufprall (für die Splitter)
@@ -403,6 +405,14 @@ export function selectMode(g, id) {
   if (!m || m.soon) return false;
   g.mode = id;
   loadBests(g);
+  return true;
+}
+// Fahrer wechseln (auf der Fresh-Seite). Anders als der Modus bleibt er gespeichert: er gehört zum Spieler, nicht
+// zum Lauf.
+export function selectRider(g, id) {
+  if (!RIDERS[id]) return false;
+  g.rider = id;
+  saveRider(id);
   return true;
 }
 // Bestweiten der anderen (board.js), je Modus für die Linien im Schnee. Im Zustand ready sofort übernehmen (Intro und

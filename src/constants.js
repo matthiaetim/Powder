@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.16.3';
+export const VERSION = '0.17.0';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -55,6 +55,7 @@ export const C = {
   PLOW_MIN: 12,            // (Tuning) Schneepflug-Verzögerung in m/s²
   PLOW_K: 0.05,            // Schneepflug wächst nur schwach mit dem Tempo
   PLOW_SPREAD_M: 0.3,      // Schneepflug: so weit spreizt jedes Ski-Ende nach außen (Bild und Spur)
+  BOARD_SLIP_DEG: 55,      // Snowboard (riders.js): so weit dreht beidseitiges Halten das Brett quer, statt Pflug
   PLOW_EASE_S: 0.12,       // Zeitkonstante, mit der die Ski in den Pflug gehen und zurück
 
   SKIER_R: 0.45,
@@ -166,6 +167,8 @@ export const C = {
   BG_DIM: '#F4F3EF',         // Fresh-Seite: Papier-Schleier (styles.css, #ov-dead) über BG; färbt die iOS-Statusleiste mit
   INK: '#14140F',
   INK_LIGHT: '#2C2C25',
+  BOARD_FILL: '#F4F3EF',     // Snowboard: Papier mit Tinte-Rand, damit sich das Brett vom Fahrer abhebt
+  SLED_WOOD: '#9A6B45',      // Schlitten: Holz, etwas wärmer als TRUNK
   TREE: '#265A3A',
   TREE_LIGHT: '#357350',
   TRUNK: '#6B4F3B',

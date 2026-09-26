@@ -280,6 +280,32 @@ body[data-state="dead"][data-overlay="1"] #ov-dead, body[data-state="finished"][
 }
 .mode-card.active .mode-cta, .mode-card.soon .mode-cta { visibility: visible; }
 
+/* Fahrerwahl (riders.js): Icon oben links auf der Fresh-Seite, ein Tipp tauscht die Karte gegen die Auswahl.
+   Das Icon sitzt fest im Bildschirmeck, nicht in der Karte, damit es lange Meterzahlen nicht verdrängt. */
+#btn-rider {
+  position: fixed;
+  left: 16px;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  padding: 3px;
+  background: #fff;
+  border: 2.5px solid var(--ink);
+  border-radius: var(--r-tile);
+  box-shadow: 3px 4px 0 var(--ink);
+  transform: rotate(-2deg);
+  transition: transform var(--press), box-shadow var(--press);
+}
+#btn-rider:active { transform: rotate(-2deg) translate(3px, 4px); box-shadow: 0 0 0 var(--ink); }
+body[data-riders="1"] #btn-rider { background: var(--mark); }
+.rider-preview { display: block; width: 40px; height: 40px; border-radius: 9px; }
+#rider-card { display: none; }
+body[data-riders="1"] #rider-card { display: flex; }
+body[data-riders="1"] #dead-card { display: none; }
+.card-title { font-family: var(--display); font-size: 30px; line-height: 1; letter-spacing: 0.02em; }
+#riders { display: flex; gap: 8px; margin-top: 18px; align-items: flex-start; }
+#riders .mode-card { width: 94px; }
+#riders .rider-preview { width: 82px; height: 82px; border: 2px solid var(--ink); border-radius: 8px; box-sizing: border-box; }
+#btn-rider-back { margin-top: 18px; }
+
 /* kleine flache Knöpfe: Ton, Tuning-Aktionen */
 .btn-flat, #btn-sound, .tune-actions button {
   padding: 6px 12px;

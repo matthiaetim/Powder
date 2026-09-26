@@ -117,3 +117,22 @@ export const loadBoardCache = () => loadJson(BOARD_KEY);
 export const saveBoardCache = (v) => saveJson(BOARD_KEY, v);
 export const loadBoardOwn = () => loadJson(BOARD_OWN_KEY);
 export const saveBoardOwn = (v) => saveJson(BOARD_OWN_KEY, v);
+
+// Fahrer (riders.js), gewählt auf der Fresh-Seite. Bleibt gespeichert wie der Ton; ohne Eintrag der Skifahrer.
+const RIDER_KEY = 'powder.rider';
+
+export function loadRider() {
+  try {
+    return localStorage.getItem(RIDER_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function saveRider(id) {
+  try {
+    localStorage.setItem(RIDER_KEY, id);
+  } catch {
+    /* egal */
+  }
+}

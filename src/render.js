@@ -18,6 +18,14 @@ const TAG_FONT = `11px ${DISPLAY_FONT_STACK}`;
 const TAG_PAD_X = 7, TAG_H = 18, TAG_BORDER = 1.5, TAG_SHADOW = 2, TAG_TILT = -1.2 * Math.PI / 180;
 const TAG_RADII = [6, 8, 5, 7]; // ungleiche Ecken, wie von Hand gezeichnet
 const SIGN_FONT_STACK = DISPLAY_FONT_STACK;
+// Spur je Fahrer (riders.js): Seiten der Linien, halber Abstand zur Mitte in m, Breite als Faktor der Ski-Linie.
+// Das Snowboard zieht eine breite Linie in der Mitte, der Schlitten zwei Kufen, etwas weiter auseinander als Ski.
+const RAILS = {
+  ski: { sides: [-1, 1], gauge: 0.16, w: 1 },
+  board: { sides: [0], gauge: 0, w: 2.6 },
+  sled: { sides: [-1, 1], gauge: 0.24, w: 1.2 },
+};
+const railsOf = (rider) => RAILS[rider] || RAILS.ski;
 
 // Hockeystop deaktiviert (Tim und Jürgen wollen ihn nicht) — auskommentiert statt gelöscht.
 // Organischer Blob-Umriss fürs Hockeystop-Nebelfeld, normiert auf ±0.5 um den Mittelpunkt (mit `size`
@@ -368,27 +376,27 @@ function signPath(x, px, py, w, h, radii) {
 }
 
 // Die letzten count Spurpunkte als Segmente radieren; das Lücken-Flag steht am späteren Punkt (wie in drawTrack)
-function replayErase(sg, tr, count) {
+function replayErase(sg, tr, count, rails) {
   let px = 0, py = 0, pnx = 0, pny = 0, pplow = 0, has = false;
   forEachRecentTrackPoint(tr, count, (x, y, nx, ny, w, gap, plow) => {
-    if (has && !gap) eraseSegment(sg, px, py, pnx, pny, pplow, x, y, nx, ny, w, plow);
+    if (has && !gap) eraseSegment(sg, rails, px, py, pnx, pny, pplow, x, y, nx, ny, w, plow);
     px = x; py = y; pnx = nx; pny = ny; pplow = plow; has = true;
   });
 }
 
-// Ein Spursegment auf dem Offscreen-Canvas ausradieren: je Ski ein Strich in Spurbreite (Carve macht ihn breiter,
+// Ein Spursegment auf dem Offscreen-Canvas ausradieren: je Ski (Kufe, Brett, siehe RAILS) ein Strich in Spurbreite (Carve macht ihn breiter,
 // der Pflug zählt wie in drawTrack als kräftiges Carve), darüber ein breiter, schwacher Strich für den
 // aufgewirbelten Schnee. Alpha unter 1: mehrere Überfahrten summieren sich, eine allein verwischt nur.
-function eraseSegment(sg, xa, ya, nxa, nya, pa, xb, yb, nxb, nyb, wb, pb) {
+function eraseSegment(sg, rails, xa, ya, nxa, nya, pa, xb, yb, nxb, nyb, wb, pb) {
   const half = sg.hM / 2;
   if (Math.abs(ya - C.SIGN_Y_M) > half && Math.abs(yb - C.SIGN_Y_M) > half) return;
   const { x, Q } = sg;
   const carve = Math.max(wb, 0.6 * pb);
-  const w = 0.12 * Q * (1 + (C.TRACK_WIDTH_MAX - 1) * carve) * C.SIGN_ERASE_WIDTH_K;
+  const w = 0.12 * Q * (1 + (C.TRACK_WIDTH_MAX - 1) * carve) * C.SIGN_ERASE_WIDTH_K * rails.w;
   x.globalCompositeOperation = 'destination-out';
   x.lineCap = 'round';
-  for (let side = -1; side <= 1; side += 2) {
-    const offA = side * (0.16 + C.PLOW_SPREAD_M * pa), offB = side * (0.16 + C.PLOW_SPREAD_M * pb);
+  for (const side of rails.sides) {
+    const offA = side * (rails.gauge + C.PLOW_SPREAD_M * pa), offB = side * (rails.gauge + C.PLOW_SPREAD_M * pb);
     const ax = (xa + nxa * offA - sg.x0) * Q, ay = (ya + nya * offA - sg.y0) * Q;
     const bx = (xb + nxb * offB - sg.x0) * Q, by = (yb + nyb * offB - sg.y0) * Q;
     x.strokeStyle = `rgba(0,0,0,${C.SIGN_SPRAY_ALPHA})`;
@@ -407,7 +415,7 @@ function updateSignature(R, g) {
   const sg = R.sign, tr = g.track;
   if (sg.world !== g.world || sg.key !== signKey(R)) buildSignature(R, g);
   const fresh = Math.min(tr.total - sg.seen, tr.n);
-  if (fresh > 0) replayErase(sg, tr, fresh + 1);
+  if (fresh > 0) replayErase(sg, tr, fresh + 1, railsOf(g.rider));
   sg.seen = tr.total;
 }
 
@@ -436,7 +444,8 @@ function drawTrack(R, g, ox, oy) {
     pts[i] = x * S + ox; pts[i + 1] = y * S + oy; pts[i + 2] = nx * S; pts[i + 3] = ny * S; pts[i + 4] = w; pts[i + 5] = gap ? 1 : 0; pts[i + 6] = plow;
     n++;
   });
-  const base = Math.max(1, 0.12 * S);
+  const rails = railsOf(g.rider);
+  const base = Math.max(1, 0.12 * S) * rails.w;
   const buckets = 4;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -457,7 +466,7 @@ function drawTrack(R, g, ox, oy) {
   for (let b = 0; b < buckets; b++) {
     ctx.lineWidth = base * (1 + (C.TRACK_WIDTH_MAX - 1) * ((b + 0.5) / buckets));
     ctx.strokeStyle = `rgba(${C.TRACK_RGB},${(0.16 + (0.14 * b) / (buckets - 1)).toFixed(2)})`;
-    for (const side of [-1, 1]) {
+    for (const side of rails.sides) {
       ctx.beginPath();
       let any = false;
       for (let i = 1; i < n; i++) {
@@ -465,8 +474,8 @@ function drawTrack(R, g, ox, oy) {
         if (pts[j + 5] > 0 || pts[k + 1] < -20) continue;
         const wb = Math.min(buckets - 1, Math.floor(Math.max(pts[j + 4], 0.6 * pts[j + 6]) * buckets));
         if (wb !== b) continue;
-        const offK = side * (0.16 + C.PLOW_SPREAD_M * pts[k + 6]);
-        const offJ = side * (0.16 + C.PLOW_SPREAD_M * pts[j + 6]);
+        const offK = side * (rails.gauge + C.PLOW_SPREAD_M * pts[k + 6]);
+        const offJ = side * (rails.gauge + C.PLOW_SPREAD_M * pts[j + 6]);
         ctx.moveTo(pts[k] + pts[k + 2] * offK, pts[k + 1] + pts[k + 3] * offK);
         ctx.lineTo(pts[j] + pts[j + 2] * offJ, pts[j + 1] + pts[j + 3] * offJ);
         any = true;
@@ -542,8 +551,15 @@ function drawSkier(R, g, sx, sy) {
   ctx.fill();
   ctx.translate(sx, sy);
   ctx.rotate(-s.theta);
-  skierShape(ctx, S, s);
+  riderShape(ctx, S, s, g.rider);
   ctx.restore();
+}
+
+// Fahrer je nach Wahl (riders.js) um den Ursprung, Fahrtrichtung +y; Position und Drehung setzt der Aufrufer.
+function riderShape(ctx, S, s, rider) {
+  if (rider === 'board') boardShape(ctx, S, s);
+  else if (rider === 'sled') sledShape(ctx, S, s);
+  else skierShape(ctx, S, s);
 }
 
 // Ski, Körper und Kopf um den Ursprung; Position und Drehung setzt der Aufrufer.
@@ -566,6 +582,61 @@ function skierShape(ctx, S, s) {
   ctx.beginPath(); ctx.arc(lean * 1.3, -0.1 * S, 0.14 * S, 0, TAU); ctx.fill();
 }
 
+// Snowboard: ein Brett in Fahrtrichtung, der Fahrer steht quer darauf, von oben sind die Schultern längs zum Brett.
+// Einen Pflug gibt es auf dem Brett nicht: beide Daumen stellen es quer zum Rutschen, zur Außenseite der Kurve.
+function boardShape(ctx, S, s) {
+  const p = s.plowK;
+  ctx.save();
+  ctx.rotate((s.theta >= 0 ? 1 : -1) * p * C.BOARD_SLIP_DEG * D2R);
+  ctx.fillStyle = C.BOARD_FILL;
+  ctx.strokeStyle = C.INK;
+  ctx.lineWidth = Math.max(1, 0.07 * S);
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(-0.15 * S, -0.8 * S, 0.3 * S, 1.6 * S, 0.15 * S);
+  else ctx.rect(-0.15 * S, -0.8 * S, 0.3 * S, 1.6 * S);
+  ctx.fill();
+  ctx.stroke();
+  // Körper schmal quer, lang längs; in der Kurve kippt er über die Kante zur Innenseite
+  const lean = Math.sin(s.theta * 0.5) * 0.18 * S * s.carve;
+  ctx.fillStyle = C.INK;
+  ctx.beginPath(); ctx.ellipse(lean, 0, 0.2 * S, 0.4 * S, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = C.INK_LIGHT;
+  ctx.beginPath(); ctx.arc(lean * 1.3, 0.04 * S, 0.14 * S, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+// Schlitten: zwei Kufen, darauf die Sitzfläche, der Fahrer sitzt hinten mit den Beinen nach vorn. Im Pflug
+// stemmt er die Füße seitlich in den Schnee, wie man einen Rodel bremst.
+function sledShape(ctx, S, s) {
+  const p = s.plowK;
+  ctx.strokeStyle = C.INK;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = Math.max(1, 0.08 * S);
+  ctx.beginPath();
+  ctx.moveTo(-0.24 * S, -0.7 * S); ctx.lineTo(-0.24 * S, 0.62 * S); ctx.quadraticCurveTo(-0.24 * S, 0.82 * S, -0.12 * S, 0.84 * S);
+  ctx.moveTo(0.24 * S, -0.7 * S); ctx.lineTo(0.24 * S, 0.62 * S); ctx.quadraticCurveTo(0.24 * S, 0.82 * S, 0.12 * S, 0.84 * S);
+  ctx.stroke();
+  ctx.fillStyle = C.SLED_WOOD;
+  ctx.lineWidth = Math.max(1, 0.06 * S);
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(-0.3 * S, -0.6 * S, 0.6 * S, 1.05 * S, 0.08 * S);
+  else ctx.rect(-0.3 * S, -0.6 * S, 0.6 * S, 1.05 * S);
+  ctx.fill();
+  ctx.stroke();
+  // Beine nach vorn, im Pflug gespreizt bis über die Kufen hinaus
+  const lean = Math.sin(s.theta * 0.5) * 0.1 * S * s.carve;
+  const foot = 0.1 + C.PLOW_SPREAD_M * 1.3 * p;
+  ctx.lineWidth = Math.max(1, 0.12 * S);
+  ctx.beginPath();
+  ctx.moveTo(lean - 0.1 * S, -0.1 * S); ctx.lineTo(-foot * S, (0.55 - 0.15 * p) * S);
+  ctx.moveTo(lean + 0.1 * S, -0.1 * S); ctx.lineTo(foot * S, (0.55 - 0.15 * p) * S);
+  ctx.stroke();
+  ctx.fillStyle = C.INK;
+  ctx.beginPath(); ctx.ellipse(lean, -0.28 * S, 0.24 * S, 0.26 * S, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = C.INK_LIGHT;
+  ctx.beginPath(); ctx.arc(lean * 1.3, -0.36 * S, 0.14 * S, 0, TAU); ctx.fill();
+}
+
 // ---------- Aufprall oder Lawine: der Fahrer zerspringt in Pixel ----------
 
 function shattered(g) {
@@ -584,7 +655,7 @@ function spawnShards(R, g) {
   const [c, x] = makeCanvas(half * 2, half * 2, q);
   x.translate(half, half);
   x.rotate(-s.theta);
-  skierShape(x, S, s);
+  riderShape(x, S, s, g.rider);
   const data = x.getImageData(0, 0, c.width, c.height).data;
   const b = Math.max(1, Math.round(C.SHATTER_STEP_PX * q)); // Rasterzelle in Offscreen-Pixeln
   const fx = Math.sin(s.theta), fy = Math.cos(s.theta); // Fahrtrichtung
@@ -817,7 +888,10 @@ function drawWhiteout(R, g) {
 
 // ---------- Modus-Vorschau (kleine stille Szene für die Karten) ----------
 
-export function drawModePreview(canvas, modeId) {
+// Ruhige Haltung für Vorschau und Fahrerwahl: leicht angekantet, kein Carve, kein Pflug
+const PREVIEW_POSE = { theta: 0.25, carve: 0, plowK: 0 };
+
+export function drawModePreview(canvas, modeId, rider) {
   // Beim Start ist die Fresh-Seite versteckt (clientWidth 0): Fallback auf die Kartenmaße aus styles.css
   const W = canvas.clientWidth || 104, H = canvas.clientHeight || 58;
   const superg = modeId === 'superg';
@@ -862,19 +936,11 @@ export function drawModePreview(canvas, modeId) {
       }
     }
   }
-  // Fahrer
+  // Fahrer, wie gewählt (riders.js)
   ctx.save();
   ctx.translate(sx, sy);
   ctx.rotate(-0.25);
-  ctx.strokeStyle = C.INK;
-  ctx.lineWidth = 1;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(-0.16 * S, -0.85 * S); ctx.lineTo(-0.16 * S, 0.75 * S);
-  ctx.moveTo(0.16 * S, -0.85 * S); ctx.lineTo(0.16 * S, 0.75 * S);
-  ctx.stroke();
-  ctx.fillStyle = C.INK;
-  ctx.beginPath(); ctx.ellipse(0, 0, 0.3 * S, 0.45 * S, 0, 0, TAU); ctx.fill();
+  riderShape(ctx, S, PREVIEW_POSE, rider);
   ctx.restore();
   if (modeId === 'chase') {
     // Schatten von oben, wie in avalanche-view.js: Dämmerung, Schleier aus Schiefergrau, wogender Rand, Fahnen
@@ -913,4 +979,27 @@ export function drawModePreview(canvas, modeId) {
       ctx.stroke();
     }
   }
+}
+
+// ---------- Fahrerwahl: Fahrer groß auf Schnee, für das Icon und die Kacheln der Fresh-Seite ----------
+
+// size: Kantenlänge in CSS-Pixeln wie in styles.css; clientWidth ist 0, solange die Fresh-Seite versteckt ist
+export function drawRiderPreview(canvas, rider, size) {
+  const W = size, H = size;
+  const dpr = Math.min(window.devicePixelRatio || 1, C.MAX_DPR);
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = C.BG;
+  ctx.fillRect(0, 0, W, H);
+  const S = H / 2.1; // gut 2 m Bildhöhe: Ski und Kufen passen samt Drehung hinein
+  const sx = W / 2, sy = H / 2;
+  ctx.fillStyle = `rgba(${C.SHADOW_RGB},0.22)`;
+  ctx.beginPath();
+  ctx.ellipse(sx + 0.25 * S, sy + 0.2 * S, 0.45 * S, 0.3 * S, 0, 0, TAU);
+  ctx.fill();
+  ctx.translate(sx, sy);
+  ctx.rotate(-0.4);
+  riderShape(ctx, S, PREVIEW_POSE, rider);
 }

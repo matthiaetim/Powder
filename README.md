@@ -20,6 +20,7 @@ Plain HTML + JavaScript + Canvas, kein Framework, kein Build.
 - Tastatur: `A`/`D` oder Pfeile, `P` Pause, `R`, Enter oder Leertaste Fresh (neuer Lauf). Auf dem iPhone gibt es keine Pause-Taste: anhalten heißt querstellen; beim Wechsel in den Hintergrund pausiert die App von selbst.
 - **Tuning-Panel**: langer Druck auf das Versions-Label unten links. Werte bleiben gespeichert, „Standard“ setzt zurück.
 - **Ton an/aus**: Schalter unten auf der Fresh-Seite, bleibt gespeichert.
+- **Fahrer**: das Icon oben links auf der Fresh-Seite öffnet die Fahrerwahl: Ski (Standard), Snowboard oder Schlitten. Die Wahl bleibt gespeichert (`powder.rider`) und ändert nur Aussehen und Spur: das Snowboard zieht eine breite Linie und stellt sich bei beiden Daumen quer statt in den Pflug, der Schlitten zieht zwei Kufen und bremst mit den Füßen. Physik und Bestenliste sind für alle gleich. Die Fahrer stehen in `src/riders.js`, ihre Zeichnung in `src/render.js`.
 
 ## Modi
 
