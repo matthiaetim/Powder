@@ -81,6 +81,19 @@ export function viewFor(boards, mode, ownKey, rows = C.BOARD_ROWS) {
   return { top, own, ownInTop: idx >= 0 && idx < rows, total: list.length };
 }
 
+// Detail-Kachel: alle Einträge des Modus mit Rang, Fahrzeit t und Durchschnittstempo des besten Laufs. Die Strecke
+// ist in Classic und Chase die Weite, im Super-G die feste Kurslänge; t ist dort die reine Fahrzeit ohne Strafen,
+// das Tempo also das tatsächlich gefahrene. Einträge ohne t (alte Stände) haben kein Tempo: kmh 0, die Anzeige
+// setzt einen Strich.
+export function statsFor(boards, mode, ownKey) {
+  const dist = (e) => (lowerIsBetter(mode) ? C.SG_FINISH_M : e.m);
+  return sortEntries(boards && boards[mode], mode).map((e, i) => ({
+    rank: i + 1, key: e.key, name: e.name, m: e.m, t: e.t,
+    kmh: e.t > 0 ? (dist(e) / e.t) * 3.6 : 0,
+    own: !!ownKey && e.key === ownKey,
+  }));
+}
+
 // Fremde Bestweiten für die Linien im Schnee, Meter absteigend (render.js zeichnet sie von unten nach oben).
 // Zeiten lassen sich nicht als Linie in den Hang legen: im Super-G bleibt der Schnee ohne Namenslinien.
 export function friendMarks(boards, mode, ownKey) {
@@ -276,6 +289,7 @@ export function createBoard({ url = '', g = null, fetchFn = null, debug = false 
     name: () => name,
     setName,
     view: (mode) => viewFor(boards, mode, key()),
+    stats: (mode) => statsFor(boards, mode, key()),
     lastVerdict: () => verdict,
     stale: () => failed && !fetched,
     onChange: (fn) => { listeners.push(fn); },

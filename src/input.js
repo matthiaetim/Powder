@@ -67,14 +67,15 @@ export function createInput(canvas, h) {
 
   // iOS-Safari: kein Scrollen, kein Zoom, kein Kontextmenü.
   document.addEventListener('touchmove', (e) => {
-    if (e.target.closest && e.target.closest('#tune, .board-own')) return; // Tuning-Panel darf scrollen, Namensfeld bleibt nativ
+    if (e.target.closest && e.target.closest('#tune, #stats-list, .board-own')) return; // Tuning-Panel und Bestenliste-Details scrollen, Namensfeld bleibt nativ
     e.preventDefault();
   }, { passive: false });
   // Keine Lupe: Doppeltipp + Halten stoppt iOS nur über abgebrochenes touchstart, CSS und pointerdown reichen nicht.
   // Ein einziger nativer Tipp (z. B. auf Fresh) reicht, damit der nächste Halte-Tipp die Lupe öffnet, daher überall
-  // außer im Tuning-Panel (Regler, Scrollen) und im Namensfeld der Bestenliste (Fokus und Tastatur brauchen den nativen
-  // Tipp). Pointer-Events kommen trotzdem, click nicht mehr: Buttons siehe onTap in hud.js.
-  const noNative = (e) => { if (!e.target.closest?.('#tune, .board-own')) e.preventDefault(); };
+  // außer im Tuning-Panel (Regler, Scrollen), in der Liste der Bestenliste-Details (Scrollen) und im Namensfeld der
+  // Bestenliste (Fokus und Tastatur brauchen den nativen Tipp). Pointer-Events kommen trotzdem, click nicht mehr:
+  // Buttons siehe onTap in hud.js.
+  const noNative = (e) => { if (!e.target.closest?.('#tune, #stats-list, .board-own')) e.preventDefault(); };
   document.addEventListener('touchstart', noNative, { passive: false });
   document.addEventListener('touchend', noNative, { passive: false });
   document.addEventListener('gesturestart', (e) => e.preventDefault());

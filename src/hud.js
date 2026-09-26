@@ -1,4 +1,5 @@
-// DOM-HUD: Tempo, Distanz, Pause, Fresh-Seite mit Laufzeit, Bestenliste samt Namensfeld und Modus-Karten, Debug-Text.
+// DOM-HUD: Tempo, Distanz, Pause, Fresh-Seite mit Laufzeit, Bestenliste samt Namensfeld und Detail-Kachel,
+// Modus-Karten, Debug-Text.
 // Super-G: dazu die laufende Zeit, Hinweise zu Torfehler und Zwischenzeit, der Countdown in der Bildmitte.
 import { C, VERSION } from './constants.js';
 import { overlayReady, togglePause, pauseIfRunning, fresh, selectMode, selectRider } from './game.js';
@@ -45,15 +46,17 @@ export function createHud(g, doc, hooks = {}) {
   let lastMode = '', lastNote = '', lastCount = '';
 
   // Tipp auf Buttons und Overlay: Maus und Tastatur über click, Touch über pointerup (input.js bricht touchstart
-  // gegen die iOS-Lupe ab, dann kommt kein click). Nur wenn der Finger auf dem Element losgelassen wird.
+  // gegen die iOS-Lupe ab, dann kommt kein click). Nur wenn der Finger auf dem Element losgelassen wird. fn bekommt
+  // das Element unter dem Finger, damit ein Container Tipps auf einzelne Kinder ausnehmen kann.
   const onTap = (el, fn) => {
     let touchAt = -1e9;
     el.addEventListener('pointerup', (e) => {
-      if (e.pointerType === 'mouse' || !el.contains(doc.elementFromPoint(e.clientX, e.clientY))) return;
+      const hit = doc.elementFromPoint(e.clientX, e.clientY);
+      if (e.pointerType === 'mouse' || !el.contains(hit)) return;
       touchAt = performance.now();
-      fn();
+      fn(hit);
     });
-    el.addEventListener('click', () => { if (performance.now() - touchAt > 500) fn(); });
+    el.addEventListener('click', (e) => { if (performance.now() - touchAt > 500) fn(e.target); });
   };
 
   onTap($('btn-fresh'), doFresh);
@@ -138,10 +141,13 @@ export function createHud(g, doc, hooks = {}) {
   }
   markActive();
 
+  // Karten statt der Ergebniskarte: Fahrerwahl ('riders') oder Detail-Kachel der Bestenliste ('stats'), immer nur eine
+  const showPanel = (name) => { doc.body.dataset.panel = name; };
+  const showRiders = (on) => showPanel(on ? 'riders' : '');
+
   // Fahrerwahl: das Icon oben links zeigt den gewählten Fahrer, ein Tipp tauscht die Ergebniskarte gegen die
   // Auswahl. Ein Tipp auf eine Kachel wählt und führt zurück; auch das Icon und „Zurück“ schließen.
   const riderBtn = $('btn-rider'), riderIcon = riderBtn.querySelector('.rider-preview'), ridersEl = $('riders');
-  const showRiders = (on) => { doc.body.dataset.riders = on ? '1' : ''; };
   const riderTiles = RIDER_ORDER.map((id) => {
     const tile = doc.createElement('button');
     tile.type = 'button';
@@ -166,7 +172,7 @@ export function createHud(g, doc, hooks = {}) {
     drawRiderPreview(riderIcon, g.rider, 40);
   }
   markRider();
-  onTap(riderBtn, () => showRiders(doc.body.dataset.riders !== '1'));
+  onTap(riderBtn, () => showRiders(doc.body.dataset.panel !== 'riders'));
   onTap($('btn-rider-back'), () => showRiders(false));
 
   // Bestenliste (board.js): Top-Zeilen des gewählten Modus, die eigene Zeile trägt das Namensfeld. Ohne Namen steht
@@ -217,7 +223,46 @@ export function createHud(g, doc, hooks = {}) {
       ownM.textContent = v.own ? scoreText(v.own.m) : local > 0 ? scoreText(local) : '–';
     }
     const verdict = board.lastVerdict();
-    noteEl.textContent = verdict ? verdictText(verdict) : board.stale() ? 'Letzter bekannter Stand' : '';
+    noteEl.textContent = verdict ? verdictText(verdict) : board.stale() ? 'Letzter bekannter Stand' : 'Tippen für Details';
+  }
+
+  // Detail-Kachel: ein Tipp auf die Liste (nicht auf die eigene Zeile, die gehört dem Namensfeld) zeigt alle Einträge
+  // des gewählten Modus mit Wert, Fahrzeit und Durchschnittstempo des besten Laufs. Ohne Namen gibt es keine Liste,
+  // also auch keine Details. Die Liste scrollt (input.js lässt #stats-list natives Wischen).
+  const statsMode = $('stats-mode'), statsHead = $('stats-head'), statsList = $('stats-list'), statsNote = $('stats-note');
+  const cell = (cls, text) => {
+    const span = doc.createElement('span');
+    span.className = cls;
+    span.textContent = text;
+    return span;
+  };
+  function renderStats() {
+    const time = lowerIsBetter(g.mode);
+    statsMode.textContent = MODES[g.mode].name;
+    statsHead.replaceChildren(cell('stats-rank', '#'), cell('stats-name', 'Name'), cell('stats-num', time ? 'Gesamt' : 'Meter'),
+      cell('stats-num', time ? 'Fahrzeit' : 'Zeit'), cell('stats-num', 'Ø km/h'));
+    const list = board.stats(g.mode);
+    statsList.replaceChildren(...list.map((e) => {
+      const row = doc.createElement('div');
+      row.className = 'stats-row' + (e.own ? ' own' : '');
+      row.append(
+        cell('stats-rank', e.rank),
+        cell('stats-name', e.name),
+        cell('stats-num', time ? formatClock(e.m / 100, false) : nf.format(e.m)),
+        cell('stats-num', e.t > 0 ? formatClock(e.t, false) : '–'),
+        cell('stats-num', e.kmh > 0 ? nf.format(e.kmh) : '–'),
+      );
+      return row;
+    }));
+    statsNote.textContent = !list.length ? 'Noch keine Einträge'
+      : time ? `Fahrzeit ohne Strafen, Tempo auf ${nf.format(C.SG_FINISH_M)} m` : 'Zeit und Tempo des besten Laufs';
+  }
+  function openStats() {
+    if (!boardOn || !board.name()) return;
+    if (doc.activeElement === nameInput) nameInput.blur();
+    renderStats();
+    statsList.scrollTop = 0;
+    showPanel('stats');
   }
   if (boardOn) {
     let nameBefore = '';
@@ -231,7 +276,14 @@ export function createHud(g, doc, hooks = {}) {
       if (!board.setName(nameInput.value)) nameInput.value = board.name();
       renderBoard();
     });
-    board.onChange(() => { if (doc.body.dataset.overlay === '1') { refreshDead(); renderBoard(); } });
+    board.onChange(() => {
+      if (doc.body.dataset.overlay !== '1') return;
+      refreshDead();
+      renderBoard();
+      if (doc.body.dataset.panel === 'stats') renderStats();
+    });
+    onTap(boardEl, (hit) => { if (!(hit && hit.closest && hit.closest('.board-own'))) openStats(); });
+    onTap($('btn-stats-back'), () => showPanel(''));
   }
 
   function sync(now, R, force) {
@@ -286,7 +338,7 @@ export function createHud(g, doc, hooks = {}) {
       lastOverlay = ov;
       doc.body.dataset.overlay = ov;
       if (themeEl) themeEl.content = ov ? C.BG_DIM : C.BG;
-      if (ov) { refreshDead(); markActive(); renderBoard(); } else showRiders(false);
+      if (ov) { refreshDead(); markActive(); renderBoard(); } else showPanel('');
     }
     if (g.debug && (force || now - lastDebug > 250)) {
       lastDebug = now;
