@@ -41,7 +41,7 @@ export function createHud(g, doc, hooks = {}) {
   const nf1 = new Intl.NumberFormat(C.HUD_LOCALE, { maximumFractionDigits: 1 });
   const nf2 = new Intl.NumberFormat(C.HUD_LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const hintDefault = hintEl.textContent;
-  let lastSpeed = -1, lastDist = -1, lastTime = '', lastState = '', lastOverlay = '', lastDebug = 0, lastText = -1e9;
+  let lastSpeed = -1, lastDist = '', lastTime = '', lastState = '', lastOverlay = '', lastDebug = 0, lastText = -1e9;
   let lastMode = '', lastNote = '', lastCount = '';
 
   // Tipp auf Buttons und Overlay: Maus und Tastatur über click, Touch über pointerup (input.js bricht touchstart
@@ -242,7 +242,10 @@ export function createHud(g, doc, hooks = {}) {
       lastText = now;
       const kmh = Math.round(g.skier.v * 3.6);
       if (kmh !== lastSpeed) { lastSpeed = kmh; speedEl.textContent = nf.format(kmh) + ' km/h'; }
-      if (m !== lastDist) { lastDist = m; distEl.textContent = nf.format(m) + ' m'; }
+      // Gipfel (Classic): kurz „Everest“ statt der Meter
+      const summit = g.summitT >= 0 && g.state === 'running' && g.runT - g.summitT < C.EVEREST_HUD_S;
+      const dist = summit ? 'Everest' : nf.format(m) + ' m';
+      if (dist !== lastDist) { lastDist = dist; distEl.textContent = dist; }
       if (cs) {
         // Wirksame Zeit: Laufzeit plus Strafen, nach dem Ziel die Gesamtzeit
         const txt = formatClock(cs.finished ? cs.total : g.runT + cs.penalty, false);

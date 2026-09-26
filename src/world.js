@@ -81,6 +81,7 @@ function genCell(w, cx, cy) {
     const h = isRock ? 0.8 + rng() * 0.6 : 2.0 + rng() * 1.2;
     if (x * x + y * y < C.START_CLEAR_M * C.START_CLEAR_M) continue;
     if (Math.abs(y - C.SIGN_Y_M) < C.SIGN_BAND_M) continue; // Schriftzug: kein Hindernis im ganzen Streifen
+    if (Math.abs(y - C.EVEREST_Y_M) < C.SIGN_BAND_M) continue; // Gipfelschild ebenso
     if (Math.abs(x - laneX(w, y)) < laneHalf(y) + r) continue;
     if (w.pisteHalf > 0 && Math.abs(x - laneX(w, y)) < w.pisteHalf + r) continue; // Super-G: freie Piste
     let ok = true;

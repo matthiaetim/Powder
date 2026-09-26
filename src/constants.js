@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.18.0';
+export const VERSION = '0.19.0';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -211,6 +211,14 @@ export const C = {
   SIGN_SPRAY_ALPHA: 0.2,     // breiter, schwacher zweiter Strich: der aufgewirbelte Schnee neben den Ski
   SIGN_SPRAY_W_M: 0.6,       // so viel breiter als der Radierstrich
   SIGN_MAX_PX: 2048,         // Deckel für die Breite des Offscreen-Canvas in Gerätepixeln
+  SIGN_BUILD_AHEAD_M: 150,   // Schilder weit unten (Everest) erst bauen, wenn der Fahrer so nah ist; weiter als die Sicht
+
+  // Easter Egg (Classic): Gipfelschild bei der Höhe des Mount Everest, gleiche Machart wie der Credit (render.js),
+  // mit Gipfelkreuz; beim Überfahren zeigt das HUD kurz „Everest“ statt der Meter, dazu ein kleiner Dreiklang.
+  EVEREST_Y_M: 8848,
+  EVEREST_TEXT: 'Everest 8.848 m',
+  EVEREST_WIDTH_FRAC: 0.7,   // kleiner als der Credit, der Text ist kürzer und wäre sonst riesig
+  EVEREST_HUD_S: 2.5,
 
   // Easter Egg (Classic, yeti.js): Yeti-Spuren. Bewusst ohne Regler und ohne Anzeige im Debug-Overlay, der Zufall
   // soll auch für die Entwickler eine Überraschung bleiben.

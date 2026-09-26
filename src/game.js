@@ -25,6 +25,7 @@ export function createGame(opts = {}) {
     skier: P.createSkier(), world: null, av: null,
     course: null, // Super-G: Tore und Wertung (gates.js), in den anderen Modi null
     yeti: null,   // Classic: Yeti-Spuren (yeti.js), nur in manchen Läufen
+    summitT: -1,  // Classic: Laufzeit beim Erreichen der Everest-Höhe (HUD zeigt kurz „Everest“), < 0 = noch nicht
     track: createTrack(), particles: createParticles(),
     dist: 0, runT: 0, best: 0, newBest: false,
     runBest: 0, // Bestwert beim Start des Laufs: dort steht die Rekordlinie, auch wenn best beim Aufprall schon steigt
@@ -42,7 +43,7 @@ export function createGame(opts = {}) {
     viewWm: C.VIEW_W_M, viewHm: C.VIEW_W_M * C.VIEW_ASPECT,
     debug: !!opts.debug, lastGesture: '–', runs: 0,
     trackAcc: 0, spawnAcc: 0, plowAcc: 0,
-    onEvent: null, // Haken für den Ton (main.js): press, release, plow, crash, beep, gate, pole, split, finish
+    onEvent: null, // Haken für den Ton (main.js): press, release, plow, crash, beep, gate, pole, split, finish, summit
     onCourse: null, // Rückruf des Torlaufs (einmal gebunden, keine Allokation pro Schritt)
   };
   g.onCourse = (type, data) => courseEvent(g, type, data);
@@ -87,6 +88,7 @@ export function reset(g, seed, intro) {
   g.course = sg ? createCourse(seed, g.world) : null;
   g.av = createAvalanche(0);
   g.yeti = null;
+  g.summitT = -1;
   clearTrack(g.track);
   clearParticles(g.particles);
   g.dist = 0; g.runT = 0; g.newBest = false; g.newBestTime = false;
@@ -201,6 +203,7 @@ function step(g, dt) {
   updateCamera(g, dt);
   advanceTrail(g, dt);
   updateYeti(g.yeti, s, dt);
+  if (g.summitT < 0 && g.mode === 'classic' && g.dist >= C.EVEREST_Y_M) { g.summitT = g.runT; emit(g, 'summit'); }
 
   const hit = checkCollision(g.world, s);
   if (hit) { die(g, hit.t === P.TREE ? 'tree' : 'rock', hit); return; }
