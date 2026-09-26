@@ -23,8 +23,9 @@ export function resetTune() {
   try { localStorage.removeItem(KEY); } catch { /* egal */ }
 }
 
+// Weicht ein Regler vom Standard ab, der das Spiel verändert? Regler mit visual (nur Bild) zählen nicht.
 export function isTuned() {
-  return ROWS.some((t) => C[t.key] !== DEFAULTS[t.key]);
+  return ROWS.some((t) => !t.visual && C[t.key] !== DEFAULTS[t.key]);
 }
 
 // Anzeige eines Werts: Name aus names (1 = erster), sonst Zahl mit Einheit.
@@ -34,7 +35,8 @@ const fmt = (t, v) => {
   return t.unit ? num + ' ' + t.unit : num;
 };
 
-// Baut die Regler in das Panel-Element und hält Anzeige und C synchron.
+// Baut die Regler in das Panel-Element und hält Anzeige und C synchron. onChange bekommt den verstellten Regler
+// (beim Zurücksetzen nichts).
 export function createTunePanel(doc, panel, onChange) {
   const rows = doc.createElement('div');
   rows.className = 'tune-rows';
@@ -63,7 +65,7 @@ export function createTunePanel(doc, panel, onChange) {
       C[t.key] = Number(input.value);
       val.textContent = fmt(t, C[t.key]);
       saveTune();
-      if (onChange) onChange();
+      if (onChange) onChange(t);
     });
     row.append(head, val, input);
     rows.append(row);

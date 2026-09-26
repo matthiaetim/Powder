@@ -32,6 +32,7 @@ export function createWorld(seed, opts = {}) {
     // Korridor-Mitte: zwei überlagerte Sinuswellen; Super-G nur die flache erste, damit die Tore fahrbar bleiben
     lane: opts.lane || { amp: C.LANE_AMP, wave: C.LANE_WAVELENGTH, amp2: 6, wave2: 97 },
     pisteHalf: opts.pisteHalf || 0, // > 0: so weit ist die Piste um die Mitte frei von Hindernissen (Super-G)
+    cx0: NaN, cx1: NaN, cy0: NaN, cy1: NaN, // zuletzt sichergestellter Zellbereich (ensureCells)
   };
 }
 
@@ -113,6 +114,10 @@ export function ensureCells(w, xMin, xMax, yMin, yMax) {
   const cx1 = Math.floor(xMax / size) + 1;
   const cy0 = Math.floor(yMin / size) - 1;
   const cy1 = Math.floor(yMax / size) + 1;
+  // Der Aufruf kommt aus jedem Physikschritt (game.js ensureView); solange der Zellbereich derselbe ist, gibt es
+  // nichts zu tun, und die Schlüssel-Strings und die Iteration über alle Zellen entfallen
+  if (cx0 === w.cx0 && cx1 === w.cx1 && cy0 === w.cy0 && cy1 === w.cy1) return;
+  w.cx0 = cx0; w.cx1 = cx1; w.cy0 = cy0; w.cy1 = cy1;
   for (let cy = cy0; cy <= cy1; cy++) {
     for (let cx = cx0; cx <= cx1; cx++) {
       if (!w.cells.has(key(cx, cy))) genCell(w, cx, cy);

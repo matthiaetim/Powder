@@ -76,9 +76,10 @@ export function createHud(g, doc, hooks = {}) {
   // Tuning-Panel: langer Druck auf das Versions-Label öffnet es, Spiel pausiert derweil.
   const tuneEl = $('tune');
   const versionEl = $('version');
-  const markTuned = () => {
+  const markTuned = (t) => {
     versionEl.classList.toggle('tuned', isTuned());
-    if (g.state === 'running' || g.state === 'paused') g.runTainted = true; // mitten im Lauf verstellt: zählt nicht online (board.js)
+    // mitten im Lauf verstellt: zählt nicht online (board.js); Regler, die nur das Bild ändern (visual), ausgenommen
+    if (!(t && t.visual) && (g.state === 'running' || g.state === 'paused')) g.runTainted = true;
     if (hooks.onTune) hooks.onTune();
   };
   const tune = createTunePanel(doc, tuneEl, markTuned);

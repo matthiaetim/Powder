@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.20.2';
+export const VERSION = '0.20.3';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -13,7 +13,8 @@ export const C = {
   CAM_ZOOM_FAST: 1.20,       // (Tuning) Herauszoomen bei vollem Tempo, 1 = aus
   CAM_SPEED_REF_KMH: 160,    // ab hier volle Vorausschau
   CAM_ZOOM_EASE_S: 0.6,      // Zeitkonstante von Zoom und Fahrerposition
-  MAX_DPR: 2,
+  MAX_DPR: 2,                // (Tuning) Auflösung: Deckel für devicePixelRatio; 3 wäre am iPhone volle Schärfe bei mehr als
+                             // doppelter Zeichenfläche, unter 2 wird das Bild weicher, aber schneller (Regler „Bild“)
   CAM_X_EASE_S: 0.25,        // Kamera folgt seitlich mit etwas Verzug: der Fahrer schwingt im Bild
 
   // Loop: Teilschritte von höchstens STEP, die genau bis zur Bildzeit reichen (main.js). Längere Aussetzer
@@ -304,7 +305,8 @@ export const C = {
 };
 
 // Regler im Tuning-Panel (langer Druck auf das Versions-Label). Einträge mit heading sind Zwischentitel,
-// names zeigt statt der Zahl einen Namen (1 = erster Name).
+// names zeigt statt der Zahl einen Namen (1 = erster Name). visual: der Regler ändert nur das Bild, nicht das Spiel,
+// und macht Läufe deshalb nicht ungültig für die Bestenliste (tune.js isTuned, hud.js).
 export const TUNABLES = [
   { heading: 'Fahren' },
   { key: 'TURN_TAP_DEG', label: 'Tipp-Winkel', unit: '°', min: 10, max: 80, step: 5 },
@@ -352,6 +354,8 @@ export const TUNABLES = [
   { key: 'SG_PENALTY_S', label: 'Zeitstrafe pro Tor', unit: 's', min: 0, max: 10, step: 0.5, decimals: 1 },
   { key: 'SG_POLE_KMH', label: 'Stange kostet', unit: 'km/h', min: 0, max: 30, step: 1 },
   { key: 'SG_MAX_SPEED_KMH', label: 'Endtempo', unit: 'km/h', min: 100, max: 300, step: 10 },
+  { heading: 'Bild' },
+  { key: 'MAX_DPR', label: 'Auflösung', unit: '×', min: 1, max: 3, step: 0.5, decimals: 1, visual: true },
   { heading: 'Schriftzug' },
   { key: 'SIGN_ALPHA', label: 'Deckkraft', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
   { key: 'SIGN_WIDTH_FRAC', label: 'Breite', unit: '%', min: 0.4, max: 1, step: 0.02, scale: 100, decimals: 0 },

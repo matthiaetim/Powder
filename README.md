@@ -39,7 +39,8 @@ Gerät), ein Eintrag wird nur durch einen besseren überschrieben, und wer sich 
 (Aufräumen in der Firebase-Konsole). Die Bestweiten der anderen liegen als graue Namenslinien im Schnee, beim Start des
 Laufs eingefroren; die eigene rote Rekordlinie bleibt. Im Super-G gibt es keine Namenslinien, Zeiten lassen sich nicht in
 den Hang legen. Welche Modi eine Liste haben und wie sie werten, steht in `MODES` (`board: 'm'` oder `'time'`,
-`src/modes.js`). Läufe mit Tuning, `?seed=` oder `?debug=1` zählen lokal, aber nicht online (Hinweis unter der Liste).
+`src/modes.js`). Läufe mit Tuning, `?seed=` oder `?debug=1` zählen lokal, aber nicht online (Hinweis unter der Liste);
+der Regler „Auflösung“ ist ausgenommen, er ändert nur das Bild.
 Offline zeigt die Liste den letzten bekannten Stand, ausstehende Bestwerte werden beim nächsten Start oder Lauf nachgeholt.
 
 Ein Tipp auf die Liste (nicht auf die eigene Zeile, die ändert den Namen) öffnet die Detail-Kachel des gewählten Modus:
@@ -97,7 +98,7 @@ Leerlauf-Anteil, Hitboxen, Safe Lane), `?seed=42` (reproduzierbare Welt),
 
 ## Tuning
 
-Alle Stellschrauben stehen in `src/constants.js`; die Liste `TUNABLES` dort bestimmt die Regler im Panel (Abschnitte „Fahren“, „Lawine“: Tempo am Start und Ende, Anstiegsdauer, Lauerabstand, Stillstand-Schwelle und -Wartezeit, Fangabstand, Beben, Schräg zählt Tempo, Gnade beim Schuss, Gnade bis Winkel, volle Härte ab Winkel, Schuss schüttelt ab, „Super-G“: Torabstand, Torbreite, Torversatz, Piste frei je Seite, Zeitstrafe pro Tor, Stange kostet, Endtempo, „Schriftzug“: Deckkraft, Breite, Verwischen, und „Ton“: Lautstärke gesamt, Wind, Ski und Kurven, Lawine, Aufprall, Super-G).
+Alle Stellschrauben stehen in `src/constants.js`; die Liste `TUNABLES` dort bestimmt die Regler im Panel (Abschnitte „Fahren“, „Lawine“: Tempo am Start und Ende, Anstiegsdauer, Lauerabstand, Stillstand-Schwelle und -Wartezeit, Fangabstand, Beben, Schräg zählt Tempo, Gnade beim Schuss, Gnade bis Winkel, volle Härte ab Winkel, Schuss schüttelt ab, „Super-G“: Torabstand, Torbreite, Torversatz, Piste frei je Seite, Zeitstrafe pro Tor, Stange kostet, Endtempo, „Bild“: Auflösung (Deckel für die Pixeldichte, Standard 2; kleiner ist weicher, aber schneller, und zählt nicht als Tuning für die Bestenliste), „Schriftzug“: Deckkraft, Breite, Verwischen, und „Ton“: Lautstärke gesamt, Wind, Ski und Kurven, Lawine, Aufprall, Super-G).
 Ändern sich die Standardwerte, den Schlüssel `KEY` in `src/tune.js` hochzählen, sonst bleiben alte Regler-Werte auf dem iPhone aktiv.
 
 ## Deploy (GitHub Pages)

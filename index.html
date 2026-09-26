@@ -14,6 +14,31 @@
   <link rel="apple-touch-icon" href="./icons/icon-180.png">
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
+  <!-- Schriften und alle Module vorab laden: sonst entdeckt der Browser die Imports erst beim Parsen von main.js und
+       holt sie in drei Stufen nacheinander; die Schrift käme nach dem ersten Bild und der Text spränge um -->
+  <link rel="preload" href="./fonts/LuckiestGuy-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="./fonts/Nunito-Variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="modulepreload" href="./src/main.js">
+  <link rel="modulepreload" href="./src/constants.js">
+  <link rel="modulepreload" href="./src/game.js">
+  <link rel="modulepreload" href="./src/input.js">
+  <link rel="modulepreload" href="./src/render.js">
+  <link rel="modulepreload" href="./src/hud.js">
+  <link rel="modulepreload" href="./src/tune.js">
+  <link rel="modulepreload" href="./src/audio.js">
+  <link rel="modulepreload" href="./src/board.js">
+  <link rel="modulepreload" href="./src/physics.js">
+  <link rel="modulepreload" href="./src/world.js">
+  <link rel="modulepreload" href="./src/avalanche.js">
+  <link rel="modulepreload" href="./src/avalanche-view.js">
+  <link rel="modulepreload" href="./src/collision.js">
+  <link rel="modulepreload" href="./src/track.js">
+  <link rel="modulepreload" href="./src/particles.js">
+  <link rel="modulepreload" href="./src/storage.js">
+  <link rel="modulepreload" href="./src/modes.js">
+  <link rel="modulepreload" href="./src/riders.js">
+  <link rel="modulepreload" href="./src/gates.js">
+  <link rel="modulepreload" href="./src/yeti.js">
 </head>
 <body data-state="ready" data-overlay="" data-intro="1">
   <canvas id="game"></canvas>

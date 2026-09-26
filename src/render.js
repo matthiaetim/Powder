@@ -64,14 +64,15 @@ export function createRenderer(canvas) {
   const R = {
     canvas, ctx, W: 0, H: 0, dpr: 1, S: 10, Sv: 10, sprites: null, spriteKey: '', list: [], skierMarker: { skier: true, y: 0 },
     frameMs: 16.7, paceMs: 0, trackPts: new Float32Array(C.TRACK_CAP * 7), snow: createSnow(), shards: { p: [], run: -1 },
-    signs: SIGNS.map(() => ({ c: null, x: null, key: '', world: null, seen: 0, x0: 0, y0: 0, ym: 0, wM: 0, hM: 0, Q: 1 })),
+    signs: SIGNS.map(() => ({ c: null, x: null, key: '', epoch: -1, stale: true, world: null, seen: 0, x0: 0, y0: 0, ym: 0, wM: 0, hM: 0, Q: 1 })),
     fontReady: false,
+    epoch: 0, // zählt bei resize() und Schriftladen hoch: nur dann können sich die Schild-Schlüssel ändern
   };
   // Der Canvas stößt das Laden der Schrift nicht an, das HUD tut es beim Seitenstart. Bis sie da ist, würde der
   // Schriftzug in der Systemschrift gebaut; fontReady steckt im Schlüssel und baut ihn dann einmal neu. Ein Fehler zählt
   // auch als fertig, sonst bliebe der Schlüssel ewig offen.
   if (document.fonts && document.fonts.load) {
-    document.fonts.load(`400 20px ${SIGN_FONT_STACK}`).catch(() => {}).then(() => { R.fontReady = true; });
+    document.fonts.load(`400 20px ${SIGN_FONT_STACK}`).catch(() => {}).then(() => { R.fontReady = true; R.epoch++; });
   } else R.fontReady = true;
   return R;
 }
@@ -81,14 +82,17 @@ export function resize(R) {
   const H = R.canvas.clientHeight || window.innerHeight;
   const dpr = Math.min(window.devicePixelRatio || 1, C.MAX_DPR);
   R.W = W; R.H = H; R.dpr = dpr;
-  R.canvas.width = Math.round(W * dpr);
-  R.canvas.height = Math.round(H * dpr);
+  // Den Puffer nur neu anlegen, wenn sich wirklich etwas geändert hat: der Aufruf kommt auch von jedem Regler im
+  // Tuning und von der Tastatur am Namensfeld, und jede Zuweisung an width/height legt den Puffer neu an und leert ihn
+  const cw = Math.round(W * dpr), ch = Math.round(H * dpr);
+  if (R.canvas.width !== cw || R.canvas.height !== ch) { R.canvas.width = cw; R.canvas.height = ch; }
   R.S = Math.min(W / C.VIEW_W_M, H / (C.VIEW_W_M * C.VIEW_ASPECT));
   const key = R.S.toFixed(3) + '@' + dpr;
   if (key !== R.spriteKey) {
     R.sprites = makeSprites(R.S, dpr);
     R.spriteKey = key;
   }
+  R.epoch++;
 }
 
 // ---------- Sprites (einmal vorgerendert) ----------
@@ -456,9 +460,13 @@ function eraseSegment(sg, rails, xa, ya, nxa, nya, pa, xb, yb, nxb, nyb, wb, pb)
 // gebaut, wenn der Fahrer bis auf SIGN_BUILD_AHEAD_M heran ist; bis dahin gehört es zu keiner Welt.
 function updateSignature(R, g, sg, spec) {
   const tr = g.track;
-  if (sg.world !== g.world || sg.key !== signKey(R, spec)) {
+  // Ob der Schlüssel (Maßstab, Schrift, Regler) noch passt, wird nur nach resize() geprüft (R.epoch), nicht in
+  // jedem Bild: der Schlüssel ist ein zusammengesetzter String
+  if (sg.epoch !== R.epoch) { sg.epoch = R.epoch; sg.stale = sg.key !== signKey(R, spec); }
+  if (sg.world !== g.world || sg.stale) {
     if (spec.lazy && g.skier.y < spec.y() - C.SIGN_BUILD_AHEAD_M) { sg.world = null; return false; }
     buildSignature(R, g, sg, spec);
+    sg.stale = false;
   }
   const fresh = Math.min(tr.total - sg.seen, tr.n);
   if (fresh > 0) replayErase(sg, tr, fresh + 1, railsOf(g.rider));
