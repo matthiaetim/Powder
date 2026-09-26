@@ -61,6 +61,14 @@
   </div>
   <div id="ov-dead" class="overlay">
    <button id="btn-rider" type="button" aria-label="Fahrer wählen"><canvas class="rider-preview" width="40" height="40"></canvas></button>
+   <button id="btn-sound" type="button" aria-label="Ton an" aria-pressed="true">
+    <svg class="sound-icon" viewBox="0 0 40 40" aria-hidden="true">
+     <path class="spk" d="M8 16h6l8-7v22l-8-7H8z"/>
+     <path class="wave" d="M26.5 15.5a6.5 6.5 0 0 1 0 9"/>
+     <path class="wave" d="M30 11.5a12 12 0 0 1 0 17"/>
+     <path class="mute" d="M27 16l8 8M35 16l-8 8"/>
+    </svg>
+   </button>
    <div id="rider-card" class="card">
     <div class="card-title">Fahrer</div>
     <div id="riders"></div>
@@ -121,12 +129,8 @@
       <div id="board-note"></div>
     </div>
     <button id="btn-fresh" type="button">Fresh</button>
-    <button id="mode-current" class="mode-card mode-row" type="button" aria-label="Modus wählen">
-      <canvas class="mode-preview" width="104" height="58"></canvas>
-      <span class="mode-text"><span class="mode-name"></span><span class="mode-desc"></span></span>
-      <span class="mode-more">ändern</span>
-    </button>
-    <button id="btn-sound" type="button">Ton an</button>
+    <div id="modes"></div>
+    <button id="btn-modes" class="btn-flat" type="button">Modus auswählen</button>
    </div>
   </div>
   <div id="version" role="button" aria-label="Version, lange drücken für Tuning"></div>

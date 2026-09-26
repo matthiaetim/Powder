@@ -9,7 +9,7 @@ import { createAvalanche, updateAvalanche } from './avalanche.js';
 import { checkCollision } from './collision.js';
 import { createTrack, clearTrack, pushTrack } from './track.js';
 import { createParticles, clearParticles, spawnParticle, updateParticles } from './particles.js';
-import { loadBest, saveBest, loadBestTime, saveBestTime, loadBestSplits, saveBestSplits, loadRider, saveRider } from './storage.js';
+import { loadBest, saveBest, loadBestTime, saveBestTime, loadBestSplits, saveBestSplits, loadRider, saveRider, noteRecentMode } from './storage.js';
 import { MODES, DEFAULT_MODE, lowerIsBetter } from './modes.js';
 import { RIDERS, validRider } from './riders.js';
 import { createCourse, updateCourse, tickCourse, crossFrac } from './gates.js';
@@ -206,6 +206,7 @@ function start(g) {
   if (g.state !== 'ready' && g.state !== 'count') return;
   g.state = 'running';
   g.runMode = g.mode;
+  noteRecentMode(g.mode); // Reihenfolge der Modus-Vorschauen auf der Fresh-Seite (hud.js)
   loadBests(g);
   g.runBest = g.best;
   g.runMarks = g.marks[g.mode] || [];
@@ -491,11 +492,12 @@ export function fresh(g) {
   if (freshReady(g)) reset(g, seedFor(g), false);
 }
 // Modus wechseln (auf der Fresh-Seite): Bestwerte gehören zum Modus. Bewusst nicht gespeichert, die App startet
-// immer in Classic.
+// immer in Classic; gemerkt wird nur, dass er zuletzt gewählt war (Reihenfolge der Vorschauen).
 export function selectMode(g, id) {
   const m = MODES[id];
   if (!m || m.soon) return false;
   g.mode = id;
+  noteRecentMode(id);
   loadBests(g);
   return true;
 }

@@ -1,5 +1,5 @@
 // DOM-HUD: Tempo, Distanz, Pause, Fresh-Seite mit Laufzeit, Bestenliste samt Namensfeld und Detail-Kachel,
-// Moduswahl (Element unter Fresh und Kachel mit allen Modi), Debug-Text.
+// Moduswahl (drei Vorschauen unter Fresh und Kachel mit allen Modi), Ton-Icon, Debug-Text.
 // Super-G: dazu die laufende Zeit, Hinweise zu Torfehler und Zwischenzeit, der Countdown in der Bildmitte.
 import { C, VERSION } from './constants.js';
 import { overlayReady, togglePause, pauseIfRunning, fresh, selectMode, selectRider } from './game.js';
@@ -8,7 +8,7 @@ import { verdictText } from './board.js';
 import { MODES, MODE_ORDER, lowerIsBetter } from './modes.js';
 import { RIDERS, RIDER_ORDER } from './riders.js';
 import { drawModePreview, drawRiderPreview } from './render.js';
-import { loadBest, loadBestTime, loadDuelTally } from './storage.js';
+import { loadBest, loadBestTime, loadDuelTally, loadRecentModes } from './storage.js';
 import { createDuelCard } from './duel-card.js';
 
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -67,12 +67,13 @@ export function createHud(g, doc, hooks = {}) {
   onTap($('btn-fresh'), doFresh);
   if (g.debug) debugEl.hidden = false;
 
-  // Ton an/aus auf der Fresh-Seite (audio.js), bleibt gespeichert
+  // Ton an/aus: Icon oben rechts auf der Fresh-Seite (audio.js), bleibt gespeichert. Aus: Lautsprecher mit Kreuz.
   const snd = hooks.sound;
   const soundEl = $('btn-sound');
   const syncSound = () => {
     const on = !snd || snd.isOn();
-    soundEl.textContent = on ? 'Ton an' : 'Ton aus';
+    soundEl.setAttribute('aria-label', on ? 'Ton an' : 'Ton aus');
+    soundEl.setAttribute('aria-pressed', on ? 'true' : 'false');
     soundEl.classList.toggle('off', !on);
   };
   onTap(soundEl, () => { if (snd) { snd.toggle(); syncSound(); } });
@@ -140,13 +141,14 @@ export function createHud(g, doc, hooks = {}) {
   // ('stats'), immer nur eine
   const showPanel = (name) => { doc.body.dataset.panel = name; };
 
-  // Moduswahl: unter Fresh steht der gewählte Modus (Vorschau, Name, Kurztext), ein Tipp öffnet die Kachel „Modus“
-  // mit allen Modi als Zeilen samt persönlichem Bestwert. Die Bestwerte der anderen Modi liegen nur im Storage
-  // (g.best gilt für den gewählten), deshalb werden sie beim Öffnen frisch gelesen. Die Vorschauen zeigen den
-  // gewählten Fahrer und werden bei einem Fahrerwechsel neu gezeichnet.
-  const curBtn = $('mode-current'), curCv = curBtn.querySelector('.mode-preview');
-  const curName = curBtn.querySelector('.mode-name'), curDesc = curBtn.querySelector('.mode-desc');
+  // Moduswahl: unter Fresh stehen drei Vorschauen, links immer Classic, daneben die zwei zuletzt gewählten oder
+  // gefahrenen Modi (storage.js), fehlen die, die nächsten aus MODE_ORDER. Die gewählte ist gelb, ein Tipp darauf
+  // startet Fresh, ein Tipp auf eine andere wählt sie. „Modus auswählen“ öffnet die Kachel „Modus“ mit allen Modi als
+  // Zeilen samt persönlichem Bestwert. Die Bestwerte der anderen Modi liegen nur im Storage (g.best gilt für den
+  // gewählten), deshalb werden sie beim Öffnen frisch gelesen. Die Vorschauen zeigen den gewählten Fahrer und werden
+  // bei einem Fahrerwechsel neu gezeichnet.
   const modesList = $('modes-list');
+  const modeOff = (id) => id === 'duel' && !duelOn; // Duell braucht die Datenbank (BOARD_URL)
   const bestText = (id) => {
     if (id === 'duel') {
       if (!duelOn) return 'offline';
@@ -161,7 +163,7 @@ export function createHud(g, doc, hooks = {}) {
     const m = MODES[id];
     const row = doc.createElement('button');
     row.type = 'button';
-    const off = id === 'duel' && !duelOn; // Duell braucht die Datenbank (BOARD_URL)
+    const off = modeOff(id);
     row.className = 'mode-card mode-row' + (m.soon || off ? ' soon' : '');
     row.dataset.mode = id;
     const cv = doc.createElement('canvas');
@@ -187,23 +189,61 @@ export function createHud(g, doc, hooks = {}) {
     modesList.append(row);
     return row;
   });
+  const modesEl = $('modes');
+  const cards = [0, 1, 2].map(() => {
+    const card = doc.createElement('button');
+    card.type = 'button';
+    card.className = 'mode-card';
+    const cv = doc.createElement('canvas');
+    cv.className = 'mode-preview';
+    const name = doc.createElement('span');
+    name.className = 'mode-name';
+    const cta = doc.createElement('span');
+    cta.className = 'mode-cta';
+    cta.textContent = 'Tap to play'; // nur beim gewählten sichtbar, steht überall, damit die Kärtchen gleich hoch sind
+    card.append(cv, name, cta);
+    onTap(card, () => {
+      const id = card.dataset.mode;
+      if (!id || MODES[id].soon || modeOff(id)) return;
+      if (id === g.mode) { doFresh(); return; }
+      if (id === 'duel') { openDuel(); return; }
+      if (selectMode(g, id)) { markActive(); refreshDead(); renderBoard(); }
+    });
+    modesEl.append(card);
+    return card;
+  });
+  // Belegung der drei Plätze. Beim Wählen bleibt sie stehen, solange der Modus schon zu sehen ist, sonst spränge die
+  // getippte Vorschau unter dem Finger auf den mittleren Platz; neu sortiert wird, wenn die Fresh-Seite erscheint.
+  function layoutModes(keep) {
+    if (keep && cards.some((c) => c.dataset.mode === g.mode)) return;
+    const ok = (id) => MODES[id] && !MODES[id].soon && !modeOff(id) && id !== 'classic';
+    // der gewählte Modus steht vorn, auch wenn der Speicher fehlt (selectMode merkt ihn sonst ohnehin)
+    const ids = ['classic', ...new Set([g.mode, ...loadRecentModes(), ...MODE_ORDER].filter(ok))].slice(0, 3);
+    cards.forEach((card, i) => {
+      const id = ids[i];
+      card.hidden = !id;
+      if (!id || card.dataset.mode === id) return;
+      card.dataset.mode = id;
+      card.querySelector('.mode-name').textContent = MODES[id].name;
+      drawModePreview(card.querySelector('.mode-preview'), id, g.rider);
+    });
+  }
   const drawModes = () => {
     for (const row of modeRows) drawModePreview(row.querySelector('.mode-preview'), row.dataset.mode, g.rider);
-    drawModePreview(curCv, g.mode, g.rider);
+    for (const card of cards) if (card.dataset.mode) drawModePreview(card.querySelector('.mode-preview'), card.dataset.mode, g.rider);
   };
-  function markActive() {
+  function markActive(keep = true) {
     for (const row of modeRows) row.classList.toggle('active', row.dataset.mode === g.mode);
-    curName.textContent = MODES[g.mode].name;
-    curDesc.textContent = MODES[g.mode].desc;
-    drawModePreview(curCv, g.mode, g.rider);
+    layoutModes(keep);
+    for (const card of cards) card.classList.toggle('active', card.dataset.mode === g.mode);
   }
   function openModes() {
     for (const row of modeRows) row.querySelector('.mode-best').textContent = bestText(row.dataset.mode);
     showPanel('modes');
   }
   drawModes();
-  markActive();
-  onTap(curBtn, openModes);
+  markActive(false);
+  onTap($('btn-modes'), openModes);
   onTap($('btn-modes-back'), () => showPanel(''));
 
   // Duell (duel.js, duel-card.js): Modus wählen und die Kachel öffnen; im Zustand ready (App-Start mit ?room=CODE)
@@ -437,7 +477,7 @@ export function createHud(g, doc, hooks = {}) {
       lastOverlay = ov;
       doc.body.dataset.overlay = ov;
       if (themeEl) themeEl.content = ov ? C.BG_DIM : C.BG;
-      if (ov) { refreshDead(); markActive(); renderBoard(); if (g.mode === 'duel' && duel && duel.active()) showPanel('duel'); } else showPanel('');
+      if (ov) { refreshDead(); markActive(false); renderBoard(); if (g.mode === 'duel' && duel && duel.active()) showPanel('duel'); } else showPanel('');
     }
     if (g.debug && (force || now - lastDebug > 250)) {
       lastDebug = now;

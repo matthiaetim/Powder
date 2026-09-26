@@ -1,5 +1,6 @@
-// Bestwert je Modus (Meter), Bestzeit (Super-G), Name, Fahrer, Ton und Duell-Zähler im localStorage. Fällt still auf
-// 0 bzw. '' zurück, wenn Speicher fehlt. Der Modus selbst wird bewusst nicht gespeichert (game.js).
+// Bestwert je Modus (Meter), Bestzeit (Super-G), Name, Fahrer, Ton, Duell-Zähler und die zuletzt gespielten Modi im
+// localStorage. Fällt still auf 0 bzw. '' zurück, wenn Speicher fehlt. Der gewählte Modus selbst wird bewusst nicht
+// gespeichert (game.js).
 const bestKey = (mode) => (mode === 'classic' || !mode ? 'powder.best' : 'powder.best.' + mode);
 
 export function loadBest(mode) {
@@ -58,7 +59,7 @@ export function saveBestSplits(mode, arr) {
   }
 }
 
-// Ton an/aus (Schalter auf der Fresh-Seite). Standard: an.
+// Ton an/aus (Icon oben rechts auf der Fresh-Seite). Standard: an.
 const SOUND_KEY = 'powder.sound';
 
 export function loadSoundOn() {
@@ -172,4 +173,19 @@ export function bumpDuelTally(key, name, result) {
   e[result] = (e[result] || 0) + 1;
   all[key] = e;
   saveJson(DUEL_KEY, all);
+}
+
+// Zuletzt gewählte oder gefahrene Modi, der jüngste vorn (hud.js zeigt die zwei jüngsten neben Classic). Der gewählte
+// Modus selbst bleibt ungespeichert, die App startet in Classic; nur die Reihenfolge der Vorschauen merkt sich das.
+const RECENT_KEY = 'powder.recent';
+
+export function loadRecentModes() {
+  const arr = loadJson(RECENT_KEY);
+  return Array.isArray(arr) ? arr.filter((id) => typeof id === 'string') : [];
+}
+
+export function noteRecentMode(id) {
+  const arr = loadRecentModes();
+  if (arr[0] === id) return;
+  saveJson(RECENT_KEY, [id, ...arr.filter((m) => m !== id)].slice(0, 6));
 }

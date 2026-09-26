@@ -37,6 +37,16 @@
         "8091"
       ],
       "port": 8091
+    },
+    {
+      "name": "powder-board-8093",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "tools/serve.js",
+        "8093",
+        "--board"
+      ],
+      "port": 8093
     }
   ]
 }
