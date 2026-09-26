@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.24.1';
+export const VERSION = '0.24.2';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -278,6 +278,7 @@ export const C = {
   SG_POLE_KMH: 20,           // (Tuning) Tempoverlust beim Berühren einer Stange
   SG_MAX_SPEED_KMH: 240,     // (Tuning) Endtempo im Super-G, unabhängig von MAX_SPEED_KMH der anderen Modi
   SG_POLE_R: 0.12,           // Radius der Stange für die Berührung
+  SG_FLAG_W_M: 0.9,          // Breite des Fähnchens; an seinem äußeren Ende steht die zweite Stange des Panels
   // Getroffene Stange (render.js): kippt um den Fußpunkt vom Fahrer weg, schwingt hin und her und klingt ab,
   // dabei biegt sie sich (Scherung, die Spitze wandert weiter als der Winkel allein)
   SG_POLE_WOBBLE_S: 1.1,     // so lange schwingt sie

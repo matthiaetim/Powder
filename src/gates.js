@@ -7,6 +7,8 @@
 import { C } from './constants.js';
 import { laneX, mulberry32 } from './world.js';
 
+const HIT_KEYS = ['hitL', 'hitLo', 'hitR', 'hitRo']; // Reihenfolge in updateCourse: Seite × innen/außen
+
 const SALT = 0x5347; // „SG“: eigener Zufallsstrom für die Tore, unabhängig von der Welt
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -35,7 +37,7 @@ export function createCourse(seed, w) {
     gates.push({
       i, y, x, half, red,
       state: 0,               // 0 offen, 1 durchfahren, 2 verpasst
-      hitL: false, hitR: false, // Stange schon berührt (zählt je Stange einmal)
+      hitL: false, hitR: false, hitLo: false, hitRo: false, // Stange schon berührt (je Stange einmal; o = äußere)
       // zwei Render-Objekte je Tor, einmal angelegt: drawWorld sortiert sie mit dem Fahrer nach y
       // wob: Sekunden seit dem Treffer (-1 = steht), wdir: Richtung, in die sie kippt (render.js)
       poles: [{ pole: true, x: x - half, y, red, dir: -1, wob: -1, wdir: 1 }, { pole: true, x: x + half, y, red, dir: 1, wob: -1, wdir: 1 }],
@@ -90,15 +92,18 @@ export function updateCourse(cs, s, prevX, prevY, runT, dt, bestSplits, on) {
     cs.next++;
   }
 
-  // Stangen berühren: nur beim zuletzt gewerteten und beim nächsten Tor, je Stange einmal
+  // Stangen berühren: nur beim zuletzt gewerteten und beim nächsten Tor, je Stange einmal. Je Seite ein Panel aus
+  // zwei Stangen: die innere an der Durchfahrt, die äußere SG_FLAG_W_M weiter außen am Ende des Fähnchens. Beide
+  // kosten Tempo; getroffen schwingt das Panel der Seite (poles[side]).
   const rr = C.SKIER_R + C.SG_POLE_R;
   for (let k = Math.max(0, cs.next - 1); k <= Math.min(cs.gates.length - 1, cs.next); k++) {
     const gt = cs.gates[k];
     if (Math.abs(gt.y - s.y) > 2) continue;
-    for (let side = 0; side < 2; side++) {
-      const key = side === 0 ? 'hitL' : 'hitR';
+    for (let n = 0; n < 4; n++) {
+      const side = n >> 1, outer = n & 1;
+      const key = HIT_KEYS[n];
       if (gt[key]) continue;
-      const px = side === 0 ? gt.x - gt.half : gt.x + gt.half;
+      const px = gt.x + (side === 0 ? -1 : 1) * (gt.half + (outer ? C.SG_FLAG_W_M : 0));
       const ddx = px - s.x, ddy = gt.y - s.y;
       if (ddx * ddx + ddy * ddy >= rr * rr) continue;
       gt[key] = true;

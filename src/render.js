@@ -170,11 +170,15 @@ function makeRock(S, dpr, v) {
 // Torstange (Super-G): stehend wie die Bäume mit Fußpunkt unten in der Mitte, oben ein Fähnchen nach außen (dir)
 // in der Torfarbe mit hellerer Oberkante (Licht von oben-links wie beim Relief), weicher Schatten nach rechts.
 function makePole(S, dpr, red, dir) {
-  const H = POLE_H * S, fw = 0.9 * S, fh = 0.6 * S, pad = 0.8 * S;
+  const H = POLE_H * S, fw = C.SG_FLAG_W_M * S, fh = 0.6 * S, pad = 0.8 * S;
   const w = fw * 2 + pad * 2, h = H + pad * 2;
   const [c, x] = makeCanvas(w, h, dpr);
   const ax = w / 2, ay = pad + H; // Fußpunkt
+  // Wie ein echtes Torpanel: das Fähnchen hängt zwischen der inneren Stange (Fußpunkt, an der Durchfahrt) und einer
+  // äußeren am anderen Ende. Beide zählen als Treffer (gates.js), getroffen kippt das Panel als Ganzes.
+  const ox2 = ax + dir * fw; // äußere Stange
   softEllipse(x, ax + 0.4 * S, ay - 0.05 * S, 0.5 * S, 0.2 * S, C.SHADOW_RGB, 0.28);
+  softEllipse(x, ox2 + 0.3 * S, ay - 0.05 * S, 0.4 * S, 0.18 * S, C.SHADOW_RGB, 0.24);
   const fx = dir > 0 ? ax : ax - fw, fy = ay - H;
   x.fillStyle = red ? C.GATE_RED : C.GATE_BLUE;
   x.fillRect(fx, fy, fw, fh);
@@ -183,7 +187,7 @@ function makePole(S, dpr, red, dir) {
   x.strokeStyle = C.INK;
   x.lineWidth = Math.max(1, 0.08 * S);
   x.lineCap = 'round';
-  x.beginPath(); x.moveTo(ax, fy); x.lineTo(ax, ay); x.stroke();
+  x.beginPath(); x.moveTo(ax, fy); x.lineTo(ax, ay); x.moveTo(ox2, fy); x.lineTo(ox2, ay); x.stroke();
   return { img: c, w, h, ax, ay, nominal: POLE_H };
 }
 
@@ -984,7 +988,8 @@ function drawDebug(R, g, ox, oy) {
       ctx.beginPath(); ctx.moveTo((gt.x - gt.half) * S + ox, sy); ctx.lineTo((gt.x + gt.half) * S + ox, sy); ctx.stroke();
       ctx.lineWidth = 1;
       ctx.strokeStyle = 'rgba(220,40,40,0.6)';
-      for (const px of [gt.x - gt.half, gt.x + gt.half]) { ctx.beginPath(); ctx.arc(px * S + ox, sy, rr, 0, TAU); ctx.stroke(); }
+      const fw = C.SG_FLAG_W_M;
+      for (const px of [gt.x - gt.half - fw, gt.x - gt.half, gt.x + gt.half, gt.x + gt.half + fw]) { ctx.beginPath(); ctx.arc(px * S + ox, sy, rr, 0, TAU); ctx.stroke(); }
     }
   }
   ctx.strokeStyle = 'rgba(220,40,40,0.8)';
