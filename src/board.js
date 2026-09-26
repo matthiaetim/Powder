@@ -81,15 +81,14 @@ export function viewFor(boards, mode, ownKey, rows = C.BOARD_ROWS) {
   return { top, own, ownInTop: idx >= 0 && idx < rows, total: list.length };
 }
 
-// Detail-Kachel: alle Einträge des Modus mit Rang, Fahrzeit t, Durchschnittstempo und Datum ts des besten Laufs
-// (ts ist die Server-Zeit des Uploads, also der Tag des Rekords oder, offline gefahren, des Nachholens). Die Strecke
+// Detail-Kachel: alle Einträge des Modus mit Rang, Fahrzeit t und Durchschnittstempo des besten Laufs. Die Strecke
 // ist in Classic und Chase die Weite, im Super-G die feste Kurslänge; t ist dort die reine Fahrzeit ohne Strafen,
 // das Tempo also das tatsächlich gefahrene. Einträge ohne t (alte Stände) haben kein Tempo: kmh 0, die Anzeige
 // setzt einen Strich.
 export function statsFor(boards, mode, ownKey) {
   const dist = (e) => (lowerIsBetter(mode) ? C.SG_FINISH_M : e.m);
   return sortEntries(boards && boards[mode], mode).map((e, i) => ({
-    rank: i + 1, key: e.key, name: e.name, m: e.m, t: e.t, ts: e.ts,
+    rank: i + 1, key: e.key, name: e.name, m: e.m, t: e.t,
     kmh: e.t > 0 ? (dist(e) / e.t) * 3.6 : 0,
     own: !!ownKey && e.key === ownKey,
   }));

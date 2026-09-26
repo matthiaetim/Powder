@@ -20,12 +20,6 @@ export function formatRunTime(sec) {
   return m === 0 ? `${s},${hh} Sekunden` : `${m}:${pad2(s)}:${hh} Minuten`;
 }
 
-// Datum des Rekords: „26.09.2026“ in Ortszeit, unabhängig vom Gebietsschema des Browsers.
-export function formatDate(ms) {
-  const d = new Date(ms);
-  return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.${d.getFullYear()}`;
-}
-
 // Uhr im Super-G: „41,27“ (Hundertstel), ab einer Minute „1:02,47“; mit unit hängt unter einer Minute „ s“ an.
 export function formatClock(sec, unit) {
   const cs = Math.max(0, Math.round(sec * 100));
@@ -233,8 +227,8 @@ export function createHud(g, doc, hooks = {}) {
   }
 
   // Detail-Kachel: ein Tipp auf die Liste (nicht auf die eigene Zeile, die gehört dem Namensfeld) zeigt alle Einträge
-  // des gewählten Modus mit Wert, Fahrzeit und Durchschnittstempo des besten Laufs, das Datum klein als zweite Zeile
-  // unter dem Namen (eine sechste Spalte passt auf dem iPhone SE nicht). Ohne Namen gibt es keine Liste, also auch keine Details. Die Liste scrollt (input.js lässt #stats-list natives Wischen).
+  // des gewählten Modus mit Wert, Fahrzeit und Durchschnittstempo des besten Laufs. Ohne Namen gibt es keine Liste,
+  // also auch keine Details. Die Liste scrollt (input.js lässt #stats-list natives Wischen).
   const statsMode = $('stats-mode'), statsHead = $('stats-head'), statsList = $('stats-list'), statsNote = $('stats-note');
   const cell = (cls, text) => {
     const span = doc.createElement('span');
@@ -258,11 +252,10 @@ export function createHud(g, doc, hooks = {}) {
         cell('stats-num', e.t > 0 ? formatClock(e.t, false) : '–'),
         cell('stats-num', e.kmh > 0 ? nf.format(e.kmh) : '–'),
       );
-      if (e.ts > 0) row.append(cell('stats-date', formatDate(e.ts)));
       return row;
     }));
     statsNote.textContent = !list.length ? 'Noch keine Einträge'
-      : time ? `Fahrzeit ohne Strafen, Tempo auf ${nf.format(C.SG_FINISH_M)} m` : 'Zeit, Tempo und Datum des besten Laufs';
+      : time ? `Fahrzeit ohne Strafen, Tempo auf ${nf.format(C.SG_FINISH_M)} m` : 'Zeit und Tempo des besten Laufs';
   }
   function openStats() {
     if (!boardOn || !board.name()) return;

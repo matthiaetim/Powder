@@ -44,8 +44,7 @@ den Hang legen. Welche Modi eine Liste haben und wie sie werten, steht in `MODES
 Offline zeigt die Liste den letzten bekannten Stand, ausstehende Bestwerte werden beim nächsten Start oder Lauf nachgeholt.
 
 Ein Tipp auf die Liste (nicht auf die eigene Zeile, die ändert den Namen) öffnet die Detail-Kachel des gewählten Modus:
-alle Einträge mit Rang, Name, Wert, Fahrzeit und Durchschnittstempo des besten Laufs, unter dem Namen das Datum des
-Rekords (`tt.mm.jjjj`, aus `ts`), die Liste scrollt. In Classic
+alle Einträge mit Rang, Name, Wert, Fahrzeit und Durchschnittstempo des besten Laufs, die Liste scrollt. In Classic
 und Chase ist das Tempo Weite durch Laufzeit, im Super-G 1000 m durch die reine Fahrzeit ohne Strafen (Spalten
 „Gesamt“ und „Fahrzeit“). Beides kommt aus den Feldern `m` und `t`, die Datenbank bleibt unverändert.
 

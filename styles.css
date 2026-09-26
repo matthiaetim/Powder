@@ -332,8 +332,6 @@ body[data-panel="riders"] #dead-card, body[data-panel="stats"] #dead-card { disp
 #stats-list .stats-row.own { opacity: 1; background: var(--mark); border-radius: 6px; }
 .stats-rank, .stats-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .stats-name { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Datum als zweite Zeile ab der Namensspalte bis zum Rand, sonst schneidet der schmale Name es ab */
-.stats-date { grid-column: 2 / -1; text-align: left; font-size: 11px; line-height: 1.1; margin-bottom: 4px; opacity: 0.6; font-variant-numeric: tabular-nums; }
 #stats-note { margin-top: 10px; font-size: 12px; opacity: 0.65; }
 #btn-stats-back { margin-top: 14px; }
 
