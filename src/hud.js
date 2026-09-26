@@ -96,16 +96,21 @@ export function createHud(g, doc, hooks = {}) {
 
   // Fresh-Seite: Ergebnis des Laufs nach runMode (Meter und Laufzeit; im Super-G Zeit und Tore), darunter der
   // Bestwert des gewählten Modus (ein Kartenwechsel ruft erneut auf): Bestzeit im Super-G, sonst Meter
+  // Durchschnittstempo des Laufs wie in der Detail-Kachel (board.js statsFor): Weite durch Laufzeit, im Super-G die
+  // Kurslänge durch die reine Fahrzeit ohne Strafen
+  const avgText = (meters, sec) => (sec > 0 ? ` · Ø ${nf.format((meters / sec) * 3.6)} km/h` : '');
   function refreshDead() {
     const cs = g.course;
     if (g.runMode === 'superg' && g.state === 'finished') {
       deadDist.textContent = formatClock(cs.total, true);
-      deadTime.textContent = cs.misses === 0
+      deadTime.textContent = (cs.misses === 0
         ? `alle ${nf.format(cs.gates.length)} Tore`
-        : `${cs.misses === 1 ? '1 Tor' : nf.format(cs.misses) + ' Tore'} verpasst · +${nf1.format(cs.penalty)} s`;
+        : `${cs.misses === 1 ? '1 Tor' : nf.format(cs.misses) + ' Tore'} verpasst · +${nf1.format(cs.penalty)} s`)
+        + avgText(C.SG_FINISH_M, cs.time);
     } else {
-      deadDist.textContent = nf.format(Math.floor(g.dist)) + ' m';
-      deadTime.textContent = g.runMode === 'superg' ? 'kein Ziel' : 'in ' + formatRunTime(g.runT);
+      const m = Math.floor(g.dist);
+      deadDist.textContent = nf.format(m) + ' m';
+      deadTime.textContent = g.runMode === 'superg' ? 'kein Ziel' : 'in ' + formatRunTime(g.runT) + avgText(m, g.runT);
     }
     if (g.mode === 'superg') {
       deadBest.textContent = g.newBestTime && g.mode === g.runMode ? 'Neue Bestzeit'
