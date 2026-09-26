@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.24.0';
+export const VERSION = '0.24.1';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -286,7 +286,7 @@ export const C = {
   SG_POLE_BEND: 0.5,         // Biegung je Bogenmaß Auslenkung, 0 = starre Stange
   SG_SPLITS_M: [250, 500, 750], // Zwischenzeiten
   SG_NOTE_S: 2,              // so lange stehen Zwischenzeit und Torfehler im HUD
-  SG_COUNT_STEP_S: 0.6,      // Abstand der Pieptöne im Countdown
+  SG_COUNT_STEP_S: 1,        // Abstand der Pieptöne im Countdown: echte Sekunden, 3 – 2 – 1 – Go dauert 3 s
   SG_COUNT_BEEPS: 3,         // kurze Pieptöne vor dem Go
   SG_GO_SHOW_S: 0.6,         // so lange steht „Go“ im Bild
   SG_COAST_DECEL: 8,         // Auslauf nach dem Ziel: zusätzliche Verzögerung in m/s²
