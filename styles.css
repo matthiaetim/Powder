@@ -319,8 +319,10 @@ body[data-panel="riders"] #dead-card, body[data-panel="stats"] #dead-card { disp
   line-height: 1.6;
   font-size: 14px;
 }
-#stats-card #stats-head { margin-top: 14px; font-size: 11px; opacity: 0.55; border-bottom: 2px solid var(--ink); }
-#stats-head span { font-family: var(--body); letter-spacing: 0; }
+/* Kopf: die Zeile behält 14 px, nur die Texte sind klein. Die Spaltenbreiten stehen in em, bei kleinerer Schrift der
+   Zeile wären die Spalten schmaler und die Überschriften rutschten gegen die Werte nach rechts. */
+#stats-head { margin-top: 14px; opacity: 0.55; border-bottom: 2px solid var(--ink); }
+#stats-head span { font-family: var(--body); font-size: 11px; letter-spacing: 0; }
 #stats-list {
   width: 100%;
   max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 260px);
@@ -333,6 +335,7 @@ body[data-panel="riders"] #dead-card, body[data-panel="stats"] #dead-card { disp
 .stats-rank, .stats-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .stats-name { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #stats-note { margin-top: 10px; font-size: 12px; opacity: 0.65; }
+#stats-note:empty { display: none; }
 #btn-stats-back { margin-top: 14px; }
 
 /* kleine flache Knöpfe: Ton, Tuning-Aktionen */
