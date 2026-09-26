@@ -40,7 +40,7 @@ export function laneX(w, y) {
   const l = w.lane;
   return l.amp * Math.sin((TAU * y) / l.wave + w.phase) + l.amp2 * Math.sin((TAU * y) / l.wave2 + w.phase2);
 }
-function laneHalf(y) {
+export function laneHalf(y) {
   return lerp(C.LANE_HALF0, C.LANE_HALF1, clamp(y / C.RAMP_M, 0, 1));
 }
 function density(y) {

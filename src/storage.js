@@ -136,3 +136,23 @@ export function saveRider(id) {
     /* egal */
   }
 }
+
+// Yeti-Spuren (yeti.js): so viele Classic-Läufe noch bis zur nächsten Spur. 0 = noch nie gewürfelt.
+const YETI_KEY = 'powder.yeti';
+
+export function loadYetiIn() {
+  try {
+    const v = parseInt(localStorage.getItem(YETI_KEY), 10);
+    return Number.isFinite(v) && v > 0 ? v : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function saveYetiIn(n) {
+  try {
+    localStorage.setItem(YETI_KEY, String(n));
+  } catch {
+    /* egal */
+  }
+}

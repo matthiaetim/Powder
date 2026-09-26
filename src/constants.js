@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.17.0';
+export const VERSION = '0.18.0';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -211,6 +211,21 @@ export const C = {
   SIGN_SPRAY_ALPHA: 0.2,     // breiter, schwacher zweiter Strich: der aufgewirbelte Schnee neben den Ski
   SIGN_SPRAY_W_M: 0.6,       // so viel breiter als der Radierstrich
   SIGN_MAX_PX: 2048,         // Deckel für die Breite des Offscreen-Canvas in Gerätepixeln
+
+  // Easter Egg (Classic, yeti.js): Yeti-Spuren. Bewusst ohne Regler und ohne Anzeige im Debug-Overlay, der Zufall
+  // soll auch für die Entwickler eine Überraschung bleiben.
+  YETI_EVERY_MIN: 4,         // frühestens jeder 4. Classic-Lauf …
+  YETI_EVERY_MAX: 8,         // … spätestens jeder 8.
+  YETI_Y_MIN: 2000,          // Spanne, in der die Spur liegt; frühe Stellen sind wahrscheinlicher (createYeti)
+  YETI_Y_MAX: 4000,
+  YETI_LEN_MIN_M: 50,        // Länge der Spur entlang des Wegs
+  YETI_LEN_MAX_M: 75,
+  YETI_STRIDE_M: 1.8,        // Abstand zweier Abdrücke, größer als ein Mensch
+  YETI_GAIT_M: 0.4,          // seitlicher Versatz jedes Fußes von der Laufmitte
+  YETI_FOOT_L_M: 0.8,        // Abdruck: Länge und Breite ohne Zehen
+  YETI_FOOT_W_M: 0.4,
+  YETI_ALPHA: 0.32,          // Deckkraft eines frischen Abdrucks, etwa wie eine kräftige Skispur
+  YETI_WIPE_PER_M: 0.6,      // Verwischen je Meter Fahrt über einem Abdruck; eine Überfahrt ist rund 1 m, wie SIGN_ERASE_ALPHA
 
   // Super-G (nur superg; gates.js, game.js, render.js, hud.js): Zeitfahren bis SG_FINISH_M durch Tore, abwechselnd
   // rot und blau. Der Kurs ist fest (SG_SEED, ?seed= überschreibt), damit Bestzeiten vergleichbar bleiben. Tore

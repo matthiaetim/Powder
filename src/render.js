@@ -210,6 +210,7 @@ export function draw(R, g, t) {
   }
   drawMarks(R, g, ox, oy);
   drawSignature(R, g, ox, oy);
+  drawYeti(R, g, ox, oy);
   drawTrack(R, g, ox, oy);
   drawWorld(R, g, ox, oy);
   // drawHockeyFog(R, g, ox, oy); // Hockeystop deaktiviert
@@ -430,6 +431,39 @@ function drawSignature(R, g, ox, oy) {
   ctx.globalAlpha = C.SIGN_ALPHA;
   ctx.drawImage(sg.c, sg.x0 * S + ox, sy, sg.wM * S, sh);
   ctx.globalAlpha = 1;
+}
+
+// Yeti-Spuren (yeti.js): unter der Skispur, damit die Ski sichtbar darüberfahren. Ein Abdruck ist eine Sohle mit
+// Ballen und drei Zehen, als Mulde im Schnee in der Farbe der Spur; verwischt wird er blasser.
+function drawYeti(R, g, ox, oy) {
+  const yt = g.yeti;
+  if (!yt) return;
+  const { ctx, Sv: S, H } = R;
+  if (yt.y1 * S + oy < -S || yt.y0 * S + oy > H + S) return;
+  const l = C.YETI_FOOT_L_M * S, w = C.YETI_FOOT_W_M * S;
+  for (const p of yt.prints) {
+    const a = C.YETI_ALPHA * (1 - p.wear);
+    const sy = p.y * S + oy;
+    if (a < 0.01 || sy < -S || sy > H + S) continue;
+    ctx.save();
+    ctx.translate(p.x * S + ox, sy);
+    ctx.rotate(-p.a);
+    ctx.fillStyle = `rgba(${C.TRACK_RGB},${a.toFixed(3)})`;
+    // Ein Pfad für alles: Überlappungen füllen sich nur einmal, sonst würden sie dunkler
+    ctx.beginPath();
+    ctx.ellipse(0, -0.12 * l, 0.4 * w, 0.32 * l, 0, 0, TAU); // Ferse bis Mitte
+    ctx.moveTo(0.5 * w, 0.2 * l);
+    ctx.ellipse(0, 0.2 * l, 0.5 * w, 0.26 * l, 0, 0, TAU);   // Ballen, breiter
+    for (let i = -1; i <= 1; i++) {
+      // Zehen vorn im Bogen, die große innen, zur Laufmitte hin (dort liegt +side)
+      const r = (i === p.side ? 0.15 : 0.1) * w;
+      const tx = (i * 0.36 + p.side * 0.06) * w, ty = (0.55 - Math.abs(i) * 0.06) * l;
+      ctx.moveTo(tx + r, ty);
+      ctx.arc(tx, ty, r, 0, TAU);
+    }
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 function drawTrack(R, g, ox, oy) {
