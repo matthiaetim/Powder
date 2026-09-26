@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.16.2';
+export const VERSION = '0.16.3';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -231,9 +231,15 @@ export const C = {
   SG_LANE_WAVE_M: 400,       // Pistenmitte: Wellenlänge
   SG_PISTE_HALF_M: 17,       // (Tuning) freie Piste je Seite der Mitte, außerhalb Bäume und Felsen
   SG_PENALTY_S: 2,           // (Tuning) Zeitstrafe pro verpasstem Tor
-  SG_POLE_KMH: 25,           // (Tuning) Tempoverlust beim Berühren einer Stange
-  SG_MAX_SPEED_KMH: 190,     // (Tuning) Endtempo im Super-G, unabhängig von MAX_SPEED_KMH der anderen Modi
+  SG_POLE_KMH: 20,           // (Tuning) Tempoverlust beim Berühren einer Stange
+  SG_MAX_SPEED_KMH: 240,     // (Tuning) Endtempo im Super-G, unabhängig von MAX_SPEED_KMH der anderen Modi
   SG_POLE_R: 0.12,           // Radius der Stange für die Berührung
+  // Getroffene Stange (render.js): kippt um den Fußpunkt vom Fahrer weg, schwingt hin und her und klingt ab,
+  // dabei biegt sie sich (Scherung, die Spitze wandert weiter als der Winkel allein)
+  SG_POLE_WOBBLE_S: 1.1,     // so lange schwingt sie
+  SG_POLE_WOBBLE_DEG: 60,    // erste Auslenkung
+  SG_POLE_WOBBLE_HZ: 3.5,    // Schwingungen pro Sekunde
+  SG_POLE_BEND: 0.5,         // Biegung je Bogenmaß Auslenkung, 0 = starre Stange
   SG_SPLITS_M: [250, 500, 750], // Zwischenzeiten
   SG_NOTE_S: 2,              // so lange stehen Zwischenzeit und Torfehler im HUD
   SG_COUNT_STEP_S: 0.6,      // Abstand der Pieptöne im Countdown

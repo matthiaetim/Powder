@@ -30,7 +30,8 @@ export function createCourse(seed, w) {
       state: 0,               // 0 offen, 1 durchfahren, 2 verpasst
       hitL: false, hitR: false, // Stange schon berührt (zählt je Stange einmal)
       // zwei Render-Objekte je Tor, einmal angelegt: drawWorld sortiert sie mit dem Fahrer nach y
-      poles: [{ pole: true, x: x - half, y, red, dir: -1 }, { pole: true, x: x + half, y, red, dir: 1 }],
+      // wob: Sekunden seit dem Treffer (-1 = steht), wdir: Richtung, in die sie kippt (render.js)
+      poles: [{ pole: true, x: x - half, y, red, dir: -1, wob: -1, wdir: 1 }, { pole: true, x: x + half, y, red, dir: 1, wob: -1, wdir: 1 }],
     });
     side = -side;
     y += C.SG_GATE_SPACING_M;
@@ -43,15 +44,27 @@ export function createCourse(seed, w) {
     splits: [], splitNext: 0, // wirksame Zwischenzeiten in Hundertstel, Index der nächsten Marke
     finished: false, time: 0, total: 0, // Ziel: reine Laufzeit und Gesamtzeit (mit Strafen) in s
     note: null,               // HUD-Hinweis { kind: 'miss' | 'fast' | 'slow' | 'split', value, t }
+    wobbling: [],             // getroffene Stangen, deren Schwingung noch läuft
   };
+}
+
+// Zeit laufen lassen, ohne zu werten: HUD-Hinweis und schwingende Stangen. Läuft auch im Auslauf nach dem Ziel
+// (game.js), damit eine kurz vor dem Ziel getroffene Stange nicht einfriert.
+export function tickCourse(cs, dt) {
+  if (cs.note) cs.note.t += dt;
+  for (let i = cs.wobbling.length - 1; i >= 0; i--) {
+    const p = cs.wobbling[i];
+    p.wob += dt;
+    if (p.wob >= C.SG_POLE_WOBBLE_S) { p.wob = -1; cs.wobbling.splice(i, 1); }
+  }
 }
 
 // Ein Physik-Schritt ist gelaufen: (prevX, prevY) ist die Position davor, s die danach, runT die Laufzeit nach
 // dem Schritt. on(type, data) meldet gate (ok oder verpasst), pole (Berührung) und split (Zwischenzeit).
 // Gibt true zurück, wenn das Ziel in diesem Schritt gekreuzt wurde.
 export function updateCourse(cs, s, prevX, prevY, runT, dt, bestSplits, on) {
+  tickCourse(cs, dt);
   if (cs.finished) return false;
-  if (cs.note) cs.note.t += dt;
   const dy = s.y - prevY;
   // Anteil des Schritts bis zur Linie lineY (Bewegung im Schritt ist geradlinig)
   const at = (lineY) => (dy > 0 ? clamp((lineY - prevY) / dy, 0, 1) : 1);
@@ -86,6 +99,11 @@ export function updateCourse(cs, s, prevX, prevY, runT, dt, bestSplits, on) {
       gt[key] = true;
       cs.hits++;
       s.v = Math.max(0, s.v - C.SG_POLE_KMH / 3.6);
+      // Stange kippt vom Fahrer weg und schwingt (render.js zeichnet sie nach wob und wdir)
+      const pole = gt.poles[side];
+      pole.wdir = s.x < px ? 1 : -1;
+      if (pole.wob < 0) cs.wobbling.push(pole);
+      pole.wob = 0;
       if (on) on('pole', { x: px, y: gt.y });
     }
   }

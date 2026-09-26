@@ -9,7 +9,7 @@ import { createTrack, clearTrack, pushTrack } from './track.js';
 import { createParticles, clearParticles, spawnParticle, updateParticles } from './particles.js';
 import { loadBest, saveBest, loadBestTime, saveBestTime, loadBestSplits, saveBestSplits } from './storage.js';
 import { MODES, DEFAULT_MODE, lowerIsBetter } from './modes.js';
-import { createCourse, updateCourse } from './gates.js';
+import { createCourse, updateCourse, tickCourse } from './gates.js';
 
 const READY_FRAC = 0.78; // Fahrer steht im Intro weit unten im Bild
 
@@ -232,6 +232,7 @@ function coast(g, dt) {
   g.finT += dt;
   P.updateSkier(s, dt, maxKmh(g));
   s.v = Math.max(0, s.v - C.SG_COAST_DECEL * dt);
+  tickCourse(g.course, dt); // Stangen schwingen aus, Hinweis läuft ab
   if (s.y - s.y0 > g.dist) g.dist = s.y - s.y0;
   updateCamera(g, dt);
   advanceTrail(g, dt);

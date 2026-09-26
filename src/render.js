@@ -6,6 +6,7 @@ import { drawAvalanche, makeAvSprites } from './avalanche-view.js';
 import { laneX } from './world.js';
 
 const TAU = Math.PI * 2;
+const D2R = Math.PI / 180;
 const TREE_H = 3.2; // nominale Sprite-Höhe in Metern
 const ROCK_H = 1.4;
 const POLE_H = 1.8; // Torstange (Super-G)
@@ -509,7 +510,19 @@ function drawWorld(R, g, ox, oy) {
     }
     if (o.pole) {
       const sp = R.sprites.poles[o.red ? 1 : 0][o.dir > 0 ? 1 : 0];
-      ctx.drawImage(sp.img, o.x * S + ox - sp.ax * spriteScale, o.y * S + oy - sp.ay * spriteScale, sp.w * spriteScale, sp.h * spriteScale);
+      const sx = o.x * S + ox, sy = o.y * S + oy;
+      if (o.wob >= 0) {
+        // Getroffen: um den Fußpunkt vom Fahrer weg kippen, hin und her schwingen, abklingen; die Scherung im
+        // gedrehten Bild lässt die Spitze weiter auswandern als den Fuß, das wirkt wie Biegen
+        const k = 1 - o.wob / C.SG_POLE_WOBBLE_S;
+        const a = o.wdir * C.SG_POLE_WOBBLE_DEG * D2R * Math.sin(TAU * C.SG_POLE_WOBBLE_HZ * o.wob) * k * k;
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.rotate(a);
+        ctx.transform(1, 0, -C.SG_POLE_BEND * a, 1, 0, 0);
+        ctx.drawImage(sp.img, -sp.ax * spriteScale, -sp.ay * spriteScale, sp.w * spriteScale, sp.h * spriteScale);
+        ctx.restore();
+      } else ctx.drawImage(sp.img, sx - sp.ax * spriteScale, sy - sp.ay * spriteScale, sp.w * spriteScale, sp.h * spriteScale);
       continue;
     }
     const sp = o.t === TREE ? R.sprites.trees[o.variant] : R.sprites.rocks[o.variant];
