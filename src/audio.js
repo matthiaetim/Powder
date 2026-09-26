@@ -315,7 +315,7 @@ export function createSound(g) {
     set(n.scrapeF.frequency, 1100 - 500 * skid - 350 * plow, 0.08);
     set(n.chatterDepth.gain, 0.75 * Math.max(skid, plow), 0.08);
 
-    // Lawine: nur im Chase, solange sie rollt (Lauf oder Erwischt-Moment); nach dem Erwischen klingt sie aus
+    // Lawine: nur im Modus Lawine, solange sie rollt (Lauf oder Erwischt-Moment); nach dem Erwischen klingt sie aus
     const chase = g.mode === 'chase' && (running || (g.state === 'dead' && g.deadCause === 'avalanche'));
     let near = 0, threat = 0;
     if (chase) {

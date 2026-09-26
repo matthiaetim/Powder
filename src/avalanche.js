@@ -1,4 +1,4 @@
-// Die Lawine (Chase): eine Front, die von oben nachrückt. Sie hält ein Tempo (Pace), das mit der Laufzeit
+// Die Lawine (Modus Lawine): eine Front, die von oben nachrückt. Sie hält ein Tempo (Pace), das mit der Laufzeit
 // steigt. Ist der Fahrer schneller, lauert sie knapp über dem oberen Bildrand; ist er langsamer, schließt sie
 // mit der Differenz auf. Als Fahrertempo wertet sie (AV_DIAG_K) das Tempo entlang der Ski, nicht nur den
 // Höhenverlust, sonst wäre jede Schrägfahrt trotz Tempo ein Einholen. Steht er, kommt sie nach AV_STALL_S an

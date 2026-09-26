@@ -65,7 +65,7 @@ function seedFor(g) {
   return g.fixedSeed ?? (isSuperG(g) ? C.SG_SEED : randomSeed());
 }
 
-// Bestwerte des gewählten Modus: Meter (Classic, Chase) und Bestzeit mit Zwischenzeiten (Super-G)
+// Bestwerte des gewählten Modus: Meter (Classic, Lawine) und Bestzeit mit Zwischenzeiten (Super-G)
 function loadBests(g) {
   g.best = loadBest(g.mode);
   g.bestTime = loadBestTime(g.mode);

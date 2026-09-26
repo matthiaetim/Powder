@@ -1,7 +1,7 @@
 // Bestenliste: Bestwerte aller Spieler in einer Firebase Realtime Database, per REST ohne SDK (fetch).
 // Die reine Logik (Schlüssel, Sortierung, Rang, Zulässigkeit) ist exportiert und ohne DOM testbar; createBoard hält
 // Cache, Namen und Upload-Stand, spricht mit dem Server und reicht die Linien an game.js weiter (setMarks).
-// Das Feld m ist je Modus etwas anderes (modes.js): Meter in Classic und Chase, mehr ist besser; im Super-G die
+// Das Feld m ist je Modus etwas anderes (modes.js): Meter in Classic und Lawine, mehr ist besser; im Super-G die
 // Gesamtzeit in Hundertstel, weniger ist besser. Alle Vergleiche laufen über better(), nie direkt über m.
 import { C, VERSION } from './constants.js';
 import { BOARD_MODES, lowerIsBetter } from './modes.js';
@@ -82,7 +82,7 @@ export function viewFor(boards, mode, ownKey, rows = C.BOARD_ROWS) {
 }
 
 // Detail-Kachel: alle Einträge des Modus mit Rang, Fahrzeit t und Durchschnittstempo des besten Laufs. Die Strecke
-// ist in Classic und Chase die Weite, im Super-G die feste Kurslänge; t ist dort die reine Fahrzeit ohne Strafen,
+// ist in Classic und Lawine die Weite, im Super-G die feste Kurslänge; t ist dort die reine Fahrzeit ohne Strafen,
 // das Tempo also das tatsächlich gefahrene. Einträge ohne t (alte Stände) haben kein Tempo: kmh 0, die Anzeige
 // setzt einen Strich.
 export function statsFor(boards, mode, ownKey) {

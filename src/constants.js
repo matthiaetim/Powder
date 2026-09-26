@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.19.3';
+export const VERSION = '0.19.4';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -60,7 +60,7 @@ export const C = {
 
   SKIER_R: 0.45,
 
-  // Lawine (nur Chase): eine Front, die von oben nachrückt. Sie hält ein Tempo (Pace), das mit der Laufzeit
+  // Lawine (nur im Modus Lawine): eine Front, die von oben nachrückt. Sie hält ein Tempo (Pace), das mit der Laufzeit
   // steigt: wer langsamer fährt, holt sie sich ins Bild, wer schneller ist, lässt sie AV_LURK_M über dem oberen
   // Bildrand lauern. Steht der Fahrer (unter AV_STALL_KMH für AV_STALL_S), kommt sie sofort an den Bildrand
   // und rollt mit Pace-Tempo auf ihn zu. Erwischt ist er, wenn die Front auf AV_CATCH_M heran ist.
@@ -133,7 +133,7 @@ export const C = {
   SHAKE_PX: 5,             // Bildwackeln beim Aufprall
   SHAKE_S: 0.4,
 
-  // Warnschnee (nur Chase): setzt ein, sobald die Lawine ihren Lauerabstand verlässt
+  // Warnschnee (nur im Modus Lawine): setzt ein, sobald die Lawine ihren Lauerabstand verlässt
   SNOW_POOL: 160,
   SNOW_MIN_SPEED: 140,
   SNOW_MAX_SPEED: 260,
@@ -314,7 +314,7 @@ export const TUNABLES = [
   // { key: 'HOCKEY_MIN_KMH', label: 'Mindesttempo', unit: 'km/h', min: 20, max: 180, step: 5 },
   // { key: 'HOCKEY_HOLD_S', label: 'Haltezeit', unit: 's', min: 0.1, max: 1.5, step: 0.05 },
   // { key: 'HOCKEY_FOG_OFFSET_PX', label: 'Nebelgröße', unit: 'px', min: 0, max: 150, step: 5 },
-  { heading: 'Lawine (Chase)' },
+  { heading: 'Lawine' },
   { key: 'AV_PACE0_KMH', label: 'Tempo am Start', unit: 'km/h', min: 5, max: 120, step: 5 },
   { key: 'AV_PACE1_KMH', label: 'Tempo am Ende', unit: 'km/h', min: 20, max: 250, step: 5 },
   { key: 'AV_RAMP_S', label: 'Schneller bis Laufzeit', unit: 's', min: 30, max: 600, step: 10 },
