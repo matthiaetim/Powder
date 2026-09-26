@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.20.1';
+export const VERSION = '0.20.2';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -107,6 +107,7 @@ export const C = {
   // Welt
   CELL_M: 40,
   CULL_CELLS: 1,
+  WORLD_CULL_M: 1,         // Reserve in m, wenn render.js die Welt aufs Bild beschneidet (Rundung, Schattenrand)
   MIN_SPACING_M: 4.0,
   TREE_D0: 0.010,
   TREE_D1: 0.017,          // (Tuning) Dichte am Ende des Anstiegs

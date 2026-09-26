@@ -569,25 +569,40 @@ function drawTrack(R, g, ox, oy) {
 }
 
 function drawWorld(R, g, ox, oy) {
-  const { ctx, Sv: S, H, list } = R;
+  const { ctx, Sv: S, W, H, list, sprites } = R;
   const spriteScale = S / R.S;
+  const res = C.WORLD_CULL_M * S;
   list.length = 0;
+  // Nur, was ins Bild ragen kann: das Sprite-Rechteck samt Rand in x und y gegen das Bild, plus Reserve. Geladen
+  // sind rund vier- bis fünfmal mehr Objekte, als je einen Pixel im Bild haben; bis v0.20.1 wurden sie alle
+  // gezeichnet und sortiert. Die Prüfung läuft in jedem Bild neu gegen die aktuelle Kamera, auch in der schärfsten
+  // Kurve kann also nichts zu spät erscheinen; nur die Zeichenarbeit für Objekte außerhalb entfällt.
   for (const cell of g.world.cells.values()) {
     const objs = cell.objs;
     for (let i = 0; i < objs.length; i++) {
       const o = objs[i];
-      const sy = o.y * S + oy;
-      if (sy < -40 || sy > H + 40) continue;
+      const sp = o.t === TREE ? sprites.trees[o.variant] : sprites.rocks[o.variant];
+      const sc = (o.h / sp.nominal) * spriteScale;
+      const sx = o.x * S + ox - sp.ax * sc, sy = o.y * S + oy - sp.ay * sc; // linke obere Ecke des Sprites
+      if (sx - res > W || sx + sp.w * sc + res < 0 || sy - res > H || sy + sp.h * sc + res < 0) continue;
       list.push(o);
     }
   }
-  // Super-G: Torstangen wie Hindernisse einsortieren, damit der Fahrer vor oder hinter ihnen steht
+  // Super-G: Torstangen wie Hindernisse einsortieren, damit der Fahrer vor oder hinter ihnen steht. Eine getroffene
+  // Stange kippt und schwingt, ihr Bild reicht dann bis zur Sprite-Höhe zur Seite: darum der großzügige Rand.
   if (g.course) {
     const gates = g.course.gates;
+    const psp = sprites.poles[0][0];
+    const pr = Math.max(psp.w, psp.h) * spriteScale + res;
     for (let i = 0; i < gates.length; i++) {
-      const sy = gates[i].y * S + oy;
-      if (sy < -40 || sy > H + 40) continue;
-      list.push(gates[i].poles[0], gates[i].poles[1]);
+      const gt = gates[i];
+      const sy = gt.y * S + oy;
+      if (sy + pr < 0 || sy - pr > H) continue;
+      for (let k = 0; k < 2; k++) {
+        const p = gt.poles[k], sx = p.x * S + ox;
+        if (sx + pr < 0 || sx - pr > W) continue;
+        list.push(p);
+      }
     }
   }
   R.skierMarker.y = g.skier.y;
