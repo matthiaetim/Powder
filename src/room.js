@@ -120,8 +120,9 @@ export function createRoom(net, { onChange = null, onStatus = null, debug = fals
     return 'error';
   }
 
-  // Beitreten: Raum muss da, gleich alt (Version) und in der Lobby sein; ein Gast, der sich in der letzten Minute
-  // gemeldet hat, blockiert den Platz, außer er trägt denselben Namen (dann ist es derselbe Spieler nach einem Neuladen).
+  // Beitreten: Raum muss da, gleich alt (Version) und in der Lobby oder nach dem Rennen (done) sein; ein Gast, der sich
+  // in der letzten Minute gemeldet hat, blockiert den Platz, außer er trägt denselben Namen (dann ist es derselbe Spieler
+  // nach einem Neuladen, etwa wenn iOS die App im Hintergrund beendet hat).
   async function join(c, player) {
     const got = await net.get(`/rooms/${c}.json`);
     if (!got.ok) return got.status === 401 ? 'rules' : 'error';
@@ -132,7 +133,7 @@ export function createRoom(net, { onChange = null, onStatus = null, debug = fals
     const guest = r0.players.guest;
     const fresh = guest && typeof guest.seen === 'number' && guest.seen > serverNow() - C.DUEL_LOBBY_GONE_S * 1000;
     if (fresh && guest.name !== player.name) return 'full';
-    if (r0.state !== 'lobby') return 'busy';
+    if (r0.state !== 'lobby' && r0.state !== 'done') return 'busy';
     code = c; role = 'guest';
     const me = { name: player.name, rider: player.rider, ready: false, v: VERSION, seen: SV };
     const r = await write('patch', 'players/guest', me, false);

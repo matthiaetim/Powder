@@ -265,13 +265,17 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
   }
 
   // Eigene Position senden: alle DUEL_SEND_MS, nach Sturz, Weiterfahrt und Ziel sofort; läuft noch ein Senden, wird
-  // der Takt übersprungen. Nach dem Ende nur noch das letzte Paket, bis es angekommen ist.
+  // der Takt übersprungen. Das letzte Paket (done, fin) muss ankommen, sonst wartet der andere vergeblich auf die
+  // Wertung: es geht auch dann noch raus, wenn die eigene Wertung schon steht (Phase result, weil der andere längst im
+  // Ziel war), und wird nach einem Fehlschlag wiederholt. Bis v0.23.0 blieb es aus, sobald in dem Bild noch ein
+  // Positions-Paket unterwegs war: der andere sah nie „im Ziel“ und bekam keine Revanche.
   function afterFrame() {
-    if (d.phase !== 'count' && d.phase !== 'race') return;
     if (d.sending || !d.role) return;
+    const racing = d.phase === 'count' || d.phase === 'race';
+    const finalDue = d.done && !d.sentFinal && d.phase !== 'lobby';
+    if (!(racing && !d.done) && !finalDue) return;
     const now = Date.now();
     if (now - d.lastSend < C.DUEL_SEND_MS) return;
-    if (d.done && d.sentFinal) return;
     sendLive(now);
   }
   async function sendLive(now) {
@@ -356,10 +360,13 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
     room.patch('', { state: 'count', startAt: room.serverNow() + C.DUEL_COUNT_LEAD_MS, pause: C.DUEL_CRASH_PAUSE_S, ts: SV, 'players/guest/ready': false }, true);
   }
 
-  // Revanche: der Host würfelt neu und schickt beide in die Lobby, der Gast meldet nur seinen Wunsch
+  // Revanche: der Host würfelt neu und schickt beide in die Lobby, der Gast meldet nur seinen Wunsch (ready). Hat er
+  // das schon getan, bleibt er in der neuen Lobby bereit und der Host kann sofort auf „Los“ tippen.
   function rematch() {
     if (d.role === 'host') {
-      room.patch('', { state: 'lobby', round: d.round + 1, seed: randomSeed(), startAt: 0, ts: SV, 'live/host': null, 'live/guest': null, 'players/guest/ready': false }, true);
+      const body = { state: 'lobby', round: d.round + 1, seed: randomSeed(), startAt: 0, ts: SV, 'live/host': null, 'live/guest': null };
+      if (!view().oppWantsRematch) body['players/guest/ready'] = false;
+      room.patch('', body, true);
     } else setReady(true);
   }
 
