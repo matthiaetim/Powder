@@ -175,13 +175,16 @@ function start(g) {
   g.runs++;
 }
 
+// Endtempo je Modus: der Super-G hat seinen eigenen Regler
+const maxKmh = (g) => (isSuperG(g) ? C.SG_MAX_SPEED_KMH : C.MAX_SPEED_KMH);
+
 function step(g, dt) {
   const s = g.skier;
   g.runT += dt;
   const px = s.x, py = s.y; // Position vor dem Schritt: Super-G wertet Tor-, Zwischenzeit- und Ziellinie dazwischen
   // Hockeystop deaktiviert (Tim und Jürgen wollen ihn nicht) — auskommentiert statt gelöscht.
   // const wasHockey = s.hockeyT >= 0;
-  P.updateSkier(s, dt);
+  P.updateSkier(s, dt, maxKmh(g));
   // if (!wasHockey && s.hockeyT >= 0) hockeyStop(g);
   // if (g.fogT >= 0) {
   //   g.fogT += dt;
@@ -227,7 +230,7 @@ function advanceTrail(g, dt) {
 function coast(g, dt) {
   const s = g.skier;
   g.finT += dt;
-  P.updateSkier(s, dt);
+  P.updateSkier(s, dt, maxKmh(g));
   s.v = Math.max(0, s.v - C.SG_COAST_DECEL * dt);
   if (s.y - s.y0 > g.dist) g.dist = s.y - s.y0;
   updateCamera(g, dt);

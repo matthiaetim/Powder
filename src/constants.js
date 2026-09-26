@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.16.1';
+export const VERSION = '0.16.2';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -223,15 +223,16 @@ export const C = {
   SG_SEED: 20260925,         // fester Kurs
   SG_GATE_FIRST_M: 50,
   SG_GATE_SPACING_M: 45,     // (Tuning) Abstand der Tore
-  SG_GATE_WIDTH_M: 8,        // (Tuning) Durchfahrt zwischen den Stangen
-  SG_GATE_OFFSET_M: 9,       // (Tuning) Versatz der Tore zur Pistenmitte, abwechselnd links und rechts
+  SG_GATE_WIDTH_M: 7.5,      // (Tuning) Durchfahrt zwischen den Stangen (am iPhone getunt, v0.16.2)
+  SG_GATE_OFFSET_M: 10,      // (Tuning) Versatz der Tore zur Pistenmitte, abwechselnd links und rechts
   SG_GATE_JITTER: 0.5,       // zufälliger Anteil am Versatz: jedes Tor steht bei 50–100 % des vollen Versatzes
   SG_LAST_GATE_GAP_M: 30,    // so weit steht das letzte Tor mindestens vor dem Ziel
   SG_LANE_AMP_M: 8,          // Pistenmitte: Amplitude der Sinuskurve
   SG_LANE_WAVE_M: 400,       // Pistenmitte: Wellenlänge
-  SG_PISTE_HALF_M: 15,       // (Tuning) freie Piste je Seite der Mitte, außerhalb Bäume und Felsen
-  SG_PENALTY_S: 3,           // (Tuning) Zeitstrafe pro verpasstem Tor
-  SG_POLE_KMH: 8,            // (Tuning) Tempoverlust beim Berühren einer Stange
+  SG_PISTE_HALF_M: 17,       // (Tuning) freie Piste je Seite der Mitte, außerhalb Bäume und Felsen
+  SG_PENALTY_S: 2,           // (Tuning) Zeitstrafe pro verpasstem Tor
+  SG_POLE_KMH: 25,           // (Tuning) Tempoverlust beim Berühren einer Stange
+  SG_MAX_SPEED_KMH: 190,     // (Tuning) Endtempo im Super-G, unabhängig von MAX_SPEED_KMH der anderen Modi
   SG_POLE_R: 0.12,           // Radius der Stange für die Berührung
   SG_SPLITS_M: [250, 500, 750], // Zwischenzeiten
   SG_NOTE_S: 2,              // so lange stehen Zwischenzeit und Torfehler im HUD
@@ -302,6 +303,7 @@ export const TUNABLES = [
   { key: 'SG_PISTE_HALF_M', label: 'Piste frei je Seite', unit: 'm', min: 12, max: 40, step: 1 },
   { key: 'SG_PENALTY_S', label: 'Zeitstrafe pro Tor', unit: 's', min: 0, max: 10, step: 0.5, decimals: 1 },
   { key: 'SG_POLE_KMH', label: 'Stange kostet', unit: 'km/h', min: 0, max: 30, step: 1 },
+  { key: 'SG_MAX_SPEED_KMH', label: 'Endtempo', unit: 'km/h', min: 100, max: 300, step: 10 },
   { heading: 'Schriftzug' },
   { key: 'SIGN_ALPHA', label: 'Deckkraft', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
   { key: 'SIGN_WIDTH_FRAC', label: 'Breite', unit: '%', min: 0.4, max: 1, step: 0.02, scale: 100, decimals: 0 },
