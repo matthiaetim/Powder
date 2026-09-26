@@ -7,7 +7,7 @@ import { createAvalanche, updateAvalanche } from './avalanche.js';
 import { checkCollision } from './collision.js';
 import { createTrack, clearTrack, pushTrack } from './track.js';
 import { createParticles, clearParticles, spawnParticle, updateParticles } from './particles.js';
-import { loadBest, saveBest, loadMode, saveMode, loadBestTime, saveBestTime, loadBestSplits, saveBestSplits } from './storage.js';
+import { loadBest, saveBest, loadBestTime, saveBestTime, loadBestSplits, saveBestSplits } from './storage.js';
 import { MODES, DEFAULT_MODE, lowerIsBetter } from './modes.js';
 import { createCourse, updateCourse } from './gates.js';
 
@@ -42,8 +42,6 @@ export function createGame(opts = {}) {
     onCourse: null, // Rückruf des Torlaufs (einmal gebunden, keine Allokation pro Schritt)
   };
   g.onCourse = (type, data) => courseEvent(g, type, data);
-  const saved = loadMode();
-  if (MODES[saved] && !MODES[saved].soon) g.mode = saved;
   loadBests(g);
   reset(g, seedFor(g), true);
   return g;
@@ -394,13 +392,13 @@ export function freshReady(g) {
 export function fresh(g) {
   if (freshReady(g)) reset(g, seedFor(g), false);
 }
-// Modus wechseln (auf der Fresh-Seite): Bestwerte gehören zum Modus.
+// Modus wechseln (auf der Fresh-Seite): Bestwerte gehören zum Modus. Bewusst nicht gespeichert, die App startet
+// immer in Classic.
 export function selectMode(g, id) {
   const m = MODES[id];
   if (!m || m.soon) return false;
   g.mode = id;
   loadBests(g);
-  saveMode(id);
   return true;
 }
 // Bestweiten der anderen (board.js), je Modus für die Linien im Schnee. Im Zustand ready sofort übernehmen (Intro und

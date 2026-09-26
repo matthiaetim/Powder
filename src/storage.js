@@ -57,24 +57,6 @@ export function saveBestSplits(mode, arr) {
   }
 }
 
-const MODE_KEY = 'powder.mode';
-
-export function loadMode() {
-  try {
-    return localStorage.getItem(MODE_KEY) || '';
-  } catch {
-    return '';
-  }
-}
-
-export function saveMode(id) {
-  try {
-    localStorage.setItem(MODE_KEY, id);
-  } catch {
-    /* egal */
-  }
-}
-
 // Ton an/aus (Schalter auf der Fresh-Seite). Standard: an.
 const SOUND_KEY = 'powder.sound';
 
