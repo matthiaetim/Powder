@@ -20,6 +20,7 @@ const FILES = [
   './src/audio.js',
   './src/modes.js',
   './src/riders.js',
+  './src/yeti.js',
   './src/gates.js',
   './src/tune.js',
   './src/input.js',

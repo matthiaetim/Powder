@@ -273,6 +273,8 @@ export function createSound(g) {
         break;
       case 'pole': shot(n.race, 'bandpass', 1400, 3, 0.6, 0.002, 0.05); thud(n.race, 'triangle', 700, 250, 0.05, 0.3, 0.08); break;
       case 'finish': tone(n.race, 'sine', 660, 0.15, 0.45); tone(n.race, 'sine', 990, 0.4, 0.45, 0.17); break;
+      // Gipfel (Classic, Everest-Höhe): Dreiklang aufwärts, verwandt mit dem Zielton, deshalb in derselben Gruppe
+      case 'summit': tone(n.race, 'sine', 660, 0.15, 0.4); tone(n.race, 'sine', 830, 0.15, 0.4, 0.15); tone(n.race, 'sine', 990, 0.5, 0.45, 0.3); break;
       default: break;
     }
   }

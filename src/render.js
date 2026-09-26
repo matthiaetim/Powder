@@ -18,6 +18,13 @@ const TAG_FONT = `11px ${DISPLAY_FONT_STACK}`;
 const TAG_PAD_X = 7, TAG_H = 18, TAG_BORDER = 1.5, TAG_SHADOW = 2, TAG_TILT = -1.2 * Math.PI / 180;
 const TAG_RADII = [6, 8, 5, 7]; // ungleiche Ecken, wie von Hand gezeichnet
 const SIGN_FONT_STACK = DISPLAY_FONT_STACK;
+// Schilder im Schnee (siehe drawSignature): der Credit in jedem Modus, das Gipfelschild bei Everest-Höhe nur im
+// Classic. Getter, weil Breite und Text am Regler bzw. in constants.js hängen. lazy: erst bauen, wenn der Fahrer
+// sich nähert, die meisten Läufe kommen nie hin.
+const SIGNS = [
+  { y: () => C.SIGN_Y_M, text: () => C.SIGN_TEXT, frac: () => C.SIGN_WIDTH_FRAC, cross: false, lazy: false, on: () => true },
+  { y: () => C.EVEREST_Y_M, text: () => C.EVEREST_TEXT, frac: () => C.EVEREST_WIDTH_FRAC, cross: true, lazy: true, on: (g) => g.mode === 'classic' },
+];
 // Spur je Fahrer (riders.js): Seiten der Linien, halber Abstand zur Mitte in m, Breite als Faktor der Ski-Linie.
 // Das Snowboard zieht eine breite Linie in der Mitte, der Schlitten zwei Kufen, etwas weiter auseinander als Ski.
 const RAILS = {
@@ -57,7 +64,8 @@ export function createRenderer(canvas) {
   const R = {
     canvas, ctx, W: 0, H: 0, dpr: 1, S: 10, Sv: 10, sprites: null, spriteKey: '', list: [], skierMarker: { skier: true, y: 0 },
     frameMs: 16.7, paceMs: 0, trackPts: new Float32Array(C.TRACK_CAP * 7), snow: createSnow(), shards: { p: [], run: -1 },
-    sign: { c: null, x: null, key: '', world: null, seen: 0, x0: 0, y0: 0, wM: 0, hM: 0, Q: 1 }, fontReady: false,
+    signs: SIGNS.map(() => ({ c: null, x: null, key: '', world: null, seen: 0, x0: 0, y0: 0, ym: 0, wM: 0, hM: 0, Q: 1 })),
+    fontReady: false,
   };
   // Der Canvas stößt das Laden der Schrift nicht an, das HUD tut es beim Seitenstart. Bis sie da ist, würde der
   // Schriftzug in der Systemschrift gebaut; fontReady steckt im Schlüssel und baut ihn dann einmal neu. Ein Fehler zählt
@@ -210,6 +218,7 @@ export function draw(R, g, t) {
   }
   drawMarks(R, g, ox, oy);
   drawSignature(R, g, ox, oy);
+  drawYeti(R, g, ox, oy);
   drawTrack(R, g, ox, oy);
   drawWorld(R, g, ox, oy);
   // drawHockeyFog(R, g, ox, oy); // Hockeystop deaktiviert
@@ -304,6 +313,8 @@ function tagPath(ctx, x, y, w, h) {
 }
 
 // ---------- Signatur im Schnee ----------
+// Gilt für alle Schilder in SIGNS, hier am Beispiel des Credits. Das Gipfelschild trägt zusätzlich links ein
+// Gipfelkreuz in Tinte.
 // Der Credit (SIGN_TEXT) steht bei SIGN_Y_M auf einem großen Schild, zentriert auf der Korridor-Mitte, in einem
 // Offscreen-Canvas in Welt-Koordinaten mit fester Auflösung Q px/m (wie die Sprites, unabhängig vom Tempo-Zoom).
 // Das Schild ist SIGN_WIDTH_FRAC der Sichtbreite breit, mit Tinte-Rand, hartem Versatz-Schatten und leicht
@@ -312,14 +323,13 @@ function tagPath(ctx, x, y, w, h) {
 // Spurpunkte entlang beider Ski Striche hinein (destination-out), das geht nur auf einem Canvas mit Alpha: das
 // Schild wird zerkratzt und bleibt es bis zum nächsten Lauf. Gebunden an g.world: reset() legt eine neue Welt an, dann ist der Schriftzug wieder heil und
 // steht auf der Korridor-Mitte der neuen Welt. Die echte Spur (drawTrack) liegt wie bisher darüber.
-function signKey(R) {
-  return [R.S.toFixed(3), R.dpr, R.fontReady ? 1 : 0, C.SIGN_TEXT, C.SIGN_WIDTH_FRAC, C.VIEW_W_M, C.SIGN_SHADOW_M].join('|');
+function signKey(R, spec) {
+  return [R.S.toFixed(3), R.dpr, R.fontReady ? 1 : 0, spec.text(), spec.frac(), spec.y(), C.VIEW_W_M, C.SIGN_SHADOW_M].join('|');
 }
 
-function buildSignature(R, g) {
-  const sg = R.sign;
-  const text = C.SIGN_TEXT;
-  const wM = C.VIEW_W_M * C.SIGN_WIDTH_FRAC;                       // Breite der Platte
+function buildSignature(R, g, sg, spec) {
+  const text = spec.text();
+  const wM = C.VIEW_W_M * spec.frac();                             // Breite der Platte
   const outer = C.SIGN_SHADOW_M + C.SIGN_BORDER_M + 0.3;            // Rand des Canvas: Schatten, Rand, Drehung
   const Q = Math.min(R.S * R.dpr, C.SIGN_MAX_PX / (wM + 2 * outer));
   const c = sg.c || document.createElement('canvas');
@@ -329,8 +339,12 @@ function buildSignature(R, g) {
   x.font = `400 ${refPx}px ${SIGN_FONT_STACK}`;
   const m0 = x.measureText(text);
   const refW = m0.actualBoundingBoxLeft + m0.actualBoundingBoxRight || m0.width || 1;
-  const textW = (wM - 2 * C.SIGN_PAD_M) * Q;
-  const fontPx = (textW / refW) * refPx;
+  // Mit Gipfel teilen sich Bild, Lücke und Text die Breite; das Bild ist ICON_W mal so breit wie die Versalhöhe
+  const ICON_W = 1.2;
+  const refAsc = m0.actualBoundingBoxAscent || refPx * 0.8;
+  const gapPx = spec.cross ? 0.6 * C.SIGN_PAD_M * Q : 0;
+  const innerW = (wM - 2 * C.SIGN_PAD_M) * Q;
+  const fontPx = ((innerW - gapPx) / (refW + (spec.cross ? ICON_W * refAsc : 0))) * refPx;
   const font = `400 ${fontPx}px ${SIGN_FONT_STACK}`;
   x.font = font;
   const m1 = x.measureText(text);
@@ -356,17 +370,44 @@ function buildSignature(R, g) {
   x.fill();
   x.stroke();
   x.fillStyle = C.INK;
-  x.fillText(text, 0, -ph / 2 + C.SIGN_PAD_M * Q + asc);
+  const baseY = -ph / 2 + C.SIGN_PAD_M * Q + asc;
+  if (spec.cross) {
+    // Links vom Text ein Berg in Tinte mit Schneekappe und Gipfelkreuz; ein Kreuz allein läse sich wie ein Grab.
+    // Bild und Text zusammen zentriert, der Berg steht auf der Grundlinie und reicht mit dem Kreuz bis zur Versalhöhe.
+    const tw = m1.width, iw = ICON_W * asc, bar = Math.max(1, 0.07 * iw);
+    const left = -(iw + gapPx + tw) / 2, cx = left + iw / 2, peak = baseY - 0.66 * asc;
+    x.beginPath();
+    x.moveTo(left, baseY); x.lineTo(cx, peak); x.lineTo(left + iw, baseY); x.closePath();
+    x.fill();
+    const cap = 0.3; // Schneekappe: oberer Teil der Flanken, unten gezackt
+    x.fillStyle = '#FFFFFF';
+    x.beginPath();
+    x.moveTo(cx, peak);
+    x.lineTo(cx + cap * iw / 2, peak + cap * (baseY - peak));
+    x.lineTo(cx + cap * iw / 6, peak + cap * 0.75 * (baseY - peak));
+    x.lineTo(cx, peak + cap * (baseY - peak));
+    x.lineTo(cx - cap * iw / 6, peak + cap * 0.75 * (baseY - peak));
+    x.lineTo(cx - cap * iw / 2, peak + cap * (baseY - peak));
+    x.closePath();
+    x.fill();
+    x.fillStyle = C.INK;
+    x.fillRect(cx - bar / 2, baseY - asc, bar, asc - (baseY - peak) + bar);
+    x.fillRect(cx - 0.14 * iw, baseY - 0.88 * asc, 0.28 * iw, bar);
+    x.textAlign = 'left';
+    x.fillText(text, left + iw + gapPx, baseY);
+  } else x.fillText(text, 0, baseY);
   x.setTransform(1, 0, 0, 1, 0, 0);
+  const ym = spec.y();
   sg.c = c; sg.x = x; sg.Q = Q;
   sg.wM = c.width / Q; sg.hM = c.height / Q;
-  sg.x0 = laneX(g.world, C.SIGN_Y_M) - sg.wM / 2;
-  sg.y0 = C.SIGN_Y_M - sg.hM / 2;
-  sg.key = signKey(R);
+  sg.x0 = laneX(g.world, ym) - sg.wM / 2;
+  sg.y0 = ym - sg.hM / 2;
+  sg.ym = ym;
+  sg.key = signKey(R, spec);
   sg.world = g.world;
   // Radierung aus dem Ringpuffer nachspielen: ein Neuaufbau mitten im Lauf (Schrift geladen, Regler gedreht,
   // Fenster geändert) darf den kaputt gefahrenen Schriftzug nicht heilen
-  replayErase(sg, g.track, g.track.n);
+  replayErase(sg, g.track, g.track.n, railsOf(g.rider));
   sg.seen = g.track.total;
 }
 
@@ -389,7 +430,7 @@ function replayErase(sg, tr, count, rails) {
 // aufgewirbelten Schnee. Alpha unter 1: mehrere Überfahrten summieren sich, eine allein verwischt nur.
 function eraseSegment(sg, rails, xa, ya, nxa, nya, pa, xb, yb, nxb, nyb, wb, pb) {
   const half = sg.hM / 2;
-  if (Math.abs(ya - C.SIGN_Y_M) > half && Math.abs(yb - C.SIGN_Y_M) > half) return;
+  if (Math.abs(ya - sg.ym) > half && Math.abs(yb - sg.ym) > half) return;
   const { x, Q } = sg;
   const carve = Math.max(wb, 0.6 * pb);
   const w = 0.12 * Q * (1 + (C.TRACK_WIDTH_MAX - 1) * carve) * C.SIGN_ERASE_WIDTH_K * rails.w;
@@ -411,25 +452,67 @@ function eraseSegment(sg, rails, xa, ya, nxa, nya, pa, xb, yb, nxb, nyb, wb, pb)
 
 // Jedes Bild, auch wenn der Schriftzug nicht im Bild ist: neue Spurpunkte seit dem letzten Bild radieren.
 // Ein Punkt mehr, damit das erste neue Segment seinen Vorgänger hat.
-function updateSignature(R, g) {
-  const sg = R.sign, tr = g.track;
-  if (sg.world !== g.world || sg.key !== signKey(R)) buildSignature(R, g);
+// Gibt zurück, ob das Schild zur aktuellen Welt gehört und gezeichnet werden kann. Ein faules Schild wird erst
+// gebaut, wenn der Fahrer bis auf SIGN_BUILD_AHEAD_M heran ist; bis dahin gehört es zu keiner Welt.
+function updateSignature(R, g, sg, spec) {
+  const tr = g.track;
+  if (sg.world !== g.world || sg.key !== signKey(R, spec)) {
+    if (spec.lazy && g.skier.y < spec.y() - C.SIGN_BUILD_AHEAD_M) { sg.world = null; return false; }
+    buildSignature(R, g, sg, spec);
+  }
   const fresh = Math.min(tr.total - sg.seen, tr.n);
   if (fresh > 0) replayErase(sg, tr, fresh + 1, railsOf(g.rider));
   sg.seen = tr.total;
+  return true;
 }
 
 function drawSignature(R, g, ox, oy) {
-  updateSignature(R, g);
-  const { ctx, Sv: S, H } = R, sg = R.sign;
-  // Ohne Canvas-Maße (Tab noch unsichtbar, S = 0) wäre der Offscreen-Canvas leer und drawImage würfe: das
-  // beendete den ganzen Bildtakt. Sobald es Maße gibt, ändert sich der Schlüssel und der Schriftzug wird neu gebaut.
-  if (!sg.c.width || !sg.c.height) return;
-  const sy = sg.y0 * S + oy, sh = sg.hM * S;
-  if (sy + sh < 0 || sy > H) return;
-  ctx.globalAlpha = C.SIGN_ALPHA;
-  ctx.drawImage(sg.c, sg.x0 * S + ox, sy, sg.wM * S, sh);
-  ctx.globalAlpha = 1;
+  const { ctx, Sv: S, H } = R;
+  for (let i = 0; i < SIGNS.length; i++) {
+    const spec = SIGNS[i], sg = R.signs[i];
+    if (!spec.on(g) || !updateSignature(R, g, sg, spec)) continue;
+    // Ohne Canvas-Maße (Tab noch unsichtbar, S = 0) wäre der Offscreen-Canvas leer und drawImage würfe: das
+    // beendete den ganzen Bildtakt. Sobald es Maße gibt, ändert sich der Schlüssel und der Schriftzug wird neu gebaut.
+    if (!sg.c.width || !sg.c.height) continue;
+    const sy = sg.y0 * S + oy, sh = sg.hM * S;
+    if (sy + sh < 0 || sy > H) continue;
+    ctx.globalAlpha = C.SIGN_ALPHA;
+    ctx.drawImage(sg.c, sg.x0 * S + ox, sy, sg.wM * S, sh);
+    ctx.globalAlpha = 1;
+  }
+}
+
+// Yeti-Spuren (yeti.js): unter der Skispur, damit die Ski sichtbar darüberfahren. Ein Abdruck ist eine Sohle mit
+// Ballen und drei Zehen, als Mulde im Schnee in der Farbe der Spur; verwischt wird er blasser.
+function drawYeti(R, g, ox, oy) {
+  const yt = g.yeti;
+  if (!yt) return;
+  const { ctx, Sv: S, H } = R;
+  if (yt.y1 * S + oy < -S || yt.y0 * S + oy > H + S) return;
+  const l = C.YETI_FOOT_L_M * S, w = C.YETI_FOOT_W_M * S;
+  for (const p of yt.prints) {
+    const a = C.YETI_ALPHA * (1 - p.wear);
+    const sy = p.y * S + oy;
+    if (a < 0.01 || sy < -S || sy > H + S) continue;
+    ctx.save();
+    ctx.translate(p.x * S + ox, sy);
+    ctx.rotate(-p.a);
+    ctx.fillStyle = `rgba(${C.TRACK_RGB},${a.toFixed(3)})`;
+    // Ein Pfad für alles: Überlappungen füllen sich nur einmal, sonst würden sie dunkler
+    ctx.beginPath();
+    ctx.ellipse(0, -0.12 * l, 0.4 * w, 0.32 * l, 0, 0, TAU); // Ferse bis Mitte
+    ctx.moveTo(0.5 * w, 0.2 * l);
+    ctx.ellipse(0, 0.2 * l, 0.5 * w, 0.26 * l, 0, 0, TAU);   // Ballen, breiter
+    for (let i = -1; i <= 1; i++) {
+      // Zehen vorn im Bogen, die große innen, zur Laufmitte hin (dort liegt +side)
+      const r = (i === p.side ? 0.15 : 0.1) * w;
+      const tx = (i * 0.36 + p.side * 0.06) * w, ty = (0.55 - Math.abs(i) * 0.06) * l;
+      ctx.moveTo(tx + r, ty);
+      ctx.arc(tx, ty, r, 0, TAU);
+    }
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 function drawTrack(R, g, ox, oy) {

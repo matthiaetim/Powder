@@ -40,7 +40,7 @@ export function laneX(w, y) {
   const l = w.lane;
   return l.amp * Math.sin((TAU * y) / l.wave + w.phase) + l.amp2 * Math.sin((TAU * y) / l.wave2 + w.phase2);
 }
-function laneHalf(y) {
+export function laneHalf(y) {
   return lerp(C.LANE_HALF0, C.LANE_HALF1, clamp(y / C.RAMP_M, 0, 1));
 }
 function density(y) {
@@ -81,6 +81,7 @@ function genCell(w, cx, cy) {
     const h = isRock ? 0.8 + rng() * 0.6 : 2.0 + rng() * 1.2;
     if (x * x + y * y < C.START_CLEAR_M * C.START_CLEAR_M) continue;
     if (Math.abs(y - C.SIGN_Y_M) < C.SIGN_BAND_M) continue; // Schriftzug: kein Hindernis im ganzen Streifen
+    if (Math.abs(y - C.EVEREST_Y_M) < C.SIGN_BAND_M) continue; // Gipfelschild ebenso
     if (Math.abs(x - laneX(w, y)) < laneHalf(y) + r) continue;
     if (w.pisteHalf > 0 && Math.abs(x - laneX(w, y)) < w.pisteHalf + r) continue; // Super-G: freie Piste
     let ok = true;
