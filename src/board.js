@@ -51,13 +51,41 @@ export function sanitizeBoards(raw) {
   return out;
 }
 
+// Derselbe Lauf unter mehreren Schlüsseln: wer sich umbenennt, lädt seinen Bestwert unter dem neuen Namen hoch, und
+// der alte Eintrag bleibt stehen (Löschen erlauben die Regeln nicht, sonst könnte jeder die Liste leeren). Wert und
+// Fahrzeit auf die Hundertstel gleich heißt praktisch sicher derselbe Lauf. Ohne t (alte Stände) keine Kennung,
+// gleiche Meter allein können auch zwei Spieler haben.
+const runId = (e) => (e.t > 0 ? e.m + '|' + e.t : '');
+
 // Rangfolge: der bessere Wert zuerst (Meter absteigend, Zeiten aufsteigend), bei Gleichstand wer früher da war (ts),
-// dann der Schlüssel, damit die Liste stabil bleibt.
-export function sortEntries(byKey, mode) {
+// dann der Schlüssel, damit die Liste stabil bleibt. Doppelte Läufe erscheinen einmal, auf dem Platz des frühesten
+// Eintrags (da wurde der Lauf gefahren) und unter dem eigenen Schlüssel, sonst dem neuesten (der aktuelle Name).
+export function sortEntries(byKey, mode, ownKey = '') {
   const sign = lowerIsBetter(mode) ? 1 : -1;
-  return Object.entries(byKey || {})
+  const list = Object.entries(byKey || {})
     .map(([key, e]) => ({ key, ...e }))
     .sort((a, b) => sign * (a.m - b.m) || a.ts - b.ts || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  const pick = new Map();
+  for (const e of list) {
+    const id = runId(e);
+    if (!id) continue;
+    const cur = pick.get(id);
+    if (!cur || (cur.key !== ownKey && (e.key === ownKey || e.ts >= cur.ts))) pick.set(id, e);
+  }
+  const out = [];
+  const placed = new Set();
+  for (const e of list) {
+    const id = runId(e);
+    if (!id) out.push(e);
+    else if (!placed.has(id)) { placed.add(id); out.push({ ...pick.get(id), ts: e.ts }); }
+  }
+  return out;
+}
+
+// Liegt derselbe Lauf wie e unter einem anderen Schlüssel mit neuerem Stand? Dann zeigen andere Geräte jenen Namen.
+function newerDuplicate(byKey, key, e) {
+  const id = runId(e);
+  return !!id && Object.entries(byKey || {}).some(([k, x]) => k !== key && runId(x) === id && x.ts > e.ts);
 }
 
 // Zwei Stände vereinen: je Modus und Schlüssel der bessere Eintrag, bei Gleichstand der aus b.
@@ -75,7 +103,7 @@ export function mergeBoards(a, b) {
 
 // Ansicht für die Fresh-Seite: die ersten rows Einträge und der eigene mit Rang, falls er auf dem Server steht.
 export function viewFor(boards, mode, ownKey, rows = C.BOARD_ROWS) {
-  const list = sortEntries(boards && boards[mode], mode);
+  const list = sortEntries(boards && boards[mode], mode, ownKey);
   const top = list.slice(0, rows).map((e, i) => ({ rank: i + 1, key: e.key, name: e.name, m: e.m, own: !!ownKey && e.key === ownKey }));
   const idx = ownKey ? list.findIndex((e) => e.key === ownKey) : -1;
   const own = idx >= 0 ? { rank: idx + 1, key: ownKey, name: list[idx].name, m: list[idx].m } : null;
@@ -88,7 +116,7 @@ export function viewFor(boards, mode, ownKey, rows = C.BOARD_ROWS) {
 // setzt einen Strich.
 export function statsFor(boards, mode, ownKey) {
   const dist = (e) => (lowerIsBetter(mode) ? C.SG_FINISH_M : e.m);
-  return sortEntries(boards && boards[mode], mode).map((e, i) => ({
+  return sortEntries(boards && boards[mode], mode, ownKey).map((e, i) => ({
     rank: i + 1, key: e.key, name: e.name, m: e.m, t: e.t,
     kmh: e.t > 0 ? (dist(e) / e.t) * 3.6 : 0,
     own: !!ownKey && e.key === ownKey,
@@ -99,7 +127,7 @@ export function statsFor(boards, mode, ownKey) {
 // Zeiten lassen sich nicht als Linie in den Hang legen: im Super-G bleibt der Schnee ohne Namenslinien.
 export function friendMarks(boards, mode, ownKey) {
   if (lowerIsBetter(mode)) return [];
-  return sortEntries(boards && boards[mode], mode).filter((e) => e.key !== ownKey).map((e) => ({ name: e.name, m: e.m }));
+  return sortEntries(boards && boards[mode], mode, ownKey).filter((e) => e.key !== ownKey).map((e) => ({ name: e.name, m: e.m }));
 }
 
 // Was ein beendeter Lauf für die Liste wert ist: Meter beim Sturz, im Super-G die Gesamtzeit in Hundertstel, aber nur
@@ -207,7 +235,11 @@ export function createBoard({ url = '', g = null, fetchFn = null, debug = false,
     const k = key();
     const o = own[mode];
     if (!k || !o || o.sentAs === k || busy[mode]) return;
-    if (boards[mode][k] && !better(mode, o.m, boards[mode][k].m)) { o.sentAs = k; saveBoardOwn(own); return; } // Server hat schon so gut oder besser
+    // Server hat schon so gut oder besser. Ausnahme: genau dieser Lauf, aber unter einem anderen Namen neuer
+    // eingetragen (zurückbenannt). Dann gleich noch einmal senden, damit andere Geräte wieder diesen Namen zeigen.
+    const e = boards[mode][k];
+    const back = e && e.m === o.m && e.t === o.t && newerDuplicate(boards[mode], k, e);
+    if (e && !better(mode, o.m, e.m) && !back) { o.sentAs = k; saveBoardOwn(own); return; }
     busy[mode] = true;
     try {
       const body = { name, m: o.m, t: o.t, ts: { '.sv': 'timestamp' }, v: VERSION };

@@ -39,8 +39,10 @@ liegt er außerhalb, steht er nach „…“ mit seinem Rang darunter. In Classi
 Super-G die Gesamtzeit (Zeit plus Strafen, schnellste zuerst); dort zählt nur ein Lauf bis ins Ziel, ein Sturz
 davor meldet nichts. Beim ersten Sturz fragt die Seite einmal nach einem Namen (2 bis 12 Zeichen), ein Tipp auf den
 eigenen Eintrag ändert ihn. Die Identität ist der Name: gleiche Namen teilen sich einen Eintrag (auch von einem zweiten
-Gerät), ein Eintrag wird nur durch einen besseren überschrieben, und wer sich umbenennt, lässt den alten Eintrag stehen
-(Aufräumen in der Firebase-Konsole). Die Bestweiten der anderen liegen als graue Namenslinien im Schnee, beim Start des
+Gerät), ein Eintrag wird nur durch einen besseren überschrieben. Wer sich umbenennt, lädt seinen Bestwert unter dem neuen
+Namen hoch, der alte Eintrag bleibt auf dem Server (Aufräumen in der Firebase-Konsole). Angezeigt wird derselbe Lauf
+(gleicher Wert und gleiche Fahrzeit auf die Hundertstel) nur einmal, auf seinem ursprünglichen Platz und unter dem
+neuesten Namen, auf dem eigenen Gerät unter dem eigenen. Die Bestweiten der anderen liegen als graue Namenslinien im Schnee, beim Start des
 Laufs eingefroren; die eigene rote Rekordlinie bleibt. Im Super-G gibt es keine Namenslinien, Zeiten lassen sich nicht in
 den Hang legen. Welche Modi eine Liste haben und wie sie werten, steht in `MODES` (`board: 'm'` oder `'time'`,
 `src/modes.js`). Läufe mit Tuning, `?seed=` oder `?debug=1` zählen lokal, aber nicht online (Hinweis unter der Liste);
