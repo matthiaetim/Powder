@@ -236,14 +236,10 @@ body[data-state="dead"][data-overlay="1"] #ov-dead, body[data-state="finished"][
 }
 #btn-fresh:active { transform: rotate(0.7deg) translate(5px, 6px); box-shadow: 0 0 0 var(--ink); }
 
-/* Modus-Kacheln: weiße Kärtchen, die gewählte ist gelb. Vorschau-Canvas 104x58 wird auf 82 px skaliert, damit drei
-   Kacheln in die Karte passen (313 px innen auf dem 375-px-iPhone). */
-#modes {
-  display: flex;
-  gap: 8px;
-  margin-top: 22px;
-  align-items: flex-start;
-}
+/* Modus-Kärtchen: weiße Kärtchen, die gewählte ist gelb. Die Fahrerwahl nutzt sie hochkant, die Moduswahl als Zeile
+   (.mode-row): unter Fresh steht der gewählte Modus mit Vorschau, Name und Kurztext, ein Tipp öffnet die Kachel
+   „Modus“ mit allen Modi als Zeilen samt Bestwert. Vier Kärtchen nebeneinander passten nicht mehr in die 313 px der
+   Karte auf dem 375-px-iPhone. Vorschau-Canvas 104x58 wird auf 72 px skaliert. */
 .mode-card {
   display: flex;
   flex-direction: column;
@@ -263,23 +259,30 @@ body[data-state="dead"][data-overlay="1"] #ov-dead, body[data-state="finished"][
 .mode-card.soon { opacity: 0.4; cursor: default; }
 .mode-preview {
   display: block;
-  width: 82px;
-  height: 46px;
+  width: 72px;
+  height: 40px;
   border: 2px solid var(--ink);
   border-radius: 8px;
   box-sizing: border-box;
 }
 .mode-name { font-size: 12px; line-height: 1; letter-spacing: 0.06em; text-transform: uppercase; }
-.mode-cta {
-  font-family: var(--body);
-  font-size: 11px;
-  line-height: 1;
-  opacity: 0.65;
-  visibility: hidden;
-  text-transform: none;
-  letter-spacing: 0;
+.mode-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  column-gap: 10px;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 10px 5px 5px;
+  text-align: left;
 }
-.mode-card.active .mode-cta, .mode-card.soon .mode-cta { visibility: visible; }
+.mode-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mode-desc { font-family: var(--body); font-size: 12px; line-height: 1.2; opacity: 0.7; }
+.mode-more { font-family: var(--body); font-size: 11px; opacity: 0.65; white-space: nowrap; }
+.mode-best { font-family: var(--display); font-size: 13px; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; opacity: 0.8; white-space: nowrap; }
+#mode-current { margin-top: 22px; } /* volle Kartenbreite wie die Zeilen der Kachel, sonst umbricht der Kurztext */
+#modes-list { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; width: 100%; }
+#btn-modes-back { margin-top: 18px; }
 
 /* Fahrerwahl (riders.js): Icon oben links auf der Fresh-Seite, ein Tipp tauscht die Karte gegen die Auswahl.
    Das Icon sitzt fest im Bildschirmeck, nicht in der Karte, damit es lange Meterzahlen nicht verdrängt. */
@@ -298,9 +301,9 @@ body[data-state="dead"][data-overlay="1"] #ov-dead, body[data-state="finished"][
 #btn-rider:active { transform: rotate(-2deg) translate(3px, 4px); box-shadow: 0 0 0 var(--ink); }
 body[data-panel="riders"] #btn-rider { background: var(--mark); }
 .rider-preview { display: block; width: 40px; height: 40px; border-radius: 9px; }
-#rider-card, #stats-card { display: none; }
-body[data-panel="riders"] #rider-card, body[data-panel="stats"] #stats-card { display: flex; }
-body[data-panel="riders"] #dead-card, body[data-panel="stats"] #dead-card { display: none; }
+#rider-card, #stats-card, #modes-card { display: none; }
+body[data-panel="riders"] #rider-card, body[data-panel="stats"] #stats-card, body[data-panel="modes"] #modes-card { display: flex; }
+body[data-panel="riders"] #dead-card, body[data-panel="stats"] #dead-card, body[data-panel="modes"] #dead-card { display: none; }
 .card-title { font-family: var(--display); font-size: 30px; line-height: 1; letter-spacing: 0.02em; }
 #riders { display: flex; gap: 8px; margin-top: 18px; align-items: flex-start; }
 #riders .mode-card { width: 94px; }

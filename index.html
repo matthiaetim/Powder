@@ -69,6 +69,11 @@
     <div id="stats-note"></div>
     <button id="btn-stats-back" class="btn-flat" type="button">Zurück</button>
    </div>
+   <div id="modes-card" class="card">
+    <div class="card-title">Modus</div>
+    <div id="modes-list"></div>
+    <button id="btn-modes-back" class="btn-flat" type="button">Zurück</button>
+   </div>
    <div id="dead-card" class="card">
     <div id="dead-dist">0 m</div>
     <div id="dead-time">in 0,00 Sekunden</div>
@@ -85,23 +90,11 @@
       <div id="board-note"></div>
     </div>
     <button id="btn-fresh" type="button">Fresh</button>
-    <div id="modes">
-      <button class="mode-card" type="button" data-mode="classic">
-        <canvas class="mode-preview" width="104" height="58"></canvas>
-        <span class="mode-name">Classic</span>
-        <span class="mode-cta"></span>
-      </button>
-      <button class="mode-card" type="button" data-mode="chase">
-        <canvas class="mode-preview" width="104" height="58"></canvas>
-        <span class="mode-name">Lawine</span>
-        <span class="mode-cta"></span>
-      </button>
-      <button class="mode-card" type="button" data-mode="superg">
-        <canvas class="mode-preview" width="104" height="58"></canvas>
-        <span class="mode-name">Super-G</span>
-        <span class="mode-cta"></span>
-      </button>
-    </div>
+    <button id="mode-current" class="mode-card mode-row" type="button" aria-label="Modus wählen">
+      <canvas class="mode-preview" width="104" height="58"></canvas>
+      <span class="mode-text"><span class="mode-name"></span><span class="mode-desc"></span></span>
+      <span class="mode-more">ändern</span>
+    </button>
     <button id="btn-sound" type="button">Ton an</button>
    </div>
   </div>

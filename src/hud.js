@@ -1,13 +1,14 @@
 // DOM-HUD: Tempo, Distanz, Pause, Fresh-Seite mit Laufzeit, Bestenliste samt Namensfeld und Detail-Kachel,
-// Modus-Karten, Debug-Text.
+// Moduswahl (Element unter Fresh und Kachel mit allen Modi), Debug-Text.
 // Super-G: dazu die laufende Zeit, Hinweise zu Torfehler und Zwischenzeit, der Countdown in der Bildmitte.
 import { C, VERSION } from './constants.js';
 import { overlayReady, togglePause, pauseIfRunning, fresh, selectMode, selectRider } from './game.js';
 import { createTunePanel, isTuned } from './tune.js';
 import { verdictText } from './board.js';
-import { MODES, lowerIsBetter } from './modes.js';
+import { MODES, MODE_ORDER, lowerIsBetter } from './modes.js';
 import { RIDERS, RIDER_ORDER } from './riders.js';
 import { drawModePreview, drawRiderPreview } from './render.js';
+import { loadBest, loadBestTime } from './storage.js';
 
 const pad2 = (n) => String(n).padStart(2, '0');
 
@@ -128,27 +129,69 @@ export function createHud(g, doc, hooks = {}) {
     return (n.value < 0 ? '−' : n.value > 0 ? '+' : '±') + nf2.format(Math.abs(n.value)) + ' s';
   }
 
-  // Modus-Karten: Vorschau zeichnen (neu, wenn der Fahrer wechselt), aktive Karte markieren, Tipp startet
-  const cards = Array.from(doc.querySelectorAll('#modes .mode-card'));
-  const drawModes = () => { for (const card of cards) drawModePreview(card.querySelector('.mode-preview'), card.dataset.mode, g.rider); };
-  drawModes();
-  for (const card of cards) {
-    const id = card.dataset.mode;
-    const m = MODES[id];
-    card.querySelector('.mode-cta').textContent = m && m.soon ? 'bald' : 'Tap to play';
-    onTap(card, () => {
-      if (!m || m.soon) return;
-      if (id === g.mode) { doFresh(); return; }
-      if (selectMode(g, id)) { markActive(); refreshDead(); renderBoard(); }
-    });
-  }
-  function markActive() {
-    for (const card of cards) card.classList.toggle('active', card.dataset.mode === g.mode);
-  }
-  markActive();
-
-  // Karten statt der Ergebniskarte: Fahrerwahl ('riders') oder Detail-Kachel der Bestenliste ('stats'), immer nur eine
+  // Karten statt der Ergebniskarte: Moduswahl ('modes'), Fahrerwahl ('riders') oder Detail-Kachel der Bestenliste
+  // ('stats'), immer nur eine
   const showPanel = (name) => { doc.body.dataset.panel = name; };
+
+  // Moduswahl: unter Fresh steht der gewählte Modus (Vorschau, Name, Kurztext), ein Tipp öffnet die Kachel „Modus“
+  // mit allen Modi als Zeilen samt persönlichem Bestwert. Die Bestwerte der anderen Modi liegen nur im Storage
+  // (g.best gilt für den gewählten), deshalb werden sie beim Öffnen frisch gelesen. Die Vorschauen zeigen den
+  // gewählten Fahrer und werden bei einem Fahrerwechsel neu gezeichnet.
+  const curBtn = $('mode-current'), curCv = curBtn.querySelector('.mode-preview');
+  const curName = curBtn.querySelector('.mode-name'), curDesc = curBtn.querySelector('.mode-desc');
+  const modesList = $('modes-list');
+  const bestText = (id) => {
+    if (MODES[id].board === 'time') { const v = loadBestTime(id); return v > 0 ? formatClock(v / 100, true) : '–'; }
+    const v = loadBest(id);
+    return v > 0 ? nf.format(v) + ' m' : '–';
+  };
+  const modeRows = MODE_ORDER.map((id) => {
+    const m = MODES[id];
+    const row = doc.createElement('button');
+    row.type = 'button';
+    row.className = 'mode-card mode-row' + (m.soon ? ' soon' : '');
+    row.dataset.mode = id;
+    const cv = doc.createElement('canvas');
+    cv.className = 'mode-preview';
+    const text = doc.createElement('span');
+    text.className = 'mode-text';
+    const name = doc.createElement('span');
+    name.className = 'mode-name';
+    name.textContent = m.name;
+    const desc = doc.createElement('span');
+    desc.className = 'mode-desc';
+    desc.textContent = m.desc;
+    text.append(name, desc);
+    const best = doc.createElement('span');
+    best.className = 'mode-best';
+    row.append(cv, text, best);
+    onTap(row, () => {
+      if (m.soon) return;
+      if (id !== g.mode && selectMode(g, id)) { markActive(); refreshDead(); renderBoard(); }
+      showPanel('');
+    });
+    modesList.append(row);
+    return row;
+  });
+  const drawModes = () => {
+    for (const row of modeRows) drawModePreview(row.querySelector('.mode-preview'), row.dataset.mode, g.rider);
+    drawModePreview(curCv, g.mode, g.rider);
+  };
+  function markActive() {
+    for (const row of modeRows) row.classList.toggle('active', row.dataset.mode === g.mode);
+    curName.textContent = MODES[g.mode].name;
+    curDesc.textContent = MODES[g.mode].desc;
+    drawModePreview(curCv, g.mode, g.rider);
+  }
+  function openModes() {
+    for (const row of modeRows) row.querySelector('.mode-best').textContent = bestText(row.dataset.mode);
+    showPanel('modes');
+  }
+  drawModes();
+  markActive();
+  onTap(curBtn, openModes);
+  onTap($('btn-modes-back'), () => showPanel(''));
+
   const showRiders = (on) => showPanel(on ? 'riders' : '');
 
   // Fahrerwahl: das Icon oben links zeigt den gewählten Fahrer, ein Tipp tauscht die Ergebniskarte gegen die
