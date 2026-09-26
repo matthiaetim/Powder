@@ -247,9 +247,13 @@ export function createHud(g, doc, hooks = {}) {
   onTap($('btn-modes-back'), () => showPanel(''));
 
   // Duell (duel.js, duel-card.js): Modus wählen und die Kachel öffnen; im Zustand ready (App-Start mit ?room=CODE)
-  // hält hold den Lauf an und zeigt die Fresh-Seite über dem Startbild. Beim Verlassen zurück nach Classic.
+  // hält hold den Lauf an und zeigt die Fresh-Seite über dem Startbild. Verlassen führt wie ein Zurück auf die Kachel
+  // und in den Modus von vorher, ohne einen Lauf zu starten; nur im Zustand ready fährt der wartende Lauf dann los,
+  // weil es davor keine Kachel gab.
+  let beforeDuel = null; // { mode, panel } beim Öffnen, damit ein zweites openDuel (Fresh, Link) es nicht überschreibt
   function openDuel(code = '') {
     if (!duel) return;
+    if (!beforeDuel) beforeDuel = { mode: g.mode === 'duel' ? 'classic' : g.mode, panel: doc.body.dataset.panel || '' };
     if (g.mode !== 'duel') selectMode(g, 'duel');
     if (g.state === 'ready') g.hold = true;
     markActive();
@@ -257,10 +261,11 @@ export function createHud(g, doc, hooks = {}) {
     duel.open(code);
   }
   function leaveDuel() {
-    selectMode(g, 'classic');
+    const back = beforeDuel || { mode: 'classic', panel: '' };
+    beforeDuel = null;
+    selectMode(g, back.mode);
     markActive(); refreshDead(); renderBoard();
-    showPanel('');
-    if (g.state !== 'ready') doFresh(); // im Zustand ready startet der Lauf von selbst, sobald hold weg ist
+    if (back.panel === 'modes') openModes(); else showPanel(back.panel === 'duel' ? '' : back.panel);
   }
   if (duel) createDuelCard(doc, g, duel, { onTap, board: hooks.board, fmtClock: formatClock, nf, onLeave: leaveDuel });
 

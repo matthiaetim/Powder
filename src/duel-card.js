@@ -98,7 +98,6 @@ export function createDuelCard(doc, g, duel, { onTap, board, fmtClock, nf, onLea
     show(againBtn, view === 'result' && !!v.verdict);
     show(joinRow, view !== 'result' && v.hasName);
     errEl.textContent = v.error || '';
-    leaveBtn.textContent = v.role ? 'Verlassen' : 'Zurück';
 
     if (view === 'join') {
       noteEl.textContent = v.notice || (!v.hasName ? 'Für das Duell brauchst du einen Namen.' : v.busy ? 'Verbinde …'
@@ -146,7 +145,8 @@ export function createDuelCard(doc, g, duel, { onTap, board, fmtClock, nf, onLea
     if (v.role === 'host') duel.go(); else duel.setReady(!v.ready);
   });
   onTap(againBtn, () => duel.rematch());
-  onTap(leaveBtn, async () => { await duel.leave(); onLeave(); });
+  // Zurück sofort, das Austragen aus dem Raum läuft im Hintergrund weiter (leave räumt den Stand vor dem ersten await)
+  onTap(leaveBtn, () => { const p = duel.leave(); onLeave(); return p; });
   // Teilen braucht eine echte Nutzergeste: der Knopf ist .native, deshalb kommt hier ein click
   shareBtn.addEventListener('click', () => {
     const data = duel.shareData();
