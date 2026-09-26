@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.24.3';
+export const VERSION = '0.24.4';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -261,8 +261,8 @@ export const C = {
   // mit Torversatz wären das Bögen über 45°. Die Piste ist SG_PISTE_HALF_M je Seite frei, außen stehen Bäume wie
   // in Classic (Aufprall beendet den Lauf ohne Zeit). Ein verpasstes Tor kostet SG_PENALTY_S, eine berührte Stange
   // SG_POLE_KMH Tempo, kein Sturz. Zwischenzeiten bei SG_SPLITS_M gegen die Bestzeit. Start mit Countdown
-  // (SG_COUNT_BEEPS kurze Pieptöne im Abstand SG_COUNT_STEP_S, dann der lange = Go). Nach dem Ziel gleitet der
-  // Fahrer aus (SG_COAST_DECEL zusätzlich zur Physik), dann kommt die Fresh-Seite.
+  // (SG_COUNT_BEEPS kurze Pieptöne im Abstand SG_COUNT_STEP_S, dann der lange = Go). Nach dem Ziel macht der
+  // Fahrer einen Hockeystop (STOP_*), dann kommt die Fresh-Seite.
   SG_FINISH_M: 1000,
   SG_SEED: 20260925,         // fester Kurs
   SG_GATE_FIRST_M: 50,
@@ -290,7 +290,6 @@ export const C = {
   SG_COUNT_STEP_S: 1,        // Abstand der Pieptöne im Countdown: echte Sekunden, 3 – 2 – 1 – Go dauert 3 s
   SG_COUNT_BEEPS: 3,         // kurze Pieptöne vor dem Go
   SG_GO_SHOW_S: 0.6,         // so lange steht „Go“ im Bild
-  SG_COAST_DECEL: 8,         // Auslauf nach dem Ziel: zusätzliche Verzögerung in m/s²
 
   // Markierung an den Innenstangen (gate-marks.js): gesprühter ovaler Bogen, Scheitel an der Stange, Winkel wie auf
   // dem Kompass (0° bergauf, 90° Scheitel zur Toröffnung, 180° talwärts). An den Zwischenzeit-Toren dazu Fleck und
@@ -306,7 +305,17 @@ export const C = {
   GM_DOT_PX: 16,             // Fleck an der Stange (Zwischenzeit-Tor)
   GM_LINE_PX: 8,             // Linie zur Außenstange (Zwischenzeit-Tor)
   GM_PULSE_S: 0.5,           // so lange leuchtet die Markierung nach der Zwischenzeit auf
-  SG_FINISH_OVERLAY_MS: 1200, // nach dem Ziel so lange Auslauf, dann die Fresh-Seite
+  SG_FINISH_OVERLAY_MS: 2200, // nach dem Ziel so lange Hockeystop und Wolke, dann die Fresh-Seite (Tipp springt hin)
+
+  // Hockeystop nach dem Ziel (Super-G und Duell; hockey.js, hockey-view.js, game.js coast): der Fahrer reißt die Ski
+  // quer zu der Seite, zu der er lehnt (Zeitkonstante STOP_TURN_S), rutscht in der alten Fahrtrichtung weiter und
+  // bremst mit STOP_DECEL_MIN + STOP_DECEL_K · v bis zum Stand (bei 110 km/h rund 0,9 s). Aus der Kante stiebt eine
+  // Wolke aus Lawinen-Wülsten talwärts, je größer, je schneller er ins Ziel kam (voll bei STOP_REF_KMH).
+  STOP_TURN_S: 0.07,
+  STOP_DECEL_MIN: 15,        // m/s², damit er auch aus wenig Tempo sichtbar abrupt steht
+  STOP_DECEL_K: 2,           // 1/s, der Anteil, der mit dem Tempo wächst
+  STOP_REF_KMH: 110,
+  STOP_CLOUD_S: 3,           // so lange bewegt sich die Wolke, danach zeichnet main.js im Leerlauf
 
   // Duell (duel.js, room.js, duel-card.js, render.js, hud.js): zwei Geräte fahren dieselbe Welt (Seed aus dem Raum),
   // gewertet wird die eigene Wanduhr-Zeit ab dem gemeinsamen Go bis zur Zielweite; die Netzlaufzeit spielt so keine

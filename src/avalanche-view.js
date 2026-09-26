@@ -116,11 +116,18 @@ function level(imgs, px) {
   return imgs[imgs.length - 1];
 }
 
-// Wulst mit Radius rPx (CSS-Pixel) um (x, y); v wählt die Variante, dpr die Sprite-Größe
-function lobeAt(ctx, spr, v, x, y, rPx, dpr) {
+// Wulst mit Radius rPx (CSS-Pixel) um (x, y); v wählt die Variante, dpr die Sprite-Größe. Auch für die Wolke des
+// Hockeystops (hockey-view.js), damit sie aus denselben Wülsten besteht.
+export function lobeAt(ctx, spr, v, x, y, rPx, dpr) {
   if (rPx < 0.5) return;
   const e = rPx / SPRITE_R;
   ctx.drawImage(level(spr.lobes[v % spr.lobes.length], e * dpr), x - SPRITE_CX * e, y - SPRITE_CY * e, e, e);
+}
+
+// Staubwölkchen mit Radius rPx um (x, y), wie vor der Front der Lawine (hockey-view.js nutzt es mit)
+export function dustAt(ctx, spr, x, y, rPx, dpr) {
+  if (rPx < 0.5) return;
+  ctx.drawImage(level(spr.dust, 2 * rPx * dpr), x - rPx, y - rPx, 2 * rPx, 2 * rPx);
 }
 
 export function drawAvalanche(R, g, ox, oy, t) {

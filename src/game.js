@@ -14,6 +14,7 @@ import { MODES, DEFAULT_MODE, lowerIsBetter } from './modes.js';
 import { RIDERS, validRider } from './riders.js';
 import { createCourse, updateCourse, tickCourse, crossFrac } from './gates.js';
 import { rollYeti, updateYeti } from './yeti.js';
+import { startStop, speedAt, distAt, headingAt } from './hockey.js';
 
 const READY_FRAC = 0.78; // Fahrer steht im Intro weit unten im Bild
 
@@ -40,6 +41,7 @@ export function createGame(opts = {}) {
     readyT: 0, deadT: 0, deadCause: '',
     countT: 0, countBeeps: 0, finT: 0, pausedFrom: 'running', // Super-G: Countdown-Zeit und -Töne, Auslauf-Zeit, woher die Pause kam
     crashV: 0, crashX: 0, crashY: 0, crashPush: 0, // Tempo, Hindernis und Schub beim Aufprall (für die Splitter)
+    stop: null, // Hockeystop nach dem Ziel (hockey.js): beim Ziel festgehaltener Anfang
     // fogT: -1, // < 0 = kein Nebel; sonst verstrichene Zeit seit dem Hockeystop (render.js) — deaktiviert
     camX: 0, skierFrac: READY_FRAC, zoom: 1,
     viewWm: C.VIEW_W_M, viewHm: C.VIEW_W_M * C.VIEW_ASPECT,
@@ -107,6 +109,7 @@ export function reset(g, seed, intro) {
   g.runMarks = g.marks[g.mode] || [];
   g.runTainted = false;
   g.readyT = 0; g.deadT = 0; g.deadCause = '';
+  g.stop = null;
   g.countT = 0; g.countBeeps = 0; g.finT = 0;
   // g.fogT = -1; // Hockeystop deaktiviert
   g.camX = 0; g.zoom = 1;
@@ -276,17 +279,39 @@ function advanceTrail(g, dt) {
   updateParticles(g.particles, dt);
 }
 
-// Auslauf nach dem Ziel (Super-G): die Physik läuft ohne Eingabe weiter, so gehen Winkel, Carve und Ton sauber
-// auf null, dazu bremst SG_COAST_DECEL den Fahrer aus. Hindernisse zählen nicht mehr, der Lauf ist gewertet.
+// Nach dem Ziel (Super-G und Duell): Hockeystop (hockey.js). Die Ski kommen schnell quer, der Fahrer rutscht in der
+// alten Fahrtrichtung weiter und steht nach knapp einer Sekunde; Lage, Tempo und Stellung folgen geschlossen aus
+// g.finT. Die Spur wird zur breiten Bremsspur (Pflug-Band quer zur Fahrt, siehe drawTrack); das normale Spray
+// entfällt, den Schnee übernimmt die Wolke (hockey-view.js). Hindernisse zählen nicht mehr, der Lauf ist gewertet.
 function coast(g, dt) {
-  const s = g.skier;
+  const s = g.skier, st = g.stop;
   g.finT += dt;
-  P.updateSkier(s, dt, maxKmh(g));
-  s.v = Math.max(0, s.v - C.SG_COAST_DECEL * dt);
+  const t = g.finT, d = distAt(st, t);
+  s.theta = headingAt(st, t);
+  s.omega = 0;
+  s.v = speedAt(st, t);
+  s.x = st.x0 + Math.sin(st.dir) * d;
+  s.y = st.y0 + Math.cos(st.dir) * d;
+  s.brake = s.v > 0 ? C.STOP_DECEL_MIN + C.STOP_DECEL_K * s.v : 0; // der Ton kratzt, solange er rutscht
+  s.carve = s.v > 0.5 ? 1 : 0;
+  s.plowK *= Math.exp(-dt / C.PLOW_EASE_S);
   if (g.course) tickCourse(g.course, dt); // Stangen schwingen aus, Hinweis läuft ab (im Duell gibt es keinen Kurs)
   if (s.y - s.y0 > g.dist) g.dist = s.y - s.y0;
   updateCamera(g, dt);
-  advanceTrail(g, dt);
+  g.trackAcc += s.v * dt;
+  if (g.trackAcc >= C.TRACK_SPACING_M) {
+    g.trackAcc = 0;
+    pushTrack(g.track, s.x, s.y, Math.cos(st.dir), -Math.sin(st.dir), 1, 1);
+  }
+  updateParticles(g.particles, dt);
+}
+
+// Ein Tipp nach dem Ziel überspringt Hockeystop und Wolke: g.finT springt ans Ende, die Fresh-Seite kommt sofort.
+// Die Schonfrist gegen Doppeltipps (freshReady) läuft ab dann, derselbe Tipp startet also keinen neuen Lauf.
+function skipFinish(g) {
+  if (g.state !== 'finished' || g.finT * 1000 >= C.SG_FINISH_OVERLAY_MS) return false;
+  g.finT = C.SG_FINISH_OVERLAY_MS / 1000;
+  return true;
 }
 
 // Lauf gewertet, Fahrer in den Auslauf: Super-G nach dem Ziel, Duell am Ziel oder wenn die Zeit vorbei ist (duel.js).
@@ -296,6 +321,7 @@ export function endRun(g, data) {
   const s = g.skier;
   g.state = 'finished';
   g.finT = 0;
+  g.stop = startStop(s);
   s.side = 0;
   s.plow = false;
   emit(g, 'finish', data);
@@ -424,6 +450,7 @@ function burstAt(g, x, y, n, speed) {
 
 export function onPress(g, side) {
   g.lastGesture = side < 0 ? 'hold L' : 'hold R';
+  skipFinish(g);
   if (g.state === 'ready' && !g.hold) launch(g);
   if (g.state === 'running' || g.state === 'count') P.press(g.skier, side); // im Countdown steht die Seite schon beim Go
   emit(g, 'press', side);
@@ -434,6 +461,7 @@ export function onRelease(g) {
 }
 export function onPlow(g, on) {
   if (on) g.lastGesture = 'plow';
+  if (on) skipFinish(g);
   if (g.state === 'ready' && on && !g.hold) launch(g);
   if (g.state === 'running' || g.state === 'count') P.setPlow(g.skier, on);
   emit(g, 'plow', on);
@@ -479,7 +507,7 @@ export function overlayReady(g) {
 export function animating(g) {
   switch (g.state) {
     case 'running': case 'count': return true;
-    case 'finished': return g.finT < 1.5 || g.skier.v > 0;
+    case 'finished': return g.finT < C.STOP_CLOUD_S || g.skier.v > 0; // Hockeystop und Wolke
     case 'dead': return g.deadT < C.DEAD_SETTLE_S || (g.respawnS > 0 && !g.raceOver); // Duell: Geist fährt, Weiterfahrt kommt
     default: return false; // ready, paused: das Bild steht
   }
@@ -496,6 +524,7 @@ export function restart(g) {
   return true;
 }
 export function fresh(g) {
+  if (skipFinish(g)) return; // Leertaste/Enter während des Hockeystops: erst zur Fresh-Seite
   if (freshReady(g)) reset(g, seedFor(g), false);
 }
 // Modus wechseln (auf der Fresh-Seite): Bestwerte gehören zum Modus. Bewusst nicht gespeichert, die App startet

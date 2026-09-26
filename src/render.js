@@ -3,6 +3,7 @@ import { C } from './constants.js';
 import { TREE } from './physics.js';
 import { forEachTrackPoint, forEachRecentTrackPoint } from './track.js';
 import { drawAvalanche, drawCloud, makeAvSprites } from './avalanche-view.js';
+import { drawHockey } from './hockey-view.js';
 import { laneX } from './world.js';
 import { drawGateMarks } from './gate-marks.js';
 
@@ -236,6 +237,7 @@ export function draw(R, g, t) {
   if (g.course) drawGateMarks(R, g, ox, oy, railsOf(g.rider)); // Farbe im Schnee an den Innenstangen, die Ski verwischen sie
   drawTrack(R, g, ox, oy);
   drawWorld(R, g, ox, oy);
+  if (g.state === 'finished') drawHockey(R, g, ox, oy); // Hockeystop-Wolke über dem Fahrer
   // drawHockeyFog(R, g, ox, oy); // Hockeystop deaktiviert
   drawParticles(R, g, ox, oy);
   if (g.ghost.on) drawDuelTags(R, g, ox, oy);
