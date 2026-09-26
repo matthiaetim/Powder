@@ -10,6 +10,13 @@ import { laneX, mulberry32 } from './world.js';
 const SALT = 0x5347; // „SG“: eigener Zufallsstrom für die Tore, unabhängig von der Welt
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
+// Anteil eines Schritts von prevY nach y bis zur Linie lineY (die Bewegung im Schritt ist geradlinig); ohne Vortrieb 1.
+// Auch das Duell wertet seine Zielweite damit (game.js).
+export function crossFrac(prevY, y, lineY) {
+  const dy = y - prevY;
+  return dy > 0 ? clamp((lineY - prevY) / dy, 0, 1) : 1;
+}
+
 export function createCourse(seed, w) {
   const rng = mulberry32((seed ^ SALT) >>> 0);
   const gates = [];
@@ -65,9 +72,7 @@ export function tickCourse(cs, dt) {
 export function updateCourse(cs, s, prevX, prevY, runT, dt, bestSplits, on) {
   tickCourse(cs, dt);
   if (cs.finished) return false;
-  const dy = s.y - prevY;
-  // Anteil des Schritts bis zur Linie lineY (Bewegung im Schritt ist geradlinig)
-  const at = (lineY) => (dy > 0 ? clamp((lineY - prevY) / dy, 0, 1) : 1);
+  const at = (lineY) => crossFrac(prevY, s.y, lineY);
 
   // Torlinien in Reihenfolge werten, sobald der Fahrer sie erreicht hat
   while (cs.next < cs.gates.length && s.y >= cs.gates[cs.next].y) {

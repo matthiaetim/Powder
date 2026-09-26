@@ -1,8 +1,10 @@
 // Spielzustand und Ablauf: ready → running → dead → (Fresh) → ready. Pause jederzeit.
 // Super-G (gates.js): ready → count (Countdown) → running → finished (Auslauf) → (Fresh) → ready.
+// Duell (duel.js): ready mit hold (Lobby) → count aus einer gemeinsamen Uhr → running → dead → running (Weiterfahrt
+// nach der Sturzpause) → finished an der Zielweite oder wenn die Zeit vorbei ist.
 import { C } from './constants.js';
 import * as P from './physics.js';
-import { createWorld, ensureCells } from './world.js';
+import { createWorld, ensureCells, laneX } from './world.js';
 import { createAvalanche, updateAvalanche } from './avalanche.js';
 import { checkCollision } from './collision.js';
 import { createTrack, clearTrack, pushTrack } from './track.js';
@@ -10,7 +12,7 @@ import { createParticles, clearParticles, spawnParticle, updateParticles } from 
 import { loadBest, saveBest, loadBestTime, saveBestTime, loadBestSplits, saveBestSplits, loadRider, saveRider } from './storage.js';
 import { MODES, DEFAULT_MODE, lowerIsBetter } from './modes.js';
 import { RIDERS, validRider } from './riders.js';
-import { createCourse, updateCourse, tickCourse } from './gates.js';
+import { createCourse, updateCourse, tickCourse, crossFrac } from './gates.js';
 import { rollYeti, updateYeti } from './yeti.js';
 
 const READY_FRAC = 0.78; // Fahrer steht im Intro weit unten im Bild
@@ -45,6 +47,11 @@ export function createGame(opts = {}) {
     trackAcc: 0, spawnAcc: 0, plowAcc: 0,
     onEvent: null, // Haken für den Ton (main.js): press, release, plow, crash, beep, gate, pole, split, finish, summit
     onCourse: null, // Rückruf des Torlaufs (einmal gebunden, keine Allokation pro Schritt)
+    // Duell (duel.js): Start gesperrt (Lobby), Countdown aus der gemeinsamen Uhr, Zielweite, Sturzpause, Zeit vorbei,
+    // Schonfrist nach der Weiterfahrt, Stürze im Lauf und Radius des letzten Hindernisses, Rückruf am Ziel, Pose des
+    // Gegners (render.js zeichnet sie als Geist)
+    hold: false, countClock: null, finishM: 0, respawnS: 0, raceOver: false, graceT: 0, crashes: 0, crashR: 0,
+    onFinish: null, ghost: { on: false },
   };
   g.onCourse = (type, data) => courseEvent(g, type, data);
   loadBests(g);
@@ -58,6 +65,10 @@ export function hasAvalanche(g) {
 
 export function isSuperG(g) {
   return g.mode === 'superg';
+}
+
+export function isDuel(g) {
+  return g.mode === 'duel';
 }
 
 // Super-G fährt immer denselben Kurs (SG_SEED), damit Bestzeiten vergleichbar sind; ?seed= gilt für alle Modi.
@@ -103,6 +114,10 @@ export function reset(g, seed, intro) {
   g.skierFrac = intro ? READY_FRAC : C.SKIER_SCREEN_Y_FRAC;
   g.readyDelayMs = intro ? C.READY_AUTO_START_MS : C.FRESH_START_MS;
   g.trackAcc = 0; g.spawnAcc = 0;
+  // Duell: der Lauf wartet auf den gemeinsamen Countdown (beginCount), alles andere setzt duel.js vor dem Start
+  g.hold = isDuel(g);
+  g.countClock = null; g.finishM = 0; g.respawnS = 0; g.raceOver = false; g.graceT = 0; g.crashes = 0; g.crashR = 0;
+  g.ghost.on = false;
   g.state = 'ready';
   ensureView(g);
 }
@@ -125,20 +140,23 @@ function lookahead(v) {
   return t * t * (3 - 2 * t);
 }
 
-export function update(g, dt) {
+// left: Simulationszeit, die in diesem Bild nach diesem Teilschritt noch folgt (main.js); das Duell rechnet damit
+// den Zieldurchgang auf die Wanduhr um.
+export function update(g, dt, left = 0) {
   switch (g.state) {
     case 'ready':
       g.readyT += dt;
-      // Super-G wartet im Intro auf den Tipp: der gibt zugleich den Ton frei, sonst wäre der erste Countdown stumm
-      if (g.readyT * 1000 >= g.readyDelayMs && !(isSuperG(g) && g.intro)) launch(g);
+      // Super-G wartet im Intro auf den Tipp: der gibt zugleich den Ton frei, sonst wäre der erste Countdown stumm.
+      // Im Duell (hold) startet nur der gemeinsame Countdown (beginCount).
+      if (!g.hold && g.readyT * 1000 >= g.readyDelayMs && !(isSuperG(g) && g.intro)) launch(g);
       break;
     case 'count':
-      g.countT += dt;
+      g.countT = g.countClock ? g.countClock() : g.countT + dt; // Duell: gemeinsame Uhr statt Simulationszeit
       updateCamera(g, dt);
       countdown(g);
       break;
     case 'running':
-      step(g, dt);
+      step(g, dt, left);
       break;
     case 'finished':
       coast(g, dt);
@@ -147,16 +165,29 @@ export function update(g, dt) {
       g.deadT += dt;
       if (g.deadCause === 'avalanche') updateAvalanche(g.av, g.skier, g.runT, dt, topDist(g)); // rollt über den Fahrer
       updateParticles(g.particles, dt);
+      if (g.respawnS > 0 && !g.raceOver && g.deadT >= g.respawnS) respawn(g); // Duell: weiter nach der Sturzpause
       break;
     default:
       break;
   }
 }
 
-// Aus ready heraus: Super-G in den Countdown, die anderen Modi sofort los.
+// Aus ready heraus: Super-G und Duell in den Countdown, die anderen Modi sofort los.
 function launch(g) {
   if (g.state !== 'ready') return;
-  if (isSuperG(g)) { g.state = 'count'; g.countT = 0; g.countBeeps = 0; } else start(g);
+  if (isSuperG(g) || isDuel(g)) { g.state = 'count'; g.countT = 0; g.countBeeps = 0; } else start(g);
+}
+
+// Duell: Countdown aus einer gemeinsamen Uhr (duel.js). clock() liefert die Countdown-Zeit in s, 0 = erster Piepton,
+// Go nach SG_COUNT_BEEPS · SG_COUNT_STEP_S. Kommt das Gerät zu spät, spielt nur der jüngste fällige Piepton.
+export function beginCount(g, clock) {
+  if (g.state !== 'ready') return false;
+  g.hold = false;
+  g.countClock = clock;
+  g.countT = clock();
+  g.countBeeps = Math.min(C.SG_COUNT_BEEPS, Math.max(0, Math.floor(g.countT / C.SG_COUNT_STEP_S)));
+  g.state = 'count';
+  return true;
 }
 
 // Countdown: SG_COUNT_BEEPS kurze Pieptöne im Abstand SG_COUNT_STEP_S (der erste sofort), dann der lange = Go.
@@ -187,7 +218,7 @@ function start(g) {
 // Endtempo je Modus: der Super-G hat seinen eigenen Regler
 const maxKmh = (g) => (isSuperG(g) ? C.SG_MAX_SPEED_KMH : C.MAX_SPEED_KMH);
 
-function step(g, dt) {
+function step(g, dt, left) {
   const s = g.skier;
   g.runT += dt;
   const px = s.x, py = s.y; // Position vor dem Schritt: Super-G wertet Tor-, Zwischenzeit- und Ziellinie dazwischen
@@ -205,7 +236,15 @@ function step(g, dt) {
   updateYeti(g.yeti, s, dt);
   if (g.summitT < 0 && g.mode === 'classic' && g.dist >= C.EVEREST_Y_M) { g.summitT = g.runT; emit(g, 'summit'); }
 
-  const hit = checkCollision(g.world, s);
+  // Duell: Zielweite gekreuzt, die Zeit wird auf die Linie interpoliert (wie die Ziellinie im Super-G). Der Rückruf
+  // bekommt, wie viel Simulationszeit vor dem Ende des Bildes die Linie lag; duel.js rechnet auf die Wanduhr um.
+  if (g.finishM > 0 && s.y >= g.finishM) {
+    if (g.onFinish) g.onFinish(left + (1 - crossFrac(py, s.y, g.finishM)) * dt);
+    endRun(g, { duel: true });
+    return;
+  }
+  if (g.graceT > 0) g.graceT = Math.max(0, g.graceT - dt); // Schonfrist nach der Weiterfahrt (Duell)
+  const hit = g.graceT > 0 ? null : checkCollision(g.world, s);
   if (hit) { die(g, hit.t === P.TREE ? 'tree' : 'rock', hit); return; }
   if (hasAvalanche(g) && updateAvalanche(g.av, s, g.runT, dt, topDist(g))) { die(g, 'avalanche'); return; }
   if (g.course && updateCourse(g.course, s, px, py, g.runT, dt, g.bestSplits, g.onCourse)) finish(g);
@@ -243,19 +282,27 @@ function coast(g, dt) {
   g.finT += dt;
   P.updateSkier(s, dt, maxKmh(g));
   s.v = Math.max(0, s.v - C.SG_COAST_DECEL * dt);
-  tickCourse(g.course, dt); // Stangen schwingen aus, Hinweis läuft ab
+  if (g.course) tickCourse(g.course, dt); // Stangen schwingen aus, Hinweis läuft ab (im Duell gibt es keinen Kurs)
   if (s.y - s.y0 > g.dist) g.dist = s.y - s.y0;
   updateCamera(g, dt);
   advanceTrail(g, dt);
 }
 
-// Ziel gekreuzt (Super-G): Zeit steht, Bestzeit samt Zwischenzeiten speichern, Fahrer in den Auslauf
-function finish(g) {
-  const s = g.skier, cs = g.course;
+// Lauf gewertet, Fahrer in den Auslauf: Super-G nach dem Ziel, Duell am Ziel oder wenn die Zeit vorbei ist (duel.js).
+// data geht mit dem finish-Ereignis an den Ton.
+export function endRun(g, data) {
+  if (g.state !== 'running' && g.state !== 'paused') return;
+  const s = g.skier;
   g.state = 'finished';
   g.finT = 0;
   s.side = 0;
   s.plow = false;
+  emit(g, 'finish', data);
+}
+
+// Ziel gekreuzt (Super-G): Zeit steht, Bestzeit samt Zwischenzeiten speichern, Fahrer in den Auslauf
+function finish(g) {
+  const cs = g.course;
   const total = Math.round(cs.total * 100);
   if (g.bestTime === 0 || total < g.bestTime) {
     g.bestTime = total;
@@ -264,7 +311,7 @@ function finish(g) {
     saveBestTime(g.runMode, total);
     saveBestSplits(g.runMode, g.bestSplits);
   }
-  emit(g, 'finish', { total: cs.total, misses: cs.misses, best: g.newBestTime });
+  endRun(g, { total: cs.total, misses: cs.misses, best: g.newBestTime });
 }
 
 // Ereignisse aus dem Torlauf: Ton über den Haken, an einer berührten Stange stiebt Schnee
@@ -289,9 +336,32 @@ function die(g, cause, hit) {
   s.plow = false;
   burst(g, 24, 4);
   s.v = 0;
+  g.crashes++;
+  g.crashR = hit ? hit.r : 0;
   const m = Math.floor(g.dist);
-  // Super-G wertet nur Zeiten: ein Aufprall vor dem Ziel setzt keinen Meter-Bestwert
-  if (g.runMode !== 'superg' && m > g.best) { g.best = m; g.newBest = true; saveBest(g.runMode, m); }
+  // Nur Modi mit Meter-Wertung setzen einen Bestwert: der Super-G wertet Zeiten, das Duell zählt Siege
+  if (MODES[g.runMode].board === 'm' && m > g.best) { g.best = m; g.newBest = true; saveBest(g.runMode, m); }
+}
+
+// Duell: nach der Sturzpause geht es weiter, seitlich neben dem Hindernis (vom Hindernis weg, Abstand aus beiden
+// Radien plus Luft), notfalls auf der Korridor-Mitte, die immer frei ist. Kurze Schonfrist ohne Kollision, die Spur
+// bekommt eine Lücke; die Zeit lief die ganze Sturzpause weiter (Wanduhr in duel.js).
+function respawn(g) {
+  const old = g.skier;
+  const s = P.createSkier();
+  const side = old.x >= g.crashX ? 1 : -1;
+  s.y = old.y;
+  s.y0 = old.y0;
+  s.x = g.crashX + side * (C.SKIER_R + g.crashR + C.DUEL_RESPAWN_CLEAR_M);
+  if (checkCollision(g.world, s)) s.x = laneX(g.world, s.y);
+  s.v = C.START_SPEED_KMH / 3.6;
+  g.skier = s;
+  g.graceT = C.DUEL_RESPAWN_GRACE_S;
+  g.track.pendingGap = true;
+  g.deadT = 0;
+  g.deadCause = '';
+  g.state = 'running';
+  emit(g, 'respawn');
 }
 
 function spawnSpray(g, dt) {
@@ -353,7 +423,7 @@ function burstAt(g, x, y, n, speed) {
 
 export function onPress(g, side) {
   g.lastGesture = side < 0 ? 'hold L' : 'hold R';
-  if (g.state === 'ready') launch(g);
+  if (g.state === 'ready' && !g.hold) launch(g);
   if (g.state === 'running' || g.state === 'count') P.press(g.skier, side); // im Countdown steht die Seite schon beim Go
   emit(g, 'press', side);
 }
@@ -363,7 +433,7 @@ export function onRelease(g) {
 }
 export function onPlow(g, on) {
   if (on) g.lastGesture = 'plow';
-  if (g.state === 'ready' && on) launch(g);
+  if (g.state === 'ready' && on && !g.hold) launch(g);
   if (g.state === 'running' || g.state === 'count') P.setPlow(g.skier, on);
   emit(g, 'plow', on);
 }
@@ -384,12 +454,14 @@ function pause(g) {
   g.skier.plow = false;
 }
 function resume(g) {
-  if (g.pausedFrom === 'count') { g.state = 'count'; g.countT = 0; g.countBeeps = 0; } else g.state = 'running';
+  // Duell: die gemeinsame Uhr lief weiter, der Countdown beginnt nicht von vorn
+  if (g.pausedFrom === 'count') { g.state = 'count'; if (!g.countClock) { g.countT = 0; g.countBeeps = 0; } } else g.state = 'running';
 }
 // Ende eines Laufs: nach dem Aufprall (dead) oder nach dem Ziel (finished, Super-G). Bis zur Fresh-Seite dauert es
 // nach dem Ziel etwas länger, der Fahrer läuft aus.
+// Im Duell ist ein Sturz kein Ende, solange die Weiterfahrt noch kommt (respawnS) und die Zeit nicht vorbei ist
 function ended(g) {
-  return g.state === 'dead' || g.state === 'finished';
+  return g.state === 'finished' || (g.state === 'dead' && !(g.respawnS > 0 && !g.raceOver));
 }
 function endedMs(g) {
   return (g.state === 'finished' ? g.finT : g.deadT) * 1000;
@@ -397,8 +469,9 @@ function endedMs(g) {
 function overlayMs(g) {
   return g.state === 'finished' ? C.SG_FINISH_OVERLAY_MS : C.DEATH_OVERLAY_MS;
 }
+// Im Duell (hold) steht die Fresh-Seite mit der Lobby auch über dem wartenden Startbild
 export function overlayReady(g) {
-  return ended(g) && endedMs(g) >= overlayMs(g);
+  return g.hold || (ended(g) && endedMs(g) >= overlayMs(g));
 }
 // Bewegt sich noch etwas im Bild? Sonst zeichnet main.js nur noch im Leerlauf (IDLE_FPS). Nach dem Ziel gleitet der
 // Fahrer aus, bis er steht (Stangen schwingen, Hinweis läuft ab); nach dem Sturz fliegen Splitter und Partikel.
@@ -406,7 +479,7 @@ export function animating(g) {
   switch (g.state) {
     case 'running': case 'count': return true;
     case 'finished': return g.finT < 1.5 || g.skier.v > 0;
-    case 'dead': return g.deadT < C.DEAD_SETTLE_S;
+    case 'dead': return g.deadT < C.DEAD_SETTLE_S || (g.respawnS > 0 && !g.raceOver); // Duell: Geist fährt, Weiterfahrt kommt
     default: return false; // ready, paused: das Bild steht
   }
 }

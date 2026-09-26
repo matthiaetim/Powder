@@ -8,7 +8,8 @@ import { verdictText } from './board.js';
 import { MODES, MODE_ORDER, lowerIsBetter } from './modes.js';
 import { RIDERS, RIDER_ORDER } from './riders.js';
 import { drawModePreview, drawRiderPreview } from './render.js';
-import { loadBest, loadBestTime } from './storage.js';
+import { loadBest, loadBestTime, loadDuelTally } from './storage.js';
+import { createDuelCard } from './duel-card.js';
 
 const pad2 = (n) => String(n).padStart(2, '0');
 
@@ -34,7 +35,8 @@ export function formatClock(sec, unit) {
 export function createHud(g, doc, hooks = {}) {
   const $ = (id) => doc.getElementById(id);
   const doFresh = hooks.fresh || (() => fresh(g));
-  const speedEl = $('hud-speed'), distEl = $('hud-dist'), timeEl = $('hud-time'), raceNoteEl = $('hud-note');
+  const speedEl = $('hud-speed'), distEl = $('hud-dist'), timeEl = $('hud-time'), raceNoteEl = $('hud-note'), oppEl = $('hud-opp');
+  const pauseSub = doc.querySelector('#ov-pause .ov-sub'), pauseDefault = pauseSub ? pauseSub.textContent : '';
   const countEl = $('ov-count'), hintEl = $('hint');
   const deadDist = $('dead-dist'), deadTime = $('dead-time'), deadBest = $('dead-best'), debugEl = $('debug');
   const themeEl = doc.querySelector('meta[name="theme-color"]'); // färbt die iOS-Statusleiste (Safari-Tab) mit
@@ -44,7 +46,9 @@ export function createHud(g, doc, hooks = {}) {
   const nf2 = new Intl.NumberFormat(C.HUD_LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const hintDefault = hintEl.textContent;
   let lastSpeed = -1, lastDist = '', lastTime = '', lastState = '', lastOverlay = '', lastDebug = 0, lastText = -1e9;
-  let lastMode = '', lastNote = '', lastCount = '';
+  let lastMode = '', lastNote = '', lastCount = '', lastOpp = '';
+  const duel = hooks.duel || null;
+  const duelOn = !!(duel && hooks.net && hooks.net.enabled);
 
   // Tipp auf Buttons und Overlay: Maus und Tastatur über click, Touch über pointerup (input.js bricht touchstart
   // gegen die iOS-Lupe ab, dann kommt kein click). Nur wenn der Finger auf dem Element losgelassen wird. fn bekommt
@@ -86,7 +90,10 @@ export function createHud(g, doc, hooks = {}) {
   const tune = createTunePanel(doc, tuneEl, markTuned);
   markTuned();
   let pressTimer = 0;
-  const openTune = () => { tune.refresh(); tuneEl.hidden = false; pauseIfRunning(g); };
+  const openTune = () => {
+    if (duel && duel.active()) return; // im Duell stehen die Regler auf Standard, verstellen wäre unfair
+    tune.refresh(); tuneEl.hidden = false; pauseIfRunning(g);
+  };
   const closeTune = () => { tuneEl.hidden = true; };
   versionEl.addEventListener('pointerdown', (e) => {
     e.preventDefault();
@@ -141,6 +148,11 @@ export function createHud(g, doc, hooks = {}) {
   const curName = curBtn.querySelector('.mode-name'), curDesc = curBtn.querySelector('.mode-desc');
   const modesList = $('modes-list');
   const bestText = (id) => {
+    if (id === 'duel') {
+      if (!duelOn) return 'offline';
+      const w = Object.values(loadDuelTally()).reduce((n, e) => n + (e && e.w ? e.w : 0), 0);
+      return w > 0 ? (w === 1 ? '1 Sieg' : nf.format(w) + ' Siege') : '–';
+    }
     if (MODES[id].board === 'time') { const v = loadBestTime(id); return v > 0 ? formatClock(v / 100, true) : '–'; }
     const v = loadBest(id);
     return v > 0 ? nf.format(v) + ' m' : '–';
@@ -149,7 +161,8 @@ export function createHud(g, doc, hooks = {}) {
     const m = MODES[id];
     const row = doc.createElement('button');
     row.type = 'button';
-    row.className = 'mode-card mode-row' + (m.soon ? ' soon' : '');
+    const off = id === 'duel' && !duelOn; // Duell braucht die Datenbank (BOARD_URL)
+    row.className = 'mode-card mode-row' + (m.soon || off ? ' soon' : '');
     row.dataset.mode = id;
     const cv = doc.createElement('canvas');
     cv.className = 'mode-preview';
@@ -160,13 +173,14 @@ export function createHud(g, doc, hooks = {}) {
     name.textContent = m.name;
     const desc = doc.createElement('span');
     desc.className = 'mode-desc';
-    desc.textContent = m.desc;
+    desc.textContent = off ? 'Braucht Internet und die Datenbank.' : m.desc;
     text.append(name, desc);
     const best = doc.createElement('span');
     best.className = 'mode-best';
     row.append(cv, text, best);
     onTap(row, () => {
-      if (m.soon) return;
+      if (m.soon || off) return;
+      if (id === 'duel') { openDuel(); return; }
       if (id !== g.mode && selectMode(g, id)) { markActive(); refreshDead(); renderBoard(); }
       showPanel('');
     });
@@ -192,6 +206,24 @@ export function createHud(g, doc, hooks = {}) {
   onTap(curBtn, openModes);
   onTap($('btn-modes-back'), () => showPanel(''));
 
+  // Duell (duel.js, duel-card.js): Modus wählen und die Kachel öffnen; im Zustand ready (App-Start mit ?room=CODE)
+  // hält hold den Lauf an und zeigt die Fresh-Seite über dem Startbild. Beim Verlassen zurück nach Classic.
+  function openDuel(code = '') {
+    if (!duel) return;
+    if (g.mode !== 'duel') selectMode(g, 'duel');
+    if (g.state === 'ready') g.hold = true;
+    markActive();
+    showPanel('duel');
+    duel.open(code);
+  }
+  function leaveDuel() {
+    selectMode(g, 'classic');
+    markActive(); refreshDead(); renderBoard();
+    showPanel('');
+    if (g.state !== 'ready') doFresh(); // im Zustand ready startet der Lauf von selbst, sobald hold weg ist
+  }
+  if (duel) createDuelCard(doc, g, duel, { onTap, board: hooks.board, fmtClock: formatClock, nf, onLeave: leaveDuel });
+
   const showRiders = (on) => showPanel(on ? 'riders' : '');
 
   // Fahrerwahl: das Icon oben links zeigt den gewählten Fahrer, ein Tipp tauscht die Ergebniskarte gegen die
@@ -210,7 +242,7 @@ export function createHud(g, doc, hooks = {}) {
     tile.append(cv, name);
     drawRiderPreview(cv, id, 82);
     onTap(tile, () => {
-      if (id !== g.rider && selectRider(g, id)) { markRider(); drawModes(); }
+      if (id !== g.rider && selectRider(g, id)) { markRider(); drawModes(); if (duel) duel.setRider(id); }
       showRiders(false);
     });
     ridersEl.append(tile);
@@ -248,7 +280,8 @@ export function createHud(g, doc, hooks = {}) {
   };
   function renderBoard() {
     if (!boardOn || doc.activeElement === nameInput) return; // ohne Server bleibt #board hidden; nicht unter den Fingern umbauen
-    boardEl.hidden = false;
+    boardEl.hidden = !MODES[g.mode].board; // das Duell hat keine Bestenliste
+    if (boardEl.hidden) return;
     const name = board.name();
     boardEl.dataset.named = name ? '1' : '';
     rowsEl.replaceChildren();
@@ -351,6 +384,23 @@ export function createHud(g, doc, hooks = {}) {
         const txt = formatClock(cs.finished ? cs.total : g.runT + cs.penalty, false);
         if (txt !== lastTime) { lastTime = txt; timeEl.textContent = txt; }
       }
+      // Duell: eigene Uhr (Wanduhr ab dem Go) und der Stand des Gegners: Abstand bei gleicher Rennzeit (rot, wenn
+      // er vorn liegt), seine Vorgabe nach dem Ziel, Pause, weg
+      const dh = !cs && g.mode === 'duel' && duel ? duel.hud() : null;
+      if (dh) {
+        const txt = formatClock(dh.clock, false);
+        if (txt !== lastTime) { lastTime = txt; timeEl.textContent = txt; }
+        let opp = '', cls = '';
+        if (dh.oppGone) opp = `${dh.oppName} weg`;
+        else if (dh.oppFin) opp = `Vorgabe ${formatClock(dh.oppFin, false)} · ${dh.oppName} im Ziel`;
+        else if (dh.oppPaused) opp = `${dh.oppName} pausiert`;
+        else if (dh.gap != null) {
+          const gp = Math.round(dh.gap);
+          opp = `${dh.oppName} ${gp >= 0 ? '+' : '−'}${nf.format(Math.abs(gp))} m`;
+          cls = gp > 3 ? 'slow' : gp < -3 ? 'fast' : '';
+        }
+        if (opp !== lastOpp) { lastOpp = opp; oppEl.textContent = opp; oppEl.className = cls; }
+      } else if (lastOpp) { lastOpp = ''; oppEl.textContent = ''; oppEl.className = ''; }
     }
     if (g.mode !== lastMode) {
       lastMode = g.mode;
@@ -360,9 +410,10 @@ export function createHud(g, doc, hooks = {}) {
     if (g.state !== lastState) {
       lastState = g.state;
       doc.body.dataset.state = g.state;
-      doc.body.dataset.intro = g.state === 'ready' && g.intro ? '1' : '';
-      // Bestwert steht fest: die() bzw. finish() lief im Physikschritt davor
-      if ((g.state === 'dead' || g.state === 'finished') && boardOn) board.onRunEnd(g);
+      doc.body.dataset.intro = g.state === 'ready' && g.intro && !g.hold ? '1' : '';
+      // Bestwert steht fest: die() bzw. finish() lief im Physikschritt davor; das Duell hat keine Liste
+      if ((g.state === 'dead' || g.state === 'finished') && boardOn && MODES[g.runMode].board) board.onRunEnd(g);
+      if (pauseSub && g.state === 'paused') pauseSub.textContent = duel && duel.racing() ? 'Die Zeit läuft weiter · Tippen zum Weiterfahren' : pauseDefault;
     }
     // Hinweis unter dem Fahrer, verschwindet nach SG_NOTE_S (gates.js zählt note.t hoch)
     const note = cs && cs.note && cs.note.t < C.SG_NOTE_S && g.state !== 'finished' ? cs.note : null;
@@ -374,8 +425,8 @@ export function createHud(g, doc, hooks = {}) {
     }
     // Countdown 3 · 2 · 1 in der Mitte, nach dem Start kurz „Go“
     let count = '';
-    if (g.state === 'count') count = String(Math.max(1, C.SG_COUNT_BEEPS - Math.floor(g.countT / C.SG_COUNT_STEP_S)));
-    else if (g.state === 'running' && cs && g.runT < C.SG_GO_SHOW_S) count = 'Go';
+    if (g.state === 'count') count = String(Math.min(C.SG_COUNT_BEEPS, Math.max(1, C.SG_COUNT_BEEPS - Math.floor(g.countT / C.SG_COUNT_STEP_S))));
+    else if (g.state === 'running' && (cs || g.mode === 'duel') && g.runT < C.SG_GO_SHOW_S) count = 'Go';
     if (count !== lastCount) {
       lastCount = count;
       countEl.textContent = count;
@@ -386,7 +437,7 @@ export function createHud(g, doc, hooks = {}) {
       lastOverlay = ov;
       doc.body.dataset.overlay = ov;
       if (themeEl) themeEl.content = ov ? C.BG_DIM : C.BG;
-      if (ov) { refreshDead(); markActive(); renderBoard(); } else showPanel('');
+      if (ov) { refreshDead(); markActive(); renderBoard(); if (g.mode === 'duel' && duel && duel.active()) showPanel('duel'); } else showPanel('');
     }
     if (g.debug && (force || now - lastDebug > 250)) {
       lastDebug = now;
@@ -413,5 +464,5 @@ export function createHud(g, doc, hooks = {}) {
       ].join('\n');
     }
   }
-  return { sync };
+  return { sync, openDuel };
 }

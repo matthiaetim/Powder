@@ -63,7 +63,9 @@ export function createRenderer(canvas) {
   const ctx = canvas.getContext('2d', { alpha: false });
   const R = {
     canvas, ctx, W: 0, H: 0, dpr: 1, S: 10, Sv: 10, sprites: null, spriteKey: '', list: [], skierMarker: { skier: true, y: 0 },
-    frameMs: 16.7, paceMs: 0, trackPts: new Float32Array(C.TRACK_CAP * 7), snow: createSnow(), shards: { p: [], run: -1 },
+    ghostMarker: { ghost: true, y: 0 }, ghostCv: null, // Duell: der Gegner wird wie der Fahrer nach y einsortiert
+    safeTop: 0, safeBottom: 0, // Safe-Areas des iPhones in CSS-Pixeln (aus --sat/--sab in styles.css), für Randschilder
+    frameMs: 16.7, paceMs: 0, trackPts: new Float32Array(C.TRACK_CAP * 7), snow: createSnow(), shards: { p: [], run: -1, crash: -1 },
     signs: SIGNS.map(() => ({ c: null, x: null, key: '', epoch: -1, stale: true, world: null, seen: 0, x0: 0, y0: 0, ym: 0, wM: 0, hM: 0, Q: 1 })),
     fontReady: false,
     epoch: 0, // zählt bei resize() und Schriftladen hoch: nur dann können sich die Schild-Schlüssel ändern
@@ -87,6 +89,9 @@ export function resize(R) {
   const cw = Math.round(W * dpr), ch = Math.round(H * dpr);
   if (R.canvas.width !== cw || R.canvas.height !== ch) { R.canvas.width = cw; R.canvas.height = ch; }
   R.S = Math.min(W / C.VIEW_W_M, H / (C.VIEW_W_M * C.VIEW_ASPECT));
+  const cssPx = (name) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || 0;
+  R.safeTop = cssPx('--sat');
+  R.safeBottom = cssPx('--sab');
   const key = R.S.toFixed(3) + '@' + dpr;
   if (key !== R.spriteKey) {
     R.sprites = makeSprites(R.S, dpr);
@@ -227,6 +232,7 @@ export function draw(R, g, t) {
   drawWorld(R, g, ox, oy);
   // drawHockeyFog(R, g, ox, oy); // Hockeystop deaktiviert
   drawParticles(R, g, ox, oy);
+  if (g.ghost.on) drawDuelTags(R, g, ox, oy);
   if (g.mode === 'chase') drawAvalanche(R, g, ox, oy, t);
   drawWhiteout(R, g);
   drawSnow(R, g, t);
@@ -246,6 +252,7 @@ function drawMarks(R, g, ox, oy) {
   ctx.textBaseline = 'middle';
   if (g.course) { drawCourseLines(R, g, ox, oy, y0, y1); return; }
   for (let k = Math.max(1, Math.ceil(y0 / C.MARK_M)); k * C.MARK_M <= y1; k++) {
+    if (g.finishM > 0 && k * C.MARK_M === g.finishM) continue; // dort liegt die Ziellinie des Duells
     markLine(ctx, W, k * C.MARK_M * S + oy, nf.format(k * C.MARK_M) + ' m', C.MARK_RGBA, TAG_PAPER);
   }
   // Bestweiten der anderen (g.runMarks, beim Start eingefroren, Meter absteigend = im Bild von unten nach oben).
@@ -259,14 +266,21 @@ function drawMarks(R, g, ox, oy) {
   }
   const b = g.runBest;
   if (b > 0 && b >= y0 && b <= y1) markLine(ctx, W, b * S + oy, 'Rekord · ' + nf.format(b) + ' m', C.MARK_BEST_RGBA, TAG_RED);
+  if (g.finishM > 0) drawFinishLine(R, g.finishM, oy, y0, y1); // Duell: Zielweite aus dem Raum
 }
 
 // Super-G: Startlinie bei 0 und karierte Ziellinie bei SG_FINISH_M statt Meter- und Rekordlinien (die blaue
-// 1000-m-Linie läge genau auf dem Ziel). Die Zeit wird auf der Fuge zwischen den beiden Karo-Reihen genommen.
+// 1000-m-Linie läge genau auf dem Ziel).
 function drawCourseLines(R, g, ox, oy, y0, y1) {
-  const { ctx, Sv: S, W } = R;
+  const { ctx, W } = R;
   if (y0 <= 0 && 0 <= y1) markLine(ctx, W, oy, 'Start', C.MARK_RGBA, TAG_WHITE);
-  const fy = g.course.finishY;
+  drawFinishLine(R, g.course.finishY, oy, y0, y1);
+}
+
+// Karierte Ziellinie bei fy mit Schild „Ziel“ (Super-G und Duell). Die Zeit wird auf der Fuge zwischen den beiden
+// Karo-Reihen genommen.
+function drawFinishLine(R, fy, oy, y0, y1) {
+  const { ctx, Sv: S, W } = R;
   const cell = Math.max(4, 0.7 * S);
   if (fy + cell / S < y0 || fy - cell / S > y1) return;
   const sy = fy * S + oy;
@@ -615,6 +629,7 @@ function drawWorld(R, g, ox, oy) {
   }
   R.skierMarker.y = g.skier.y;
   list.push(R.skierMarker);
+  if (g.ghost.on) { R.ghostMarker.y = g.ghost.y; list.push(R.ghostMarker); }
   list.sort((a, b) => a.y - b.y);
   for (let i = 0; i < list.length; i++) {
     const o = list[i];
@@ -623,6 +638,7 @@ function drawWorld(R, g, ox, oy) {
       else drawSkier(R, g, g.skier.x * S + ox, g.skier.y * S + oy);
       continue;
     }
+    if (o.ghost) { drawGhost(R, g, ox, oy); continue; }
     if (o.pole) {
       const sp = R.sprites.poles[o.red ? 1 : 0][o.dir > 0 ? 1 : 0];
       const sx = o.x * S + ox, sy = o.y * S + oy;
@@ -650,6 +666,7 @@ function drawSkier(R, g, sx, sy) {
   const { ctx, Sv: S } = R;
   const s = g.skier;
   ctx.save();
+  if (g.graceT > 0) ctx.globalAlpha = 0.5; // Duell: Schonfrist nach der Weiterfahrt, der Fahrer steht dicht am Hindernis
   // Schatten nach unten rechts
   ctx.fillStyle = `rgba(${C.SHADOW_RGB},0.22)`;
   ctx.beginPath();
@@ -659,6 +676,52 @@ function drawSkier(R, g, sx, sy) {
   ctx.rotate(-s.theta);
   riderShape(ctx, S, s, g.rider);
   ctx.restore();
+}
+
+// Duell: der Gegner als halbtransparenter Geist mit seiner Pose (g.ghost aus duel.js, Fahrer nach seiner Wahl). Erst in
+// ein Offscreen-Canvas, dann mit Deckkraft einsetzen, sonst würden die überlappenden Flächen des Fahrers fleckig.
+// Blasser, wenn seine Proben ausbleiben.
+function drawGhost(R, g, ox, oy) {
+  const { ctx, Sv: S, dpr } = R;
+  const gh = g.ghost;
+  const half = Math.ceil(1.6 * S) + 2;
+  const key = half + '@' + dpr;
+  if (!R.ghostCv || R.ghostCv.key !== key) {
+    const [c, x] = makeCanvas(half * 2, half * 2, dpr);
+    R.ghostCv = { c, x, key };
+  }
+  const { c, x } = R.ghostCv;
+  x.setTransform(dpr, 0, 0, dpr, 0, 0);
+  x.clearRect(0, 0, half * 2, half * 2);
+  x.translate(half, half);
+  x.rotate(-gh.theta);
+  riderShape(x, S, { theta: gh.theta, carve: gh.carve, plowK: 0, side: 0, plow: false, v: gh.v, brake: 0 }, gh.rider);
+  ctx.save();
+  ctx.globalAlpha = gh.stale ? C.DUEL_GHOST_ALPHA * 0.5 : C.DUEL_GHOST_ALPHA;
+  ctx.drawImage(c, gh.x * S + ox - half, gh.y * S + oy - half, half * 2, half * 2);
+  ctx.restore();
+}
+
+// Duell: Namensschild über dem Geist. Liegt er außerhalb des Bilds, steht ein Schild mit dem Abstand am Rand: unten,
+// wenn der Gegner vorn liegt (größeres y liegt im Bild unten), oben, wenn er zurückliegt. Bleiben Proben aus: „…“.
+function drawDuelTags(R, g, ox, oy) {
+  const { ctx, Sv: S, W, H } = R;
+  const gh = g.ghost;
+  ctx.font = TAG_FONT;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const sx = gh.x * S + ox, sy = gh.y * S + oy;
+  const name = (gh.name || 'Gegner').toUpperCase() + (gh.stale ? ' …' : '');
+  const inView = sy >= -10 && sy <= H + 10;
+  const gap = Math.round(gh.gap || 0);
+  const text = inView ? name : `${name} ${gap >= 0 ? '+' : '−'}${nf.format(Math.abs(gap))} m`;
+  const w = Math.ceil(ctx.measureText(text).width) + 2 * TAG_PAD_X;
+  let right = Math.min(W - 8, Math.max(w + 8, sx + w / 2));
+  const below = !inView && sy > H;
+  if (below) right = Math.min(right, W - C.DUEL_HUD_CLEAR_PX); // unten rechts steht das HUD (Tempo, Meter, Uhr, Gegner)
+  const bottom = inView ? sy - 1.3 * S
+    : below ? H - R.safeBottom - C.DUEL_EDGE_PAD_PX : R.safeTop + C.DUEL_EDGE_PAD_PX + TAG_H;
+  drawTag(ctx, right, bottom, text, TAG_WHITE);
 }
 
 // Fahrer je nach Wahl (riders.js) um den Ursprung, Fahrtrichtung +y; Position und Drehung setzt der Aufrufer.
@@ -755,6 +818,7 @@ function shattered(g) {
 function spawnShards(R, g) {
   const S = R.Sv, s = g.skier, sh = R.shards;
   sh.run = g.runs;
+  sh.crash = g.crashes; // Duell: nach der Weiterfahrt kann derselbe Lauf noch einmal zerspringen
   sh.p.length = 0;
   const half = Math.ceil(S); // 1 m Radius fasst die Ski in jeder Richtung
   const q = 4;               // Offscreen-Pixel pro CSS-Pixel, zum Mitteln der Kanten
@@ -810,7 +874,7 @@ function hop(vz, t) {
 // laufen exponentiell aus, in der Luft werden sie größer und werfen Schatten nach unten rechts.
 function drawShards(R, g, ox, oy) {
   const sh = R.shards;
-  if (sh.run !== g.runs) spawnShards(R, g);
+  if (sh.run !== g.runs || sh.crash !== g.crashes) spawnShards(R, g);
   const { ctx, Sv: S, dpr } = R;
   const t = Math.max(0, g.deadT - C.SHATTER_FREEZE_S);
   const k = C.SHATTER_DRAG;
@@ -1000,7 +1064,7 @@ const PREVIEW_POSE = { theta: 0.25, carve: 0, plowK: 0 };
 export function drawModePreview(canvas, modeId, rider) {
   // Beim Start ist die Fresh-Seite versteckt (clientWidth 0): Fallback auf die Kartenmaße aus styles.css
   const W = canvas.clientWidth || 104, H = canvas.clientHeight || 58;
-  const superg = modeId === 'superg';
+  const superg = modeId === 'superg', duel = modeId === 'duel';
   const dpr = Math.min(window.devicePixelRatio || 1, C.MAX_DPR);
   canvas.width = Math.round(W * dpr);
   canvas.height = Math.round(H * dpr);
@@ -1025,7 +1089,9 @@ export function drawModePreview(canvas, modeId, rider) {
   // Bäume; im Super-G nur am Rand der Piste
   const trees = superg
     ? [[0.04, 0.55, 0], [0.97, 0.38, 1], [0.03, 1.0, 2], [0.96, 0.92, 0]]
-    : [[0.16, 0.42, 0], [0.8, 0.3, 1], [0.66, 0.9, 2], [0.3, 0.98, 1], [0.9, 0.7, 0]];
+    : duel
+      ? [[0.1, 0.5, 0], [0.9, 0.44, 1], [0.7, 0.92, 2], [0.25, 0.98, 1]]
+      : [[0.16, 0.42, 0], [0.8, 0.3, 1], [0.66, 0.9, 2], [0.3, 0.98, 1], [0.9, 0.7, 0]];
   const sprites = [0, 1, 2].map((v) => makeTree(S, dpr, v));
   trees.forEach(([fx, fy, v]) => {
     const sp = sprites[v];
@@ -1048,6 +1114,15 @@ export function drawModePreview(canvas, modeId, rider) {
   ctx.rotate(-0.25);
   riderShape(ctx, S, PREVIEW_POSE, rider);
   ctx.restore();
+  if (duel) {
+    // Duell: der Gegner als blasser Geist ein Stück voraus, auf dem anderen Gerät (Snowboard, wenn man selbst Ski fährt)
+    ctx.save();
+    ctx.globalAlpha = C.DUEL_GHOST_ALPHA;
+    ctx.translate(W * 0.34, H * 0.3);
+    ctx.rotate(0.2);
+    riderShape(ctx, S, PREVIEW_POSE, rider === 'ski' ? 'board' : 'ski');
+    ctx.restore();
+  }
   if (modeId === 'chase') {
     // Wolkenfront von oben, wie im Spiel (avalanche-view.js), als stehendes Bild mit etwas Pulverschnee in der Luft
     ctx.fillStyle = `rgba(${C.AV_HAZE_RGB},${(C.AV_HAZE_ALPHA * 0.4).toFixed(3)})`;

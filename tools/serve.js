@@ -1,6 +1,7 @@
 // Winziger statischer Dev-Server ohne Abhängigkeiten, Caching aus.
 // Start: node tools/serve.js [port] [--board]   → http://localhost:8080
-// --board: Mock der Bestenlisten-Schnittstelle (tools/board-mock.js), im Browser mit ?board=local ansprechen.
+// --board: Mocks der Firebase-Schnittstelle für Bestenliste (tools/board-mock.js) und Duell-Räume (tools/room-mock.js),
+// im Browser mit ?board=local ansprechen.
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -8,7 +9,7 @@ const os = require('os');
 
 const root = path.resolve(__dirname, '..');
 const port = Number(process.argv.slice(2).find((a) => /^\d+$/.test(a)) || 8080);
-const board = process.argv.includes('--board') ? require('./board-mock.js') : null;
+const mocks = process.argv.includes('--board') ? [require('./board-mock.js'), require('./room-mock.js')] : [];
 const types = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -22,7 +23,7 @@ const types = {
 };
 
 http.createServer((req, res) => {
-  if (board && board.handle(req, res)) return;
+  if (mocks.some((m) => m.handle(req, res))) return;
   let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (p.endsWith('/')) p += 'index.html';
   const file = path.normalize(path.join(root, p));

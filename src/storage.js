@@ -1,4 +1,5 @@
-// Bestwert je Modus (Meter), Bestzeit (Super-G) und gewählter Modus im localStorage. Fällt still auf 0 bzw. '' zurück, wenn Speicher fehlt.
+// Bestwert je Modus (Meter), Bestzeit (Super-G), Name, Fahrer, Ton und Duell-Zähler im localStorage. Fällt still auf
+// 0 bzw. '' zurück, wenn Speicher fehlt. Der Modus selbst wird bewusst nicht gespeichert (game.js).
 const bestKey = (mode) => (mode === 'classic' || !mode ? 'powder.best' : 'powder.best.' + mode);
 
 export function loadBest(mode) {
@@ -97,7 +98,7 @@ export function saveName(name) {
   }
 }
 
-function loadJson(key) {
+export function loadJson(key) {
   try {
     return JSON.parse(localStorage.getItem(key) || 'null');
   } catch {
@@ -105,7 +106,7 @@ function loadJson(key) {
   }
 }
 
-function saveJson(key, value) {
+export function saveJson(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
@@ -155,4 +156,20 @@ export function saveYetiIn(n) {
   } catch {
     /* egal */
   }
+}
+
+// Duell (duel.js): Siege, Niederlagen und Unentschieden je Gegner, Schlüssel wie in der Bestenliste (nameKey des
+// Gegnernamens), damit „Jo“ und „jo“ derselbe Gegner sind.
+const DUEL_KEY = 'powder.duel';
+
+export const loadDuelTally = () => loadJson(DUEL_KEY) || {};
+
+export function bumpDuelTally(key, name, result) {
+  if (!key || !['w', 'l', 'd'].includes(result)) return;
+  const all = loadDuelTally();
+  const e = all[key] && typeof all[key] === 'object' ? all[key] : { w: 0, l: 0, d: 0 };
+  e.name = name;
+  e[result] = (e[result] || 0) + 1;
+  all[key] = e;
+  saveJson(DUEL_KEY, all);
 }

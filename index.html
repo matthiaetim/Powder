@@ -26,7 +26,11 @@
   <link rel="modulepreload" href="./src/hud.js">
   <link rel="modulepreload" href="./src/tune.js">
   <link rel="modulepreload" href="./src/audio.js">
+  <link rel="modulepreload" href="./src/net.js">
   <link rel="modulepreload" href="./src/board.js">
+  <link rel="modulepreload" href="./src/room.js">
+  <link rel="modulepreload" href="./src/duel.js">
+  <link rel="modulepreload" href="./src/duel-card.js">
   <link rel="modulepreload" href="./src/physics.js">
   <link rel="modulepreload" href="./src/world.js">
   <link rel="modulepreload" href="./src/avalanche.js">
@@ -46,6 +50,7 @@
     <div id="hud-speed">0 km/h</div>
     <div id="hud-dist">0 m</div>
     <div id="hud-time">0,00</div>
+    <div id="hud-opp"></div>
   </div>
   <div id="hud-note"></div>
   <div id="hint">Tippen lenkt · Halten carvt</div>
@@ -73,6 +78,32 @@
     <div class="card-title">Modus</div>
     <div id="modes-list"></div>
     <button id="btn-modes-back" class="btn-flat" type="button">Zurück</button>
+   </div>
+   <div id="duel-card" class="card" data-view="join">
+    <div class="card-title">Duell</div>
+    <div id="duel-note"></div>
+    <div id="duel-name-row" class="duel-field-row">
+      <input id="duel-name" class="field native" type="text" maxlength="12" placeholder="Dein Name" autocomplete="off" autocorrect="off"
+             autocapitalize="words" spellcheck="false" enterkeyhint="done" aria-label="Dein Name">
+    </div>
+    <button id="btn-duel-create" class="btn-main" type="button">Neuer Raum</button>
+    <div id="duel-code-row" class="duel-code-row"><span id="duel-code" class="duel-code"></span><button id="btn-duel-share" class="btn-flat native" type="button">Teilen</button></div>
+    <div id="duel-bibs" class="duel-bibs"></div>
+    <div id="duel-target" class="duel-sign">
+      <div class="duel-sign-row"><span class="duel-sign-label">Ziel</span><span id="duel-target-val" class="duel-sign-val">1.000 m</span></div>
+      <input id="duel-target-range" class="native" type="range" min="1000" max="10000" step="500" value="1000" aria-label="Zielweite">
+    </div>
+    <button id="btn-duel-go" class="btn-main" type="button">Los</button>
+    <div id="duel-verdict"></div>
+    <div id="duel-lines"></div>
+    <button id="btn-duel-again" class="btn-main" type="button">Revanche</button>
+    <div id="duel-join-row" class="duel-join-row">
+      <input id="duel-code-in" class="field native" type="text" maxlength="4" placeholder="Code" autocomplete="off" autocorrect="off"
+             autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-label="Raum-Code">
+      <button id="btn-duel-join" class="btn-flat" type="button">Beitreten</button>
+    </div>
+    <div id="duel-error"></div>
+    <button id="btn-duel-leave" class="btn-flat" type="button">Verlassen</button>
    </div>
    <div id="dead-card" class="card">
     <div id="dead-dist">0 m</div>

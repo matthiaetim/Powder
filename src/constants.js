@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.21.0';
+export const VERSION = '0.22.0';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -109,6 +109,7 @@ export const C = {
   CELL_M: 40,
   CULL_CELLS: 1,
   WORLD_CULL_M: 1,         // Reserve in m, wenn render.js die Welt aufs Bild beschneidet (Rundung, Schattenrand)
+  CELL_RAW_EXTRA: 1.15,    // rohe Kandidaten je Zelle über Soll: an den Zellgrenzen fallen Konflikte mit Vorrang-Nachbarn weg (world.js)
   MIN_SPACING_M: 4.0,
   TREE_D0: 0.010,
   TREE_D1: 0.017,          // (Tuning) Dichte am Ende des Anstiegs
@@ -291,6 +292,33 @@ export const C = {
   SG_COAST_DECEL: 8,         // Auslauf nach dem Ziel: zusätzliche Verzögerung in m/s²
   SG_FINISH_OVERLAY_MS: 1200, // nach dem Ziel so lange Auslauf, dann die Fresh-Seite
 
+  // Duell (duel.js, room.js, duel-card.js, render.js, hud.js): zwei Geräte fahren dieselbe Welt (Seed aus dem Raum),
+  // gewertet wird die eigene Wanduhr-Zeit ab dem gemeinsamen Go bis zur Zielweite; die Netzlaufzeit spielt so keine
+  // Rolle. Die Räume liegen in derselben Firebase-Datenbank wie die Bestenliste (BOARD_URL, Pfad /rooms/CODE), die
+  // Regeln in tools/firebase-rules.json nennen dieselben Grenzen: beide Stellen zusammen ändern.
+  DUEL_TARGET_MIN_M: 1000,
+  DUEL_TARGET_MAX_M: 10000,
+  DUEL_TARGET_STEP_M: 500,
+  DUEL_TARGET_DEFAULT_M: 1000,
+  DUEL_CRASH_PAUSE_S: 1.5,     // (Tuning) Sturzpause: so lange liegt der Fahrer, dann geht es neben dem Hindernis weiter; im Duell gilt der Wert des Hosts
+  DUEL_RESPAWN_GRACE_S: 0.4,   // nach der Weiterfahrt kurz keine Kollision, der Fahrer steht dicht am Hindernis
+  DUEL_RESPAWN_CLEAR_M: 0.3,   // Abstand zum Hindernis beim Weiterfahren, zusätzlich zu beiden Radien
+  DUEL_GHOST_DELAY_S: 0.3,     // (Tuning) Geist-Verzögerung: der Gegner wird bei der eigenen Rennzeit minus dieser Spanne gezeigt, dann sind seine Proben da
+  DUEL_GHOST_EXTRAP_S: 1,      // fehlen Proben, wird der Geist so lange mit seinem Tempo fortgeschrieben, dann bleibt er stehen
+  DUEL_GHOST_ALPHA: 0.45,      // Deckkraft des Geists
+  DUEL_SEND_MS: 200,           // Sende-Takt der eigenen Position (5 Hz)
+  DUEL_HEARTBEAT_MS: 10000,    // Lebenszeichen in Lobby und Ergebnis
+  DUEL_COUNT_LEAD_MS: 3500,    // Vorlauf vom „Los“ des Hosts bis zum Go: deckt den Countdown (1,8 s) und die Netzlaufzeit
+  DUEL_STALE_S: 4,             // so lange ohne Probe des Gegners: Geist blass, Schild mit „…“
+  DUEL_GONE_S: 30,             // so lange ohne Lebenszeichen im Rennen: der Gegner gilt als weg, der andere gewinnt
+  DUEL_LOBBY_GONE_S: 60,       // in der Lobby: so lange ohne Lebenszeichen, dann ist der Platz wieder frei
+  DUEL_STREAM_HEALTH_S: 45,    // der eigene Stream gilt als gesund, wenn in dieser Spanne ein Ereignis oder keep-alive kam
+  DUEL_ROOM_TTL_MS: 7200000,   // Raum so lange ohne Statuswechsel: gilt als verlassen und darf überschrieben werden (wie die Regeln)
+  DUEL_CODE_CHARS: 'ABCDEFGHJKLMNPQRSTUVWXYZ', // ohne I und O, die verwechselt man mit 1 und 0 (Regeln: [A-HJ-NP-Z])
+  DUEL_CODE_LEN: 4,
+  DUEL_EDGE_PAD_PX: 10,        // Abstand des Randschilds („Jo +37 m“) vom Bildrand
+  DUEL_HUD_CLEAR_PX: 175,      // so viel Platz lässt das untere Randschild rechts für das HUD frei
+
   // Hockeystop deaktiviert (Tim und Jürgen wollen ihn nicht) — auskommentiert statt gelöscht, physics.js/
   // game.js/render.js haben die zugehörigen Blöcke ebenfalls auskommentiert.
   // HOCKEY_MIN_KMH: 70,        // (Tuning) ab diesem Tempo kann der Hockeystop auslösen
@@ -306,27 +334,29 @@ export const C = {
 
 // Regler im Tuning-Panel (langer Druck auf das Versions-Label). Einträge mit heading sind Zwischentitel,
 // names zeigt statt der Zahl einen Namen (1 = erster Name). visual: der Regler ändert nur das Bild, nicht das Spiel,
-// und macht Läufe deshalb nicht ungültig für die Bestenliste (tune.js isTuned, hud.js).
+// und macht Läufe deshalb nicht ungültig für die Bestenliste (tune.js isTuned, hud.js). fair: im Duell steht der Regler
+// auf Standard (tune.js), weil er Welt, Sicht oder Fahrphysik ändert und beide Geräte dieselbe Strecke gleich schnell
+// fahren müssen.
 export const TUNABLES = [
   { heading: 'Fahren' },
-  { key: 'TURN_TAP_DEG', label: 'Tipp-Winkel', unit: '°', min: 10, max: 80, step: 5 },
-  { key: 'TURN_DEEPEN_DEG_S', label: 'Vertiefen beim Halten', unit: '°/s', min: 0, max: 150, step: 5 },
-  { key: 'TURN_T', label: 'Ansprechzeit', unit: 's', min: 0.05, max: 0.4, step: 0.01 },
-  { key: 'TURN_T_FAST', label: 'Ansprechzeit bei 200 km/h', unit: 's', min: 0.05, max: 0.4, step: 0.01 },
-  { key: 'RETURN_T', label: 'Rückkehr', unit: 's', min: 0.05, max: 0.6, step: 0.01 },
-  { key: 'MAX_HEADING_DEG', label: 'Max. Winkel', unit: '°', min: 60, max: 150, step: 5 },
-  { key: 'TURN_BRAKE_K', label: 'Bremsen durch Drehen', unit: '', min: 0, max: 0.06, step: 0.002, decimals: 3 },
-  { key: 'BRAKE_K', label: 'Bremsen durch Winkel', unit: '', min: 0.2, max: 6, step: 0.1 },
-  { key: 'BRAKE_START_DEG', label: 'Winkelbremse ab', unit: '°', min: 0, max: 60, step: 5 },
-  { key: 'BRAKE_FULL_DEG', label: 'Winkelbremse voll ab', unit: '°', min: 30, max: 120, step: 5 },
-  { key: 'PLOW_MIN', label: 'Schneepflug', unit: 'm/s²', min: 0, max: 30, step: 1 },
-  { key: 'START_SPEED_KMH', label: 'Starttempo', unit: 'km/h', min: 0, max: 80, step: 5 },
-  { key: 'G_SLOPE', label: 'Beschleunigung', unit: 'm/s²', min: 1, max: 10, step: 0.25 },
-  { key: 'MAX_SPEED_KMH', label: 'Endtempo', unit: 'km/h', min: 60, max: 300, step: 10 },
-  { key: 'CAM_ZOOM_FAST', label: 'Vorausschau bei Tempo', unit: '×', min: 1, max: 1.5, step: 0.05 },
-  { key: 'VIEW_W_M', label: 'Sichtbreite', unit: 'm', min: 22, max: 48, step: 1 },
-  { key: 'TREE_D1', label: 'Dichte am Ende', unit: '/100 m²', min: 0.01, max: 0.045, step: 0.001, scale: 100, decimals: 1 },
-  { key: 'RAMP_M', label: 'Anstieg bis', unit: 'm', min: 1000, max: 15000, step: 500 },
+  { key: 'TURN_TAP_DEG', label: 'Tipp-Winkel', unit: '°', min: 10, max: 80, step: 5, fair: true },
+  { key: 'TURN_DEEPEN_DEG_S', label: 'Vertiefen beim Halten', unit: '°/s', min: 0, max: 150, step: 5, fair: true },
+  { key: 'TURN_T', label: 'Ansprechzeit', unit: 's', min: 0.05, max: 0.4, step: 0.01, fair: true },
+  { key: 'TURN_T_FAST', label: 'Ansprechzeit bei 200 km/h', unit: 's', min: 0.05, max: 0.4, step: 0.01, fair: true },
+  { key: 'RETURN_T', label: 'Rückkehr', unit: 's', min: 0.05, max: 0.6, step: 0.01, fair: true },
+  { key: 'MAX_HEADING_DEG', label: 'Max. Winkel', unit: '°', min: 60, max: 150, step: 5, fair: true },
+  { key: 'TURN_BRAKE_K', label: 'Bremsen durch Drehen', unit: '', min: 0, max: 0.06, step: 0.002, decimals: 3, fair: true },
+  { key: 'BRAKE_K', label: 'Bremsen durch Winkel', unit: '', min: 0.2, max: 6, step: 0.1, fair: true },
+  { key: 'BRAKE_START_DEG', label: 'Winkelbremse ab', unit: '°', min: 0, max: 60, step: 5, fair: true },
+  { key: 'BRAKE_FULL_DEG', label: 'Winkelbremse voll ab', unit: '°', min: 30, max: 120, step: 5, fair: true },
+  { key: 'PLOW_MIN', label: 'Schneepflug', unit: 'm/s²', min: 0, max: 30, step: 1, fair: true },
+  { key: 'START_SPEED_KMH', label: 'Starttempo', unit: 'km/h', min: 0, max: 80, step: 5, fair: true },
+  { key: 'G_SLOPE', label: 'Beschleunigung', unit: 'm/s²', min: 1, max: 10, step: 0.25, fair: true },
+  { key: 'MAX_SPEED_KMH', label: 'Endtempo', unit: 'km/h', min: 60, max: 300, step: 10, fair: true },
+  { key: 'CAM_ZOOM_FAST', label: 'Vorausschau bei Tempo', unit: '×', min: 1, max: 1.5, step: 0.05, fair: true },
+  { key: 'VIEW_W_M', label: 'Sichtbreite', unit: 'm', min: 22, max: 48, step: 1, fair: true },
+  { key: 'TREE_D1', label: 'Dichte am Ende', unit: '/100 m²', min: 0.01, max: 0.045, step: 0.001, scale: 100, decimals: 1, fair: true },
+  { key: 'RAMP_M', label: 'Anstieg bis', unit: 'm', min: 1000, max: 15000, step: 500, fair: true },
   // Hockeystop deaktiviert, siehe Kommentar bei den HOCKEY_*-Konstanten oben.
   // { heading: 'Hockeystop' },
   // { key: 'HOCKEY_MIN_KMH', label: 'Mindesttempo', unit: 'km/h', min: 20, max: 180, step: 5 },
@@ -354,6 +384,9 @@ export const TUNABLES = [
   { key: 'SG_PENALTY_S', label: 'Zeitstrafe pro Tor', unit: 's', min: 0, max: 10, step: 0.5, decimals: 1 },
   { key: 'SG_POLE_KMH', label: 'Stange kostet', unit: 'km/h', min: 0, max: 30, step: 1 },
   { key: 'SG_MAX_SPEED_KMH', label: 'Endtempo', unit: 'km/h', min: 100, max: 300, step: 10 },
+  { heading: 'Duell' },
+  { key: 'DUEL_CRASH_PAUSE_S', label: 'Sturzpause', unit: 's', min: 0.5, max: 5, step: 0.1, decimals: 1 },
+  { key: 'DUEL_GHOST_DELAY_S', label: 'Geist-Verzögerung', unit: 's', min: 0, max: 1, step: 0.05 },
   { heading: 'Bild' },
   { key: 'MAX_DPR', label: 'Auflösung', unit: '×', min: 1, max: 3, step: 0.5, decimals: 1, visual: true },
   { heading: 'Schriftzug' },

@@ -65,9 +65,12 @@ export function createInput(canvas, h) {
     if (side) up('k' + side);
   });
 
-  // iOS-Safari: kein Scrollen, kein Zoom, kein Kontextmenü.
+  // iOS-Safari: kein Scrollen, kein Zoom, kein Kontextmenü. Ausnahmen behalten den nativen Tipp: Tuning-Panel (Regler,
+  // Scrollen), Liste der Bestenliste-Details (Scrollen), Namensfeld der Bestenliste sowie Felder, Regler und
+  // Teilen-Knopf der Duell-Kachel (.native: Tastatur, Wischen, click für navigator.share).
+  const NATIVE = '#tune, #stats-list, .board-own, #duel-card .native';
   document.addEventListener('touchmove', (e) => {
-    if (e.target.closest && e.target.closest('#tune, #stats-list, .board-own')) return; // Tuning-Panel und Bestenliste-Details scrollen, Namensfeld bleibt nativ
+    if (e.target.closest && e.target.closest(NATIVE)) return;
     e.preventDefault();
   }, { passive: false });
   // Keine Lupe: Doppeltipp + Halten stoppt iOS nur über abgebrochenes touchstart, CSS und pointerdown reichen nicht.
@@ -75,12 +78,12 @@ export function createInput(canvas, h) {
   // außer im Tuning-Panel (Regler, Scrollen), in der Liste der Bestenliste-Details (Scrollen) und im Namensfeld der
   // Bestenliste (Fokus und Tastatur brauchen den nativen Tipp). Pointer-Events kommen trotzdem, click nicht mehr:
   // Buttons siehe onTap in hud.js.
-  const noNative = (e) => { if (!e.target.closest?.('#tune, #stats-list, .board-own')) e.preventDefault(); };
+  const noNative = (e) => { if (!e.target.closest?.(NATIVE)) e.preventDefault(); };
   document.addEventListener('touchstart', noNative, { passive: false });
   document.addEventListener('touchend', noNative, { passive: false });
   document.addEventListener('gesturestart', (e) => e.preventDefault());
   document.addEventListener('contextmenu', (e) => e.preventDefault());
-  document.addEventListener('dblclick', (e) => { if (!e.target.closest?.('.board-own')) e.preventDefault(); });
+  document.addEventListener('dblclick', (e) => { if (!e.target.closest?.('.board-own, #duel-card .native')) e.preventDefault(); });
   window.addEventListener('blur', cancelAll);
 
   return { cancelAll };

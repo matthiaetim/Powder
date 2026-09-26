@@ -92,3 +92,20 @@ export function createTunePanel(doc, panel, onChange) {
   refresh();
   return { refresh, closeButton: close };
 }
+
+// Duell: die fairen Regler (fair: true, Fahrphysik, Sicht, Welt) stehen für die Dauer des Duells auf Standard, sonst
+// führe ein getuntes Gerät eine andere Welt oder ein anderes Tempo. Der Storage bleibt unberührt, restoreTune stellt
+// die gespeicherten Werte zurück.
+const FAIR = ROWS.filter((t) => t.fair);
+let held = null;
+export function suspendTune() {
+  if (held) return;
+  held = Object.fromEntries(FAIR.map((t) => [t.key, C[t.key]]));
+  for (const t of FAIR) C[t.key] = DEFAULTS[t.key];
+}
+export function restoreTune() {
+  if (!held) return;
+  for (const t of FAIR) C[t.key] = held[t.key];
+  held = null;
+}
+export const tuneSuspended = () => !!held;

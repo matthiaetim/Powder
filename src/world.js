@@ -1,5 +1,9 @@
 // Unendlicher Hang aus 40-m-Zellen. Deterministisch pro Seed, mit unsichtbarem Safe-Lane-Korridor.
 // Super-G gibt der Welt eine flachere Korridor-Mitte (lane) und eine hindernisfreie Piste darum (pisteHalf) mit.
+// Jede Zelle hängt nur von Seed, Zellkoordinate und Konstanten ab, nicht davon, in welcher Reihenfolge die Zellen
+// entstehen: zwei Geräte mit gleichem Seed sehen exakt dieselben Bäume, egal wie breit ihre Sicht ist, wie sie
+// fahren oder was zwischendurch verworfen wurde (Duell). Bis v0.21.0 wurde der Mindestabstand gegen die gerade
+// vorhandenen Nachbarzellen geprüft, dadurch wichen rund 0,1 % der Hindernisse zwischen Geräten ab.
 import { C } from './constants.js';
 import { TREE, ROCK } from './physics.js';
 
@@ -28,6 +32,7 @@ export function createWorld(seed, opts = {}) {
   const phase = rng() * TAU, phase2 = rng() * TAU;
   return {
     seed, cells: new Map(), objCount: 0,
+    raw: new Map(), // rohe Kandidaten je Zelle (rawCell), auch für Nachbarn, die noch nicht im Bild sind
     phase: opts.phase ?? phase, phase2,
     // Korridor-Mitte: zwei überlagerte Sinuswellen; Super-G nur die flache erste, damit die Tore fahrbar bleiben
     lane: opts.lane || { amp: C.LANE_AMP, wave: C.LANE_WAVELENGTH, amp2: 6, wave2: 97 },
@@ -54,26 +59,25 @@ function rockFrac(y) {
 
 const key = (cx, cy) => cx + ',' + cy;
 
-function genCell(w, cx, cy) {
+// Rohe Kandidaten einer Zelle, nur aus Seed und Zellkoordinate: Mindestabstand allein innerhalb der Zelle. Erzeugt
+// CELL_RAW_EXTRA-fach mehr als das Soll, weil genCell an den Zellgrenzen noch Kandidaten streicht; ohne den
+// Überschuss läge die Dichte rund 4 % unter dem Soll.
+function rawCell(w, cx, cy) {
+  const k = key(cx, cy);
+  const cached = w.raw.get(k);
+  if (cached) return cached;
   const rng = mulberry32(hash32(w.seed, cx, cy));
   const size = C.CELL_M;
   const x0 = cx * size;
   const y0 = cy * size;
   const yMid = y0 + size / 2;
   const total = Math.round(density(yMid) * size * size);
+  const cap = Math.ceil(total * C.CELL_RAW_EXTRA);
   const rf = rockFrac(yMid);
   const objs = [];
-  const near = [];
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
-      if (dx === 0 && dy === 0) continue;
-      const n = w.cells.get(key(cx + dx, cy + dy));
-      if (n) near.push(n.objs);
-    }
-  }
   const minD2 = C.MIN_SPACING_M * C.MIN_SPACING_M;
-  let attempts = total * 3;
-  while (objs.length < total && attempts-- > 0) {
+  let attempts = cap * 3;
+  while (objs.length < cap && attempts-- > 0) {
     const x = x0 + rng() * size;
     const y = y0 + rng() * size;
     const isRock = rng() < rf;
@@ -91,16 +95,34 @@ function genCell(w, cx, cy) {
       const ddx = o.x - x, ddy = o.y - y;
       if (ddx * ddx + ddy * ddy < minD2) ok = false;
     }
-    for (let k = 0; k < near.length && ok; k++) {
-      const arr = near[k];
+    if (!ok) continue;
+    objs.push({ t: isRock ? ROCK : TREE, x, y, r, variant, h });
+  }
+  const cell = { cx, cy, total, objs };
+  w.raw.set(k, cell);
+  return cell;
+}
+
+// Fertige Zelle: die rohen Kandidaten, gekürzt um alles, was einem rohen Kandidaten eines Vorrang-Nachbarn zu nahe
+// kommt. Vorrang haben die vier Nachbarn, die in der Reihenfolge (cy, cx) vor dieser Zelle liegen; die vier anderen
+// weichen umgekehrt dieser Zelle aus. So hält jedes Paar benachbarter Zellen den Mindestabstand, und das Ergebnis
+// hängt nicht davon ab, welche Nachbarn schon existieren. Gekappt wird auf das Soll der Zelle.
+function genCell(w, cx, cy) {
+  const raw = rawCell(w, cx, cy);
+  const prior = [rawCell(w, cx - 1, cy - 1), rawCell(w, cx, cy - 1), rawCell(w, cx + 1, cy - 1), rawCell(w, cx - 1, cy)];
+  const minD2 = C.MIN_SPACING_M * C.MIN_SPACING_M;
+  const objs = [];
+  for (let n = 0; n < raw.objs.length && objs.length < raw.total; n++) {
+    const o = raw.objs[n];
+    let ok = true;
+    for (let k = 0; k < prior.length && ok; k++) {
+      const arr = prior[k].objs;
       for (let i = 0; i < arr.length; i++) {
-        const o = arr[i];
-        const ddx = o.x - x, ddy = o.y - y;
+        const ddx = arr[i].x - o.x, ddy = arr[i].y - o.y;
         if (ddx * ddx + ddy * ddy < minD2) { ok = false; break; }
       }
     }
-    if (!ok) continue;
-    objs.push({ t: isRock ? ROCK : TREE, x, y, r, variant, h });
+    if (ok) objs.push(o);
   }
   const cell = { cx, cy, objs };
   w.cells.set(key(cx, cy), cell);
@@ -128,6 +150,11 @@ export function ensureCells(w, xMin, xMax, yMin, yMax) {
   for (const [k, cell] of w.cells) {
     if (cell.cx < cx0 - m || cell.cx > cx1 + m || cell.cy < cy0 - m || cell.cy > cy1 + m) w.cells.delete(k);
     else n += cell.objs.length;
+  }
+  // Rohe Kandidaten eine Zelle weiter behalten: die Nachbarn der Randzellen brauchen sie beim nächsten Schritt
+  const mr = m + 1;
+  for (const [k, cell] of w.raw) {
+    if (cell.cx < cx0 - mr || cell.cx > cx1 + mr || cell.cy < cy0 - mr || cell.cy > cy1 + mr) w.raw.delete(k);
   }
   w.objCount = n;
 }

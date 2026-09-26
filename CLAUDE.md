@@ -69,8 +69,9 @@ Versionen, die mit anderen geteilt werden. Nicht entfernen und nicht „aufräum
   Vor dem Test `curl -s localhost:8080/src/constants.js | grep VERSION` mit der eigenen `src/constants.js`
   vergleichen. Weicht es ab, einen anderen Port nehmen; im Preview gibt es dafür die Konfiguration `powder-8090`.
 - Nützliche Parameter: `?debug=1` (Overlay mit fps, Hitboxen, Lawinen-Werten), `?seed=42` (reproduzierbare Welt).
-- Bestenliste ohne Firebase testen: `node tools/serve.js 8082 --board` startet den Mock der Datenbank-Schnittstelle
-  (`tools/board-mock.js`, Preview-Konfiguration `powder-board`), im Browser dann `?board=local`. Die echte
+- Bestenliste und Duell ohne Firebase testen: `node tools/serve.js 8082 --board` startet die Mocks der Datenbank-Schnittstelle
+  (`tools/board-mock.js` und `tools/room-mock.js` mit Event-Stream, Preview-Konfiguration `powder-board`), im Browser dann
+  `?board=local`. Gegner fürs Duell: `node tools/duel-bot.js http://localhost:8082 CODE --name Jo` (siehe README). Die echte
   Datenbank steht in `BOARD_URL` (`src/constants.js`), die Regeln in `tools/firebase-rules.json`, Anleitung in der README.
 - Spielmechanik, die sich nicht im Browser prüfen lässt, per kleiner Node-Simulation gegen die Module in `src/`
   durchrechnen (sie sind reine ES-Module) und die Zahlen in der Antwort zeigen.

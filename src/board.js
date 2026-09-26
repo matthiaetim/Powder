@@ -4,6 +4,7 @@
 // Das Feld m ist je Modus etwas anderes (modes.js): Meter in Classic und Lawine, mehr ist besser; im Super-G die
 // Gesamtzeit in Hundertstel, weniger ist besser. Alle Vergleiche laufen über better(), nie direkt über m.
 import { C, VERSION } from './constants.js';
+import { createNet } from './net.js';
 import { BOARD_MODES, lowerIsBetter } from './modes.js';
 import { isTuned } from './tune.js';
 import { loadName, saveName, loadBoardCache, saveBoardCache, loadBoardOwn, saveBoardOwn } from './storage.js';
@@ -145,10 +146,10 @@ function normalizeOwn(raw) {
   return out;
 }
 
-export function createBoard({ url = '', g = null, fetchFn = null, debug = false } = {}) {
-  const base = String(url || '').replace(/\/+$/, '');
-  const doFetch = fetchFn || (typeof fetch === 'function' ? (...args) => fetch(...args) : null);
-  const enabled = base.length > 0 && !!doFetch;
+// net: gemeinsamer Netzkern (main.js gibt denselben an die Duell-Räume), sonst wird einer aus url gebaut
+export function createBoard({ url = '', g = null, fetchFn = null, debug = false, net: netIn = null } = {}) {
+  const net = netIn || createNet(url, { fetchFn });
+  const enabled = net.enabled;
   const listeners = [];
   const sentNow = emptyBoards(); // in dieser Sitzung erfolgreich gesendet: ein älterer GET darf das nicht zurückdrehen
   const busy = {};
@@ -182,20 +183,10 @@ export function createBoard({ url = '', g = null, fetchFn = null, debug = false 
     saveBoardCache({ at: Date.now(), boards });
   }
 
-  async function request(path, init) {
-    const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), C.BOARD_TIMEOUT_MS);
-    try {
-      return await doFetch(base + path, { cache: 'no-store', ...init, signal: ctl.signal });
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
   async function load() {
     if (!enabled) return false;
     try {
-      const res = await request('/boards.json');
+      const res = await net.request('/boards.json');
       if (!res.ok) throw new Error('HTTP ' + res.status);
       boards = mergeBoards(sanitizeBoards(await res.json()), sentNow);
       fetched = true;
@@ -220,7 +211,7 @@ export function createBoard({ url = '', g = null, fetchFn = null, debug = false 
     busy[mode] = true;
     try {
       const body = { name, m: o.m, t: o.t, ts: { '.sv': 'timestamp' }, v: VERSION };
-      const res = await request(`/boards/${mode}/${encodeURIComponent(k)}.json`, { method: 'PUT', body: JSON.stringify(body) });
+      const res = await net.request(`/boards/${mode}/${encodeURIComponent(k)}.json`, { method: 'PUT', body: JSON.stringify(body) });
       if (res.ok) {
         const echo = await res.json().catch(() => null);
         const e = sanitizeBoards({ [mode]: { [k]: echo } })[mode][k] || { name, m: o.m, t: o.t, ts: Date.now() };

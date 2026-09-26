@@ -15,6 +15,50 @@
           "$other": { ".validate": false }
         }
       }
+    },
+    "rooms": {
+      "$code": {
+        ".read": "$code.matches(/^[A-HJ-NP-Z]{4}$/)",
+        ".write": "$code.matches(/^[A-HJ-NP-Z]{4}$/) && (!data.exists() || !newData.exists() || data.child('ts').val() < now - 7200000)",
+        ".validate": "newData.hasChildren(['v', 'ts', 'round', 'seed', 'target', 'pause', 'state', 'startAt', 'players'])",
+        "v": { ".write": true, ".validate": "newData.isString() && newData.val().length <= 16" },
+        "ts": { ".write": true, ".validate": "newData.isNumber() && newData.val() <= now" },
+        "round": { ".write": true, ".validate": "newData.isNumber() && newData.val() % 1 == 0 && newData.val() >= 1 && newData.val() <= 999" },
+        "seed": { ".write": true, ".validate": "newData.isNumber() && newData.val() % 1 == 0 && newData.val() >= 0 && newData.val() <= 4294967295" },
+        "target": { ".write": true, ".validate": "newData.isNumber() && newData.val() % 500 == 0 && newData.val() >= 1000 && newData.val() <= 10000" },
+        "pause": { ".write": true, ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10" },
+        "state": { ".write": true, ".validate": "newData.isString() && newData.val().matches(/^(lobby|count|race|done)$/)" },
+        "startAt": { ".write": true, ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "players": {
+          "$role": {
+            ".write": "$role == 'host' || $role == 'guest'",
+            ".validate": "newData.hasChildren(['name', 'rider', 'ready', 'v'])",
+            "name": { ".validate": "newData.isString() && newData.val().length >= 2 && newData.val().length <= 12" },
+            "rider": { ".validate": "newData.isString() && newData.val().matches(/^(ski|board|sled)$/)" },
+            "ready": { ".validate": "newData.isBoolean()" },
+            "v": { ".validate": "newData.isString() && newData.val().length <= 16" },
+            "seen": { ".validate": "newData.isNumber() && newData.val() <= now" },
+            "$other": { ".validate": false }
+          }
+        },
+        "live": {
+          "$role": {
+            ".write": "$role == 'host' || $role == 'guest'",
+            "t": { ".validate": "newData.isNumber()" },
+            "x": { ".validate": "newData.isNumber()" },
+            "y": { ".validate": "newData.isNumber()" },
+            "th": { ".validate": "newData.isNumber()" },
+            "v": { ".validate": "newData.isNumber()" },
+            "c": { ".validate": "newData.isNumber()" },
+            "done": { ".validate": "newData.isNumber()" },
+            "fin": { ".validate": "newData.isNumber()" },
+            "p": { ".validate": "newData.isNumber()" },
+            "at": { ".validate": "newData.isNumber() && newData.val() <= now" },
+            "$other": { ".validate": false }
+          }
+        },
+        "$other": { ".validate": false }
+      }
     }
   }
 }

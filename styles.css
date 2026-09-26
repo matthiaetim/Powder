@@ -32,6 +32,9 @@
   --r-btn: 24px 30px 22px 28px / 30px 22px 28px 24px;
   --r-tile: 14px 17px 12px 16px / 17px 12px 16px 14px;
   --press: 130ms ease-out;
+  /* Safe-Areas als Variablen, damit render.js sie für Schilder am Bildrand lesen kann */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
 }
 
 html, body {
@@ -100,9 +103,16 @@ button {
 #hud-speed { font-size: 17px; opacity: 0.75; }
 #hud-dist { font-size: 32px; }
 #hud-time { font-size: 32px; display: none; }
-body[data-mode="superg"] #hud-time { display: block; }
-body[data-mode="superg"] #hud-dist { font-size: 17px; opacity: 0.75; }
-body[data-state="dead"] #hud, body[data-state="finished"][data-overlay="1"] #hud { display: none; }
+body[data-mode="superg"] #hud-time, body[data-mode="duel"] #hud-time { display: block; }
+body[data-mode="superg"] #hud-dist, body[data-mode="duel"] #hud-dist { font-size: 17px; opacity: 0.75; }
+/* Duell: Zeile für den Gegner (Abstand, Vorgabe), rot wenn er vorn liegt, grün wenn er zurückliegt */
+#hud-opp { font-size: 17px; opacity: 0.75; }
+#hud-opp:empty { display: none; }
+#hud-opp.slow { color: var(--slow); opacity: 1; }
+#hud-opp.fast { color: var(--fast); opacity: 1; }
+/* HUD weg auf der Fresh-Seite; im Duell bleibt es in der Sturzpause (dead ohne Overlay) stehen */
+body[data-state="dead"]:not([data-mode="duel"]) #hud, body[data-state="dead"][data-overlay="1"] #hud,
+body[data-state="finished"][data-overlay="1"] #hud, body[data-state="ready"][data-overlay="1"] #hud { display: none; }
 
 /* Super-G: Hinweis unter dem Fahrer (Torfehler, Zwischenzeit), blendet über die Klasse ein */
 #hud-note {
@@ -156,7 +166,8 @@ body[data-state="count"] #ov-count, #ov-count.go { display: flex; }
 
 /* Fresh-Seite: Papier-Schleier über dem Spielfeld, darauf eine weiße Karte mit allem drin */
 #ov-dead { background: rgba(244, 243, 239, 0.62); padding: 0 16px; box-sizing: border-box; }
-body[data-state="dead"][data-overlay="1"] #ov-dead, body[data-state="finished"][data-overlay="1"] #ov-dead { display: flex; }
+body[data-state="dead"][data-overlay="1"] #ov-dead, body[data-state="finished"][data-overlay="1"] #ov-dead,
+body[data-state="ready"][data-overlay="1"] #ov-dead { display: flex; } /* ready: Duell-Lobby über dem wartenden Startbild */
 .card {
   display: flex;
   flex-direction: column;
@@ -191,7 +202,7 @@ body[data-state="dead"][data-overlay="1"] #ov-dead, body[data-state="finished"][
 .board-rank, .board-m { text-align: right; font-variant-numeric: tabular-nums; font-size: 15px; }
 .board-name { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #board-more { line-height: 1; opacity: 0.7; }
-#board-name {
+#board-name, .field {
   width: 100%;
   min-width: 0;
   margin: 0;
@@ -211,15 +222,16 @@ body[data-state="dead"][data-overlay="1"] #ov-dead, body[data-state="finished"][
   touch-action: manipulation;
   transition: box-shadow var(--press), transform var(--press);
 }
-#board-name::placeholder { color: var(--ink); opacity: 0.45; }
-#board-name:focus { box-shadow: 3px 4px 0 var(--ink); transform: translate(-1px, -1px); }
+#board-name::placeholder, .field::placeholder { color: var(--ink); opacity: 0.45; }
+#board-name:focus, .field:focus { box-shadow: 3px 4px 0 var(--ink); transform: translate(-1px, -1px); }
 #board[data-named=""] .board-own { grid-template-columns: 1fr; width: 170px; margin: 6px auto 0; }
 #board[data-named=""] .board-rank, #board[data-named=""] .board-m { display: none; }
 #board[data-named=""] #board-name { text-align: center; }
 #board-note { margin: 8px -40px 0; font-size: 12px; opacity: 0.65; } /* breiter als die Liste, damit der Hinweis in einer Zeile bleibt */
 
-/* Haupt-Button: schwarz mit Papier-Rand, harter Schatten, sinkt beim Druck auf seinen Schatten */
-#btn-fresh {
+/* Haupt-Button: schwarz mit Papier-Rand, harter Schatten, sinkt beim Druck auf seinen Schatten (auch Los, Bereit,
+   Revanche in der Duell-Kachel) */
+#btn-fresh, .btn-main {
   margin-top: 22px;
   height: 44px;
   padding: 0 28px;
@@ -234,7 +246,9 @@ body[data-state="dead"][data-overlay="1"] #ov-dead, body[data-state="finished"][
   transform: rotate(0.7deg);
   transition: transform var(--press), box-shadow var(--press);
 }
-#btn-fresh:active { transform: rotate(0.7deg) translate(5px, 6px); box-shadow: 0 0 0 var(--ink); }
+#btn-fresh:active, .btn-main:active { transform: rotate(0.7deg) translate(5px, 6px); box-shadow: 0 0 0 var(--ink); }
+.btn-main[disabled] { opacity: 0.4; cursor: default; }
+.btn-main[disabled]:active { transform: rotate(0.7deg); box-shadow: 5px 6px 0 var(--ink); }
 
 /* Modus-Kärtchen: weiße Kärtchen, die gewählte ist gelb. Die Fahrerwahl nutzt sie hochkant, die Moduswahl als Zeile
    (.mode-row): unter Fresh steht der gewählte Modus mit Vorschau, Name und Kurztext, ein Tipp öffnet die Kachel
@@ -301,9 +315,11 @@ body[data-state="dead"][data-overlay="1"] #ov-dead, body[data-state="finished"][
 #btn-rider:active { transform: rotate(-2deg) translate(3px, 4px); box-shadow: 0 0 0 var(--ink); }
 body[data-panel="riders"] #btn-rider { background: var(--mark); }
 .rider-preview { display: block; width: 40px; height: 40px; border-radius: 9px; }
-#rider-card, #stats-card, #modes-card { display: none; }
-body[data-panel="riders"] #rider-card, body[data-panel="stats"] #stats-card, body[data-panel="modes"] #modes-card { display: flex; }
-body[data-panel="riders"] #dead-card, body[data-panel="stats"] #dead-card, body[data-panel="modes"] #dead-card { display: none; }
+#rider-card, #stats-card, #modes-card, #duel-card { display: none; }
+body[data-panel="riders"] #rider-card, body[data-panel="stats"] #stats-card, body[data-panel="modes"] #modes-card,
+body[data-panel="duel"] #duel-card { display: flex; }
+body[data-panel="riders"] #dead-card, body[data-panel="stats"] #dead-card, body[data-panel="modes"] #dead-card,
+body[data-panel="duel"] #dead-card { display: none; }
 .card-title { font-family: var(--display); font-size: 30px; line-height: 1; letter-spacing: 0.02em; }
 #riders { display: flex; gap: 8px; margin-top: 18px; align-items: flex-start; }
 #riders .mode-card { width: 94px; }
@@ -340,6 +356,69 @@ body[data-panel="riders"] #dead-card, body[data-panel="stats"] #dead-card, body[
 #stats-note { margin-top: 10px; font-size: 12px; opacity: 0.65; }
 #stats-note:empty { display: none; }
 #btn-stats-back { margin-top: 14px; }
+
+/* Duell-Kachel (duel-card.js): Beitritt (Name, neuer Raum, Code), Lobby mit Raum-Code, Startnummern (.bib) und
+   Zielschild (.duel-sign), Ergebnis. Was zur Ansicht nicht gehört, bekommt hidden. */
+#duel-card [hidden] { display: none !important; }
+#duel-note { margin-top: 6px; font-size: 13px; opacity: 0.7; text-align: center; }
+#duel-note:empty { display: none; }
+.duel-field-row { width: 200px; margin-top: 14px; }
+#btn-duel-create { margin-top: 18px; }
+.duel-join-row { display: flex; gap: 8px; align-items: center; margin-top: 18px; }
+.duel-join-row .field { width: 104px; text-align: center; font-family: var(--display); font-weight: 400; letter-spacing: 0.16em; text-transform: uppercase; }
+.duel-code-row { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+.duel-code { font-family: var(--display); font-size: 40px; line-height: 1; letter-spacing: 0.14em; padding-left: 0.14em; }
+.duel-bibs { display: flex; gap: 12px; margin-top: 16px; align-items: stretch; }
+.bib {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 120px;
+  padding: 8px 6px;
+  box-sizing: border-box;
+  background: #fff;
+  border: 2.5px solid var(--ink);
+  border-radius: var(--r-tile);
+  box-shadow: 3px 4px 0 var(--ink);
+}
+.bib.me { background: var(--mark); }
+.bib.empty { border-style: dashed; box-shadow: none; opacity: 0.55; justify-content: center; font-size: 13px; }
+.bib-num { font-family: var(--display); font-size: 30px; line-height: 1; }
+.bib .rider-preview { border: 2px solid var(--ink); border-radius: 8px; box-sizing: border-box; }
+.bib-name { font-size: 14px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bib-state { font-size: 11px; opacity: 0.65; }
+.bib.ready .bib-state { color: var(--fast); opacity: 1; }
+.bib.warn .bib-state { color: var(--slow); opacity: 1; }
+.duel-sign {
+  width: 100%;
+  margin-top: 16px;
+  padding: 8px 12px 6px;
+  box-sizing: border-box;
+  background: #fff;
+  border: 2.5px solid var(--ink);
+  border-radius: var(--r-tile);
+  box-shadow: 3px 4px 0 var(--ink);
+  transform: rotate(-0.8deg);
+}
+.duel-sign-row { display: flex; justify-content: space-between; align-items: baseline; }
+.duel-sign-label { font-family: var(--display); font-size: 14px; letter-spacing: 0.06em; text-transform: uppercase; }
+.duel-sign-val { font-family: var(--display); font-size: 22px; font-variant-numeric: tabular-nums; }
+.duel-sign input[type="range"] { display: block; width: 100%; margin: 4px 0 0; accent-color: var(--ink); touch-action: pan-x; }
+.duel-sign input[type="range"]:disabled { opacity: 0.5; }
+#btn-duel-go { margin-top: 18px; }
+#duel-verdict { margin-top: 10px; font-family: var(--display); font-size: 44px; line-height: 1; text-align: center; letter-spacing: 0.02em; }
+#duel-verdict .sub { display: block; font-family: var(--body); font-size: 13px; opacity: 0.7; margin-top: 6px; letter-spacing: 0; }
+#duel-lines { margin-top: 12px; width: 100%; font-size: 14px; }
+.duel-line { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: 12px; align-items: baseline; line-height: 1.7; padding: 0 8px; }
+.duel-line.me { background: var(--mark); border-radius: 6px; }
+.duel-line .num { font-family: var(--display); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.duel-line .sub { font-size: 12px; opacity: 0.7; white-space: nowrap; }
+.duel-tally { margin-top: 8px; font-size: 12px; opacity: 0.7; text-align: center; }
+#btn-duel-again { margin-top: 16px; }
+#duel-error { margin-top: 10px; font-size: 12px; color: var(--slow); text-align: center; }
+#duel-error:empty { display: none; }
+#btn-duel-leave { margin-top: 14px; }
 
 /* kleine flache Knöpfe: Ton, Tuning-Aktionen */
 .btn-flat, #btn-sound, .tune-actions button {

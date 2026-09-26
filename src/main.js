@@ -6,7 +6,10 @@ import { createRenderer, resize, draw } from './render.js';
 import { createHud } from './hud.js';
 import { loadTune } from './tune.js';
 import { createSound } from './audio.js';
+import { createNet } from './net.js';
 import { createBoard } from './board.js';
+import { createDuel } from './duel.js';
+import { validCode } from './room.js';
 
 loadTune();
 const params = new URLSearchParams(location.search);
@@ -18,11 +21,16 @@ const game = G.createGame({
   debug: params.get('debug') === '1',
 });
 const snd = createSound(game);
-game.onEvent = snd.event;
-// Bestenliste (board.js): ?board=local nutzt den Mock des Dev-Servers (node tools/serve.js 8082 --board), ?board=<URL>
-// eine andere Datenbank, sonst BOARD_URL aus constants.js. Leer = aus.
+// Bestenliste (board.js) und Duell-Räume (room.js, duel.js) teilen sich die Datenbank: ?board=local nutzt die Mocks des
+// Dev-Servers (node tools/serve.js 8082 --board), ?board=<URL> eine andere Datenbank, sonst BOARD_URL aus constants.js.
+// Leer = aus. ?room=CODE öffnet nach dem Start direkt die Lobby dieses Raums (Einladungslink).
 const boardParam = params.get('board');
-const board = createBoard({ url: boardParam === 'local' ? location.origin : boardParam || C.BOARD_URL, g: game, debug: game.debug });
+const dbUrl = boardParam === 'local' ? location.origin : boardParam || C.BOARD_URL;
+const net = createNet(dbUrl, { EventSourceImpl: window.EventSource });
+const board = createBoard({ url: dbUrl, g: game, debug: game.debug, net });
+const duel = createDuel({ g: game, net, board, onTune: () => onResize(), debug: game.debug });
+game.onEvent = (type, data) => { snd.event(type, data); duel.event(type, data); };
+const roomParam = validCode(params.get('room'));
 
 let needDraw = true; // nächstes Bild auf jeden Fall zeichnen (Start, Größenänderung, Regler, Zustandswechsel)
 function onResize() {
@@ -45,6 +53,8 @@ function applyUpdate() {
   return true;
 }
 function freshOrUpdate() {
+  // Duell: Fresh-Knopf und Tasten öffnen die Lobby, den Lauf startet der gemeinsame Countdown
+  if (duel.active() || game.mode === 'duel') { hud.openDuel(); return; }
   if (G.freshReady(game) && applyUpdate()) return;
   G.fresh(game);
 }
@@ -55,18 +65,21 @@ const input = createInput(canvas, {
   pause: () => { if (G.togglePause(game)) input.cancelAll(); },
   fresh: freshOrUpdate,
 });
-const hud = createHud(game, document, { fresh: freshOrUpdate, onTune: onResize, sound: snd, board });
+const hud = createHud(game, document, { fresh: freshOrUpdate, onTune: onResize, sound: snd, board, duel, net });
+if (roomParam) hud.openDuel(roomParam);
 
 // Debug-Haken (?debug=1): Simulation gezielt vorspulen, z. B. powder.advance(2) in der Konsole.
 if (game.debug) {
   window.powder = {
-    game, R, C, G, snd, board,
+    game, R, C, G, snd, board, duel, net,
     advance(sec) {
       const n = Math.round(sec / C.STEP);
-      for (let i = 0; i < n; i++) G.update(game, C.STEP);
+      duel.beforeFrame();
+      for (let i = 0; i < n; i++) G.update(game, C.STEP, (n - 1 - i) * C.STEP);
       snd.update(game, C.STEP);
       draw(R, game, performance.now() / 1000);
       hud.sync(performance.now(), R, true);
+      duel.afterFrame();
     },
   };
 }
@@ -115,7 +128,8 @@ function frame(now) {
   const n = Math.max(1, Math.min(C.MAX_STEPS, Math.ceil(dt / C.STEP - 0.05)));
   const h = dt / n;
   const t0 = prof ? performance.now() : 0;
-  for (let i = 0; i < n; i++) G.update(game, h);
+  duel.beforeFrame();
+  for (let i = 0; i < n; i++) G.update(game, h, (n - 1 - i) * h); // Restzeit des Bildes fürs Duell (Zielzeit)
   snd.update(game, dt);
   const t1 = prof ? performance.now() : 0;
   const live = G.animating(game) || needDraw || game.state !== lastDrawState || now - lastDraw >= 1000 / C.IDLE_FPS;
@@ -146,6 +160,7 @@ function frame(now) {
       prof.upd = prof.updMax = prof.draw = prof.drawMax = prof.hud = prof.hudMax = 0;
     }
   }
+  duel.afterFrame();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -155,7 +170,7 @@ function autoPause() {
   G.pauseIfRunning(game);
   input.cancelAll();
 }
-document.addEventListener('visibilitychange', () => { if (document.hidden) autoPause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) autoPause(); else duel.resume(); }); // zurück: Stream des Duells neu
 window.addEventListener('pagehide', autoPause);
 window.addEventListener('blur', autoPause);
 
@@ -169,6 +184,7 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
     if (!hadController) return; // Erstinstallation: Seite ist schon aktuell
     updateReady = true;
     document.getElementById('version').classList.add('update');
-    if (game.state === 'ready' || game.state === 'paused' || game.state === 'count') applyUpdate();
+    // nicht mitten in einem Duell: die Lobby oder der Countdown wäre weg
+    if (!duel.active() && (game.state === 'ready' || game.state === 'paused' || game.state === 'count')) applyUpdate();
   });
 }
