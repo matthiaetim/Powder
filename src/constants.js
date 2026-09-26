@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.19.4';
+export const VERSION = '0.20.0';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -71,7 +71,7 @@ export const C = {
   AV_FOLLOW_MS: 3,           // Nachrücken auf den Lauerabstand: so viel schneller als der Fahrer, in m/s
   AV_STALL_KMH: 40,          // (Tuning) darunter gilt der Fahrer als stehend
   AV_STALL_S: 0.8,           // (Tuning) so lange stehen, dann erscheint die Lawine am Bildrand
-  AV_ENTER_M: 6,             // beim Erscheinen beginnt die Front so weit über dem Bildrand (die Schattenfahnen reichen 6 m vor)
+  AV_ENTER_M: 6,             // beim Erscheinen beginnt die Front so weit über dem Bildrand (der Staub stiebt 6 m vor)
   AV_CATCH_M: 0,             // (Tuning) Abstand, bei dem sie den Fahrer erwischt
   AV_START_GAP_M: 60,        // Abstand beim Start des Laufs
   AV_RUMBLE_PX: 0.5,         // (Tuning) Bildbeben in px, wenn sie nah ist
@@ -177,7 +177,17 @@ export const C = {
   SHADOW_RGB: '55,75,95',
   TRACK_RGB: '60,80,100',
   TRACK: 'rgba(60,80,100,0.16)',
-  AVALANCHE: [46, 58, 69],
+  // Lawine im Bild (avalanche-view.js): eine weiße Staubwolke, Licht von oben links wie beim Relief der Bäume.
+  // AV_LIT_RGB ist der Übergang vom Glanz zur Schattenseite eines Wulstes, AV_SHADE_RGB färbt Schattenseiten, die
+  // Rinnen zwischen den Wülsten und den Bodenschatten vor der Front. AV_CORE_RGB ist das Wolkeninnere, das zwischen
+  // den Wülsten durchscheint, AV_FAR_RGB dasselbe weit hinten am oberen Bildrand (ferner Dunst, heller). AV_HAZE_RGB
+  // ist der Pulverschnee in der Luft: bei Nähe (threat 1) liegt er mit AV_HAZE_ALPHA über dem ganzen Bild.
+  AV_LIT_RGB: '228,237,245',
+  AV_SHADE_RGB: '118,142,166',
+  AV_CORE_RGB: '196,210,223',
+  AV_FAR_RGB: '222,231,239',
+  AV_HAZE_RGB: '168,186,204',
+  AV_HAZE_ALPHA: 0.22,
   // Super-G: Fähnchen der Tore abwechselnd rot und blau, gedeckt wie der Rest der Palette, mit hellerer Oberkante
   GATE_RED: '#C0342A',       // wie --slow in styles.css
   GATE_RED_LIGHT: '#D25A50',
