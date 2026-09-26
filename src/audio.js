@@ -12,6 +12,46 @@ import { loadSoundOn, saveSoundOn } from './storage.js';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const LOOP_S = 4; // Länge der Rauschschleifen in s
+// Rauschdaten der Schleifen: weiß, rosa (Kellet) oder braun (Zufallsweg, am Ende auf den Anfang zurückgeführt: kein
+// Knacken am Nahtpunkt). Sie werden kurz nach dem Laden in Ruhe vorgerechnet, nicht erst beim ersten Tipp: das waren
+// rund 576 000 Samples im Berührungs-Handler, der erste Tipp ruckelte spürbar. Gerechnet wird für NOISE_RATE, der
+// AudioBuffer entsteht später mit der Abtastrate des Geräts; bei 44,1 kHz ist die Schleife dann 4,35 s statt 4 s lang
+// und die Färbung 8 % tiefer, das hört niemand. Kommt der erste Tipp früher, rechnet makeNoise wie bisher selbst.
+const NOISE_RATE = 48000;
+const noiseData = { white: null, pink: null, brown: null };
+let noiseUsed = false;
+
+function genNoise(kind) {
+  const len = Math.round(LOOP_S * NOISE_RATE);
+  const d = new Float32Array(len);
+  if (kind === 'white') {
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  } else if (kind === 'pink') {
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    for (let i = 0; i < len; i++) {
+      const w = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.96900 * b2 + w * 0.1538520;
+      b3 = 0.86650 * b3 + w * 0.3104856; b4 = 0.55000 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.0168980;
+      d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11;
+      b6 = w * 0.115926;
+    }
+  } else {
+    let b = 0;
+    for (let i = 0; i < len; i++) { b = (b + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = b * 3.5; }
+    const tilt = d[len - 1] - d[0];
+    for (let i = 0; i < len; i++) d[i] -= (tilt * i) / (len - 1);
+  }
+  return d;
+}
+
+// Gestaffelt nach den ersten Bildern, je Schleife nur wenige Millisekunden
+function prepareNoise() {
+  let delay = 250;
+  for (const kind of ['white', 'pink', 'brown']) {
+    setTimeout(() => { if (!noiseUsed && !noiseData[kind]) noiseData[kind] = genNoise(kind); }, delay);
+    delay += 150;
+  }
+}
 // Der Begrenzer (DynamicsCompressor) hebt alles um seine Ausgleichsverstärkung an, bei den Werten unten ≈ 1,2×;
 // der Trim gleicht das aus, damit SND_MASTER 1 wirklich Vollpegel heißt.
 const MASTER_TRIM = 0.82;
@@ -24,6 +64,7 @@ export function createSound(g) {
   const last = new Map();     // zuletzt gesetzter Zielwert je AudioParam (spart Automationsereignisse)
   const dbg = { rush: 0, hiss: 0, scrape: 0, rumble: 0 };
   let prevBreaks = 0, crackleAcc = 0, lastSwish = -1, lastFrame = 0;
+  prepareNoise();
 
   // ---------- Bausteine ----------
 
@@ -41,28 +82,13 @@ export function createSound(g) {
     param.setTargetAtTime(value, ctx.currentTime, tau);
   }
 
-  // Rauschschleife: weiß, rosa (Kellet) oder braun (Zufallsweg, am Ende auf den Anfang zurückgeführt: kein Knacken am Nahtpunkt)
+  // Rauschschleife aus den vorgerechneten Daten (genNoise); die Kopie wird danach freigegeben
   function makeNoise(kind) {
-    const len = Math.round(LOOP_S * ctx.sampleRate);
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    if (kind === 'white') {
-      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-    } else if (kind === 'pink') {
-      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-      for (let i = 0; i < len; i++) {
-        const w = Math.random() * 2 - 1;
-        b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.96900 * b2 + w * 0.1538520;
-        b3 = 0.86650 * b3 + w * 0.3104856; b4 = 0.55000 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.0168980;
-        d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11;
-        b6 = w * 0.115926;
-      }
-    } else {
-      let b = 0;
-      for (let i = 0; i < len; i++) { b = (b + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = b * 3.5; }
-      const tilt = d[len - 1] - d[0];
-      for (let i = 0; i < len; i++) d[i] -= (tilt * i) / (len - 1);
-    }
+    const d = noiseData[kind] || genNoise(kind);
+    noiseData[kind] = null;
+    noiseUsed = true;
+    const buf = ctx.createBuffer(1, d.length, ctx.sampleRate);
+    buf.getChannelData(0).set(d);
     return buf;
   }
 

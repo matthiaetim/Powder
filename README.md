@@ -91,7 +91,8 @@ node tools/serve.js
 ```
 
 Dann `http://localhost:8080` öffnen. Liefert 8080 einen alten Server aus einem anderen Checkout aus (`curl -s localhost:8080/src/constants.js | grep VERSION`), `node tools/serve.js 8090` nehmen; im Browser-Preview von Claude Code heißt diese Konfiguration `powder-8090`. Auf dem iPhone im selben WLAN die angezeigte IP-Adresse öffnen.
-Nützliche Parameter: `?debug=1` (Overlay mit fps, Hitboxen, Safe Lane), `?seed=42` (reproduzierbare Welt),
+Nützliche Parameter: `?debug=1` (Overlay mit fps, Zeit für Rechnen, Zeichnen und HUD als Mittel/Maximum je Sekunde,
+Leerlauf-Anteil, Hitboxen, Safe Lane), `?seed=42` (reproduzierbare Welt),
 `?board=local` (Bestenliste gegen den Mock, siehe oben).
 
 ## Tuning

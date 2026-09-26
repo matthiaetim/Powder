@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.20.0';
+export const VERSION = '0.20.1';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -21,6 +21,11 @@ export const C = {
   STEP: 1 / 120,
   MAX_STEPS: 12,
   MAX_FRAME_MS: 100,
+  // Leerlauf: bewegt sich nichts im Bild (Fresh-Seite, Pause, Intro), zeichnet main.js nur noch mit IDLE_FPS statt
+  // mit Bildrate; das spart Wärme und Akku, und ein warmes iPhone drosselt später weniger. Nach dem Sturz sind
+  // Splitter (höchstens 2,7 s), Partikel und Whiteout nach DEAD_SETTLE_S durch, dann steht das Bild.
+  IDLE_FPS: 10,
+  DEAD_SETTLE_S: 3,
 
   // Lenkung (nach dem Original vermessen): der Kurs schwingt weich auf einen Zielwinkel ein,
   // ohne Knick. Antippen setzt das Ziel auf TURN_TAP_DEG, Halten vertieft es stetig,

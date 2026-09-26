@@ -348,8 +348,13 @@ export function createHud(g, doc, hooks = {}) {
       lastDebug = now;
       const s = g.skier, av = g.av;
       const deg = (r) => (r * 180 / Math.PI).toFixed(0);
+      const p = R.prof; // Zeit je Phase (main.js), erst nach der ersten Sekunde
+      const ms = (a, b) => `${a.toFixed(2)}/${b.toFixed(1)}`;
       debugEl.textContent = [
-        `${R.frameMs.toFixed(1)} ms/frame  Takt ${R.paceMs.toFixed(2)} ms  ${R.W}x${R.H}@${R.dpr}  S=${R.S.toFixed(2)} px/m  zoom=${g.zoom.toFixed(2)}  frac=${g.skierFrac.toFixed(2)}`,
+        p
+          ? `${p.fps.toFixed(0)} fps  ${R.frameMs.toFixed(1)} ms/frame  Takt ${R.paceMs.toFixed(2)} ms  rechnen ${ms(p.upd, p.updMax)}  zeichnen ${ms(p.draw, p.drawMax)}  hud ${ms(p.hud, p.hudMax)} ms (Mittel/Max)  leerlauf ${(p.idle * 100).toFixed(0)} %`
+          : `${R.frameMs.toFixed(1)} ms/frame  Takt ${R.paceMs.toFixed(2)} ms`,
+        `${R.W}x${R.H}@${R.dpr}  S=${R.S.toFixed(2)} px/m  zoom=${g.zoom.toFixed(2)}  frac=${g.skierFrac.toFixed(2)}`,
         `state=${g.state}  mode=${g.mode}  intro=${g.intro}  seed=${g.seed}  runs=${g.runs}  t=${g.runT.toFixed(1)} s`,
         `v=${s.v.toFixed(1)} m/s (${Math.round(s.v * 3.6)} km/h)  θ=${deg(s.theta)}°  brake=${s.brake.toFixed(1)}  side=${s.side}${s.plow ? '  PFLUG' : ''}`,
         `tap=${C.TURN_TAP_DEG}°+${C.TURN_DEEPEN_DEG_S}°/s  T=${C.TURN_T}-${C.TURN_T_FAST}/${C.RETURN_T}s  target=${deg(s.target)}°  brake=turn ${C.TURN_BRAKE_K} + ${C.BRAKE_K}@${C.BRAKE_START_DEG}-${C.BRAKE_FULL_DEG}° + plow ${C.PLOW_MIN}  g=${C.G_SLOPE}  v0=${C.START_SPEED_KMH}  vmax=${g.mode === 'superg' ? C.SG_MAX_SPEED_KMH : C.MAX_SPEED_KMH}`,

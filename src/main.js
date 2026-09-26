@@ -24,10 +24,12 @@ game.onEvent = snd.event;
 const boardParam = params.get('board');
 const board = createBoard({ url: boardParam === 'local' ? location.origin : boardParam || C.BOARD_URL, g: game, debug: game.debug });
 
+let needDraw = true; // nächstes Bild auf jeden Fall zeichnen (Start, Größenänderung, Regler, Zustandswechsel)
 function onResize() {
   resize(R);
   game.viewWm = R.W / R.S;
   game.viewHm = R.H / R.S;
+  needDraw = true;
 }
 window.addEventListener('resize', onResize);
 window.addEventListener('orientationchange', onResize);
@@ -95,7 +97,13 @@ function pacedDt(raw) {
 // Loop: die Simulation läuft in Teilschritten von höchstens STEP genau bis zur Zeit des Bildes, damit jedes Bild
 // exakt seinen Zeitpunkt zeigt. Ein fester Takt mit Restzeit-Akkumulator liefert je nach Bild mal 1, mal 2,
 // mal 3 Schritte, bei Tempo sind das sichtbar ungleiche Sprünge.
-let last = 0;
+// Leerlauf: steht das Bild (Fresh-Seite, Pause, Intro), wird nur noch mit IDLE_FPS gezeichnet; Simulation, Ton und
+// HUD laufen weiter. Ein Zustandswechsel oder eine Größenänderung erzwingt das nächste Bild, sonst stünde nach Fresh
+// bis zu 100 ms lang die alte Szene.
+// Messung (nur ?debug=1): Zeit je Phase (Rechnen, Zeichnen, HUD) als Mittel und Maximum je Sekunde, dazu fps und
+// der Anteil ausgelassener Bilder; hud.js zeigt R.prof im Overlay.
+let last = 0, lastDraw = -1e9, lastDrawState = '';
+const prof = game.debug ? { t0: 0, n: 0, drawn: 0, upd: 0, updMax: 0, draw: 0, drawMax: 0, hud: 0, hudMax: 0 } : null;
 function frame(now) {
   const raw = last ? now - last : 1000 / 60;
   last = now;
@@ -106,10 +114,38 @@ function frame(now) {
   const dt = dtMs / 1000;
   const n = Math.max(1, Math.min(C.MAX_STEPS, Math.ceil(dt / C.STEP - 0.05)));
   const h = dt / n;
+  const t0 = prof ? performance.now() : 0;
   for (let i = 0; i < n; i++) G.update(game, h);
   snd.update(game, dt);
-  draw(R, game, now / 1000);
+  const t1 = prof ? performance.now() : 0;
+  const live = G.animating(game) || needDraw || game.state !== lastDrawState || now - lastDraw >= 1000 / C.IDLE_FPS;
+  if (live) {
+    draw(R, game, now / 1000);
+    lastDraw = now;
+    lastDrawState = game.state;
+    needDraw = false;
+  }
+  const t2 = prof ? performance.now() : 0;
   hud.sync(now, R);
+  if (prof) {
+    const t3 = performance.now();
+    const u = t1 - t0, d = t2 - t1, hd = t3 - t2;
+    prof.n++;
+    prof.upd += u; if (u > prof.updMax) prof.updMax = u;
+    if (live) { prof.drawn++; prof.draw += d; if (d > prof.drawMax) prof.drawMax = d; }
+    prof.hud += hd; if (hd > prof.hudMax) prof.hudMax = hd;
+    if (!prof.t0) prof.t0 = now;
+    else if (now - prof.t0 >= 1000) {
+      R.prof = {
+        fps: (prof.n * 1000) / (now - prof.t0), idle: 1 - prof.drawn / prof.n,
+        upd: prof.upd / prof.n, updMax: prof.updMax,
+        draw: prof.drawn ? prof.draw / prof.drawn : 0, drawMax: prof.drawMax,
+        hud: prof.hud / prof.n, hudMax: prof.hudMax,
+      };
+      prof.t0 = now; prof.n = prof.drawn = 0;
+      prof.upd = prof.updMax = prof.draw = prof.drawMax = prof.hud = prof.hudMax = 0;
+    }
+  }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

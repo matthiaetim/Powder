@@ -400,6 +400,16 @@ function overlayMs(g) {
 export function overlayReady(g) {
   return ended(g) && endedMs(g) >= overlayMs(g);
 }
+// Bewegt sich noch etwas im Bild? Sonst zeichnet main.js nur noch im Leerlauf (IDLE_FPS). Nach dem Ziel gleitet der
+// Fahrer aus, bis er steht (Stangen schwingen, Hinweis läuft ab); nach dem Sturz fliegen Splitter und Partikel.
+export function animating(g) {
+  switch (g.state) {
+    case 'running': case 'count': return true;
+    case 'finished': return g.finT < 1.5 || g.skier.v > 0;
+    case 'dead': return g.deadT < C.DEAD_SETTLE_S;
+    default: return false; // ready, paused: das Bild steht
+  }
+}
 // Fresh darf, sobald die Fresh-Seite steht und die Schonfrist gegen Doppeltipps um ist (main.js nutzt es fürs Update)
 export function freshReady(g) {
   return ended(g) && endedMs(g) >= overlayMs(g) + C.FRESH_GUARD_MS;
