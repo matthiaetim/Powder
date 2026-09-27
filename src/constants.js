@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.24.8';
+export const VERSION = '0.24.9';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -173,6 +173,8 @@ export const C = {
   BOARD_MAX_M: 99999,        // Obergrenze der Regeln: darüber ist es kein Lauf mehr, sondern ein Skript
   BOARD_TIMEOUT_MS: 6000,    // hängender Abruf blockiert sonst das Nachholen; die Liste kommt dann aus dem Cache
   MARK_FRIEND_RGBA: 'rgba(20,20,15,0.35)', // Namenslinien fremder Bestweiten: blasse Tinte, die eigene bleibt rot
+  BOARD_MARKS_N: 5,          // Namenslinien im Schnee: nur die nächsten Weiten vor dem eigenen Rekord (game.js runMarksFor)
+  BOARD_MARKS_GAP_M: 150,    // Mindestabstand zwischen zwei Namenslinien, sonst kleben die Ziele aufeinander
   BOARD_LABEL_GAP_PX: 22,    // Schilder sind 18 px hoch plus Schatten, sonst überlappen Weiten, die ~1 m auseinanderliegen
 
   // Farben: Polarweiß mit leichtem Blaustich, sattes Tannengrün mit braunem Stamm, Tinte wie --ink in styles.css

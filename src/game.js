@@ -106,7 +106,7 @@ export function reset(g, seed, intro) {
   clearParticles(g.particles);
   g.dist = 0; g.runT = 0; g.newBest = false; g.newBestTime = false;
   g.runBest = g.best;
-  g.runMarks = g.marks[g.mode] || [];
+  g.runMarks = runMarksFor(g);
   g.runTainted = false;
   g.readyT = 0; g.deadT = 0; g.deadCause = '';
   g.stop = null;
@@ -212,7 +212,7 @@ function start(g) {
   noteRecentMode(g.mode); // Reihenfolge der Modus-Vorschauen auf der Fresh-Seite (hud.js)
   loadBests(g);
   g.runBest = g.best;
-  g.runMarks = g.marks[g.mode] || [];
+  g.runMarks = runMarksFor(g);
   g.skier.v = C.START_SPEED_KMH / 3.6;
   g.runs++;
   // Erst hier würfeln, nicht in reset(): nur ein wirklich gestarteter Classic-Lauf zählt
@@ -545,11 +545,30 @@ export function selectRider(g, id) {
   saveRider(id);
   return true;
 }
+// Welche Bestweiten der anderen als Linie im Schnee liegen: die BOARD_MARKS_N nächsten Weiten vor dem eigenen Rekord
+// (ohne Rekord ab 0 m, also die leichtesten Ziele), untereinander mindestens BOARD_MARKS_GAP_M auseinander. Aus einem
+// Klumpen bleibt die nähere Weite, das nächste erreichbare Ziel. Gibt es vorn zu wenige (Platz 1 oder kurz davor),
+// füllen die Weiten knapp hinter dem Rekord auf, mit demselben Abstand zu allen Linien. Alle Weiten würden mit
+// wachsender Spielerzahl den Hang zupflastern. Ergebnis Meter absteigend, wie drawMarks (render.js) es erwartet.
+function runMarksFor(g) {
+  const all = [...(g.marks[g.mode] || [])].sort((a, b) => a.m - b.m);
+  const out = [];
+  const free = (m) => out.every((f) => Math.abs(f.m - m) >= C.BOARD_MARKS_GAP_M);
+  for (const f of all) {
+    if (out.length >= C.BOARD_MARKS_N) break;
+    if (f.m > g.best && free(f.m)) out.push(f);
+  }
+  for (let i = all.length - 1; i >= 0 && out.length < C.BOARD_MARKS_N; i--) {
+    if (all[i].m <= g.best && free(all[i].m)) out.push(all[i]);
+  }
+  return out.sort((a, b) => b.m - a.m);
+}
+
 // Bestweiten der anderen (board.js), je Modus für die Linien im Schnee. Im Zustand ready sofort übernehmen (Intro und
 // Wartephase zeigen sie), sonst erst beim nächsten Lauf, damit während der Fahrt nichts springt.
 export function setMarks(g, byMode) {
   g.marks = byMode || {};
-  if (g.state === 'ready') g.runMarks = g.marks[g.mode] || [];
+  if (g.state === 'ready') g.runMarks = runMarksFor(g);
 }
 // Der Server kennt für den eigenen Namen mehr als dieses Gerät (Zweitgerät, gelöschte Daten): lokal übernehmen, damit
 // „Bester Lauf“ und die rote Linie zur Bestenliste passen. Die Linie rückt erst beim nächsten Lauf.
