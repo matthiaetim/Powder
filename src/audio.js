@@ -13,18 +13,18 @@ import { C } from './constants.js';
 import { loadSoundOn, saveSoundOn } from './storage.js';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
-const LOOP_S = 4; // Länge der Rauschschleifen in s
+const LOOP_S = 4; // Länge der Rauschschleifen in s, ganzzahlig lassen (siehe makeNoise)
 // Rauschdaten der Schleifen: weiß, rosa (Kellet) oder braun (Zufallsweg, am Ende auf den Anfang zurückgeführt: kein
 // Knacken am Nahtpunkt). Sie werden kurz nach dem Laden in Ruhe vorgerechnet, nicht erst beim ersten Tipp: das waren
-// rund 576 000 Samples im Berührungs-Handler, der erste Tipp ruckelte spürbar. Gerechnet wird für NOISE_RATE, der
-// AudioBuffer entsteht später mit der Abtastrate des Geräts; bei 44,1 kHz ist die Schleife dann 4,35 s statt 4 s lang
-// und die Färbung 8 % tiefer, das hört niemand. Kommt der erste Tipp früher, rechnet makeNoise wie bisher selbst.
+// rund 576 000 Samples im Berührungs-Handler, der erste Tipp ruckelte spürbar. Gerechnet wird für NOISE_RATE (iPhone).
+// Läuft das Gerät langsamer, nimmt makeNoise davon nur die ersten LOOP_S Sekunden (bei 44,1 kHz 176 400 Samples, die
+// Färbung liegt dann 8 % tiefer, das hört niemand); läuft es schneller oder kommt der erste Tipp früher, rechnet
+// makeNoise selbst.
 const NOISE_RATE = 48000;
 const noiseData = { white: null, pink: null, brown: null };
 let noiseUsed = false;
 
-function genNoise(kind) {
-  const len = Math.round(LOOP_S * NOISE_RATE);
+function genNoise(kind, len = Math.round(LOOP_S * NOISE_RATE)) {
   const d = new Float32Array(len);
   if (kind === 'white') {
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
@@ -40,10 +40,15 @@ function genNoise(kind) {
   } else {
     let b = 0;
     for (let i = 0; i < len; i++) { b = (b + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = b * 3.5; }
-    const tilt = d[len - 1] - d[0];
-    for (let i = 0; i < len; i++) d[i] -= (tilt * i) / (len - 1);
+    closeSeam(d);
   }
   return d;
+}
+
+// Braunes Rauschen wandert: das Ende linear auf den Anfang zurückführen, sonst knackt es am Nahtpunkt der Schleife
+function closeSeam(d) {
+  const len = d.length, tilt = d[len - 1] - d[0];
+  for (let i = 0; i < len; i++) d[i] -= (tilt * i) / (len - 1);
 }
 
 // Gestaffelt nach den ersten Bildern, je Schleife nur wenige Millisekunden
@@ -85,12 +90,18 @@ export function createSound(g) {
     param.setTargetAtTime(value, ctx.currentTime, tau);
   }
 
-  // Rauschschleife aus den vorgerechneten Daten (genNoise); die Kopie wird danach freigegeben
+  // Rauschschleife aus den vorgerechneten Daten (genNoise); die Kopie wird danach freigegeben. Der Puffer ist genau
+  // LOOP_S lang, in Samples der Geräte-Abtastrate. Chromium (gesehen in Version 152) bleibt sonst bei manchen Längen
+  // am Schleifenende hängen, etwa bei 192 000 Samples mit 44,1 kHz: Es wiederholt endlos die letzten 128 Samples,
+  // hinter einem Tiefpass schaukelt sich das bis NaN auf und der ganze Ton fällt aus.
   function makeNoise(kind) {
-    const d = noiseData[kind] || genNoise(kind);
+    const len = Math.round(LOOP_S * ctx.sampleRate);
+    let d = noiseData[kind];
     noiseData[kind] = null;
     noiseUsed = true;
-    const buf = ctx.createBuffer(1, d.length, ctx.sampleRate);
+    if (!d || d.length < len) d = genNoise(kind, len);
+    else if (d.length > len) { d = d.subarray(0, len); if (kind === 'brown') closeSeam(d); }
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
     buf.getChannelData(0).set(d);
     return buf;
   }
