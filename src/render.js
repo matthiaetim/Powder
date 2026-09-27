@@ -4,7 +4,8 @@ import { TREE } from './physics.js';
 import { forEachTrackPoint, forEachRecentTrackPoint } from './track.js';
 import { drawAvalanche, drawCloud, makeAvSprites } from './avalanche-view.js';
 import { drawHockey } from './hockey-view.js';
-import { laneX } from './world.js';
+import { laneX, mulberry32 } from './world.js';
+import { scrubRect } from './snow-scrub.js';
 import { drawGateMarks } from './gate-marks.js';
 
 const TAU = Math.PI * 2;
@@ -261,7 +262,7 @@ function drawMarks(R, g, ox, oy) {
   if (g.course) { drawCourseLines(R, g, ox, oy, y0, y1); return; }
   for (let k = Math.max(1, Math.ceil(y0 / C.MARK_M)); k * C.MARK_M <= y1; k++) {
     if (g.finishM > 0 && k * C.MARK_M === g.finishM) continue; // dort liegt die Ziellinie des Duells
-    markLine(ctx, W, k * C.MARK_M * S + oy, nf.format(k * C.MARK_M) + ' m', C.MARK_RGBA, TAG_PAPER);
+    sprayMark(R, g, ox, oy, k * C.MARK_M * S + oy, nf.format(k * C.MARK_M) + ' m', C.MARK_RGBA, TAG_PAPER);
   }
   // Bestweiten der anderen (g.runMarks, beim Start eingefroren, Meter absteigend = im Bild von unten nach oben).
   // Liegen zwei Weiten dichter als BOARD_LABEL_GAP_PX, weicht das obere Label nach oben aus; die Linie bleibt exakt.
@@ -273,15 +274,14 @@ function drawMarks(R, g, ox, oy) {
     markLine(ctx, W, sy, f.name + ' · ' + nf.format(f.m) + ' m', C.MARK_FRIEND_RGBA, TAG_WHITE, labelY);
   }
   const b = g.runBest;
-  if (b > 0 && b >= y0 && b <= y1) markLine(ctx, W, b * S + oy, 'Rekord · ' + nf.format(b) + ' m', C.MARK_BEST_RGBA, TAG_RED);
+  if (b > 0 && b >= y0 && b <= y1) sprayMark(R, g, ox, oy, b * S + oy, 'Rekord · ' + nf.format(b) + ' m', C.MARK_BEST_RGBA, TAG_RED);
   if (g.finishM > 0) drawFinishLine(R, g.finishM, oy, y0, y1); // Duell: Zielweite aus dem Raum
 }
 
 // Super-G: Startlinie bei 0 und karierte Ziellinie bei SG_FINISH_M statt Meter- und Rekordlinien (die blaue
 // 1000-m-Linie läge genau auf dem Ziel).
 function drawCourseLines(R, g, ox, oy, y0, y1) {
-  const { ctx, W } = R;
-  if (y0 <= 0 && 0 <= y1) markLine(ctx, W, oy, 'Start', C.MARK_RGBA, TAG_WHITE);
+  if (y0 <= 0 && 0 <= y1) sprayMark(R, g, ox, oy, oy, 'Start', C.MARK_RGBA, TAG_WHITE);
   drawFinishLine(R, g.course.finishY, oy, y0, y1);
 }
 
@@ -303,6 +303,55 @@ function drawFinishLine(R, fy, oy, y0, y1) {
 const TAG_PAPER = { fill: '#F4F3EF', ink: C.INK, text: C.INK };
 const TAG_WHITE = { fill: '#FFFFFF', ink: C.INK, text: C.INK };
 const TAG_RED = { fill: C.GATE_RED, ink: C.INK, text: '#F4F3EF' };
+
+// Pistenmarkierung wie mit der Spraydose (Meter-, Rekord- und Startlinie): ein gerades Band aus Farbpunkten, in der
+// Mitte dicht, zum Rand licht, mit vereinzelten Sprenkeln daneben, nie ganz deckend. Je Farbe und Breite einmal als
+// nahtloser Streifen (SPRAY_TILE_PX) vorgerendert und ab Bild-x 0 in ganzen Kacheln nebeneinandergesetzt. Das Muster
+// hängt bewusst am Bild, nicht an Welt-x: seitlich mitlaufende Punkte wirkten wie ein Effekt. Die Linie reicht ohnehin
+// über die ganze Breite, sie bewegt sich nur mit dem Hang nach oben. Das Schild sitzt über dem Band.
+const SPRAY_TILE_PX = 256;
+
+// Wo die Ski über das Band fahren, verwischt die Farbe wie beim Schriftzug (snow-scrub.js); das Schild bleibt heil.
+function sprayMark(R, g, ox, oy, sy, label, color, tag) {
+  const { ctx, W } = R;
+  const t = sprayTile(R, color);
+  for (let x = 0; x < W; x += SPRAY_TILE_PX) ctx.drawImage(t.c, x, sy - t.h, SPRAY_TILE_PX, 2 * t.h);
+  scrubRect(R, g, ox, oy, { x: 0, y: sy - t.h - 2, w: W, h: 2 * t.h + 4 }, railsOf(g.rider));
+  drawTag(ctx, W - 8, sy - C.MARK_SPRAY_PX / 2 - 2, label, tag);
+}
+
+function sprayTile(R, color) {
+  if (!R.sprayTiles) R.sprayTiles = new Map();
+  const band = C.MARK_SPRAY_PX;
+  const key = color + '@' + R.dpr + '@' + band; // Breite im Schlüssel: der Regler wirkt sofort
+  const hit = R.sprayTiles.get(key);
+  if (hit) return hit;
+  const parts = color.slice(color.indexOf('(') + 1, color.indexOf(')')).split(',');
+  const rgb = parts.slice(0, 3).join(','), alpha = parts.length > 3 ? Number(parts[3]) : 1;
+  const h = Math.ceil(band * 1.6); // Höhe mit Platz für die Sprenkel
+  const TW = SPRAY_TILE_PX;
+  const [c, x] = makeCanvas(TW, 2 * h, R.dpr);
+  // Punktgröße mit der Breite: ein schmales Band aus groben Punkten wirkt fleckig. Weniger Fläche je Punkt gleicht die
+  // Anzahl aus, damit das Band gleich dicht bleibt.
+  const k = Math.min(1.2, Math.max(0.5, band / 10));
+  const rnd = mulberry32(0x5b7a1e); // fest: jeder Aufbau ergibt dasselbe Muster
+  const gauss = () => Math.sqrt(-2 * Math.log(1 - rnd())) * Math.cos(2 * Math.PI * rnd());
+  const n = Math.round(TW * band * 0.9 / (k * k));
+  for (let i = 0; i < n; i++) {
+    const over = rnd() < 0.08; // Sprühnebel neben dem Band
+    const px = rnd() * TW;
+    const py = h + gauss() * (over ? band / 1.8 : band / 4);
+    const r = (0.45 + 0.55 * rnd()) * k;
+    x.fillStyle = `rgba(${rgb},${Math.min(1, alpha * (over ? 0.35 : 0.5 + 0.7 * rnd())).toFixed(3)})`;
+    for (const dx of [0, -TW, TW]) { // nahtlos: Punkte am Rand auch auf der anderen Seite
+      if (dx !== 0 && (px + dx < -r || px + dx > TW + r)) continue;
+      x.beginPath(); x.arc(px + dx, py, r, 0, TAU); x.fill();
+    }
+  }
+  const t = { c, h };
+  R.sprayTiles.set(key, t);
+  return t;
+}
 
 function markLine(ctx, W, sy, label, color, tag, labelY = sy - 3) {
   ctx.strokeStyle = color;

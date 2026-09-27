@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.24.6';
+export const VERSION = '0.24.7';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -210,9 +210,13 @@ export const C = {
   FINISH_RGBA: 'rgba(20,20,15,0.5)', // karierte Ziellinie
 
   // Markierungen im Schnee (render.js): alle MARK_M eine blaue Querlinie mit Meterzahl, der Bestwert des Modus
-  // als rote Rekordlinie. Dünn in CSS-Pixeln, unabhängig vom Zoom; Spur, Bäume und Fahrer liegen darüber.
+  // als rote Rekordlinie. Meter-, Rekord- und Super-G-Startlinie sind wie mit der Spraydose auf den Schnee gesprüht:
+  // ein MARK_SPRAY_PX breites Band aus Farbpunkten, nie ganz deckend, gerade und fest im Bild (ein Muster, das seitlich
+  // mit dem Hang mitläuft, wirkt wie ein Effekt). Die Namenslinien bleiben dünn (MARK_PX).
+  // In CSS-Pixeln, unabhängig vom Zoom; Spur, Bäume und Fahrer liegen darüber.
   MARK_M: 1000,
   MARK_PX: 1.5,
+  MARK_SPRAY_PX: 5,          // (Tuning) Breite des Sprühbands
   MARK_RGBA: 'rgba(70,120,200,0.45)',
   MARK_BEST_RGBA: 'rgba(192,52,42,0.75)',
 
@@ -421,6 +425,7 @@ export const TUNABLES = [
   { key: 'DUEL_GHOST_DELAY_S', label: 'Geist-Verzögerung', unit: 's', min: 0, max: 1, step: 0.05 },
   { heading: 'Bild' },
   { key: 'MAX_DPR', label: 'Auflösung', unit: '×', min: 1, max: 3, step: 0.5, decimals: 1, visual: true },
+  { key: 'MARK_SPRAY_PX', label: 'Sprühlinie', unit: 'px', min: 2, max: 12, step: 1, visual: true },
   { heading: 'Schriftzug' },
   { key: 'SIGN_ALPHA', label: 'Deckkraft', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
   { key: 'SIGN_WIDTH_FRAC', label: 'Breite', unit: '%', min: 0.4, max: 1, step: 0.02, scale: 100, decimals: 0 },
