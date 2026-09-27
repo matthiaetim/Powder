@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.24.9';
+export const VERSION = '0.24.10';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -104,6 +104,12 @@ export const C = {
   SND_CRASH: 0.8,            // (Tuning) Aufprall
   SND_RACE: 0.7,             // (Tuning) Super-G: Countdown, Tore, Stangen, Ziel
   SND_SPEED_REF_KMH: 150,
+  // App verlassen (audio.js): iOS hält die Seite beim Schließen an und spielt den letzten Rest im Ausgabepuffer kurz in
+  // Schleife, das klingt verzerrt. Darum geht der Ausgang beim ersten Anzeichen fürs Verlassen schnell auf null, erst
+  // danach wird der Ton angehalten; beim Zurückkommen blendet er weich wieder ein.
+  SND_LEAVE_FADE_S: 0.02,    // Ausblenden: kurz genug, um vor dem Anhalten fertig zu sein, lang genug gegen Knacken
+  SND_LEAVE_STOP_S: 0.12,    // danach wird der Ton angehalten
+  SND_BACK_FADE_S: 0.3,      // Einblenden beim Zurückkommen
 
   // Welt
   CELL_M: 40,

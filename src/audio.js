@@ -6,6 +6,8 @@
 // und Aufprall (kurzer dumpfer Schlag, an der Lawine schwerer). Super-G hat einen eigenen Bus: Pieptöne des
 // Countdowns, Fähnchen beim Durchfahren, Buzzer beim Torfehler, Klacken an der Stange, Doppelton im Ziel.
 // iOS gibt Ton erst nach einer Berührung frei: der Kontext entsteht beim ersten Tipp, davor bleibt alles still.
+// Beim Verlassen der App (Heimgeste, App-Umschalter, Sperrtaste, Tab-Wechsel) blendet der Ton aus, bevor er angehalten
+// wird, sonst schnarrt es auf dem iPhone beim Schließen verzerrt (siehe „App verlassen“ unten).
 // Der Klingelschalter gilt wie bei nativen Spielen: steht er auf lautlos, bleibt die App stumm.
 import { C } from './constants.js';
 import { loadSoundOn, saveSoundOn } from './storage.js';
@@ -64,6 +66,7 @@ export function createSound(g) {
   const last = new Map();     // zuletzt gesetzter Zielwert je AudioParam (spart Automationsereignisse)
   const dbg = { rush: 0, hiss: 0, scrape: 0, rumble: 0 };
   let prevBreaks = 0, crackleAcc = 0, lastSwish = -1, lastFrame = 0;
+  let away = false, stopTimer = 0; // App wird verlassen: Ausgang auf null, dann Kontext anhalten
   prepareNoise();
 
   // ---------- Bausteine ----------
@@ -144,9 +147,11 @@ export function createSound(g) {
     n.comp = ctx.createDynamicsCompressor();
     n.comp.threshold.value = -3; n.comp.knee.value = 3; n.comp.ratio.value = 20;
     n.comp.attack.value = 0.002; n.comp.release.value = 0.15;
+    // Ausgang hinter dem Begrenzer: nur fürs Verlassen der App, damit update() und Ein/Aus ihn nicht zurückstellen
+    n.out = gain(1);
     n.an = ctx.createAnalyser();
     n.an.fftSize = 1024;
-    chain(n.master, n.comp, n.an, ctx.destination);
+    chain(n.master, n.comp, n.out, n.an, ctx.destination);
     for (const b of ['wind', 'ski', 'av', 'fx', 'race']) { n[b] = gain(0); n[b].connect(n.master); }
     n.white = makeNoise('white');
     const pink = makeNoise('pink'), brown = makeNoise('brown');
@@ -246,6 +251,7 @@ export function createSound(g) {
 
   function unlock() {
     if (ctx) {
+      back(); // eine Berührung heißt: die App ist wieder da, auch wenn iOS kein focus geschickt hat
       if (on && ctx.state !== 'running') ctx.resume().catch(() => {});
       return;
     }
@@ -258,14 +264,46 @@ export function createSound(g) {
     kick.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
     kick.connect(ctx.destination);
     kick.start(0);
+    // Läuft der Kontext wieder (nach Hintergrund, Anruf oder Ton aus), kommt der Ausgang weich zurück
+    ctx.onstatechange = () => { if (ctx.state === 'running' && !away) ramp(1, C.SND_BACK_FADE_S); };
     if (on) ctx.resume().catch(() => {}); else ctx.suspend().catch(() => {});
   }
   for (const ev of ['pointerdown', 'touchend', 'keydown', 'click']) window.addEventListener(ev, unlock, { capture: true, passive: true });
-  document.addEventListener('visibilitychange', () => {
-    if (!ctx) return;
-    if (document.hidden) ctx.suspend().catch(() => {});
+
+  // ---------- App verlassen: ausblenden, dann anhalten ----------
+
+  // Beim Schließen hält iOS die Seite an, während der Ton noch läuft. Was dann noch im Ausgabepuffer steht, spielt das
+  // iPhone kurz in Schleife ab: das verzerrte Schnarren beim Schließen, umso lauter, je lauter der Klang gerade war.
+  // Ein sofortiges suspend() hilft nicht, es schneidet mitten in der Welle ab und kommt oft erst, wenn iOS schon
+  // anhält. Darum geht der Ausgang beim ersten Anzeichen (Fokus weg, Seite versteckt, Seite geht) in SND_LEAVE_FADE_S
+  // auf null und erst danach wird angehalten; kommt der Timer nicht mehr dran, steht im Puffer schon Stille.
+  function leave() {
+    if (!ctx || away) return;
+    away = true;
+    ramp(0, C.SND_LEAVE_FADE_S);
+    clearTimeout(stopTimer);
+    stopTimer = setTimeout(() => { if (away) ctx.suspend().catch(() => {}); }, (C.SND_LEAVE_FADE_S + C.SND_LEAVE_STOP_S) * 1000);
+  }
+  // Zurück: läuft der Kontext noch, gleich einblenden, sonst wieder anwerfen und in onstatechange einblenden
+  function back() {
+    if (!ctx || !away || document.hidden) return;
+    away = false;
+    clearTimeout(stopTimer);
+    if (ctx.state === 'running') ramp(1, C.SND_BACK_FADE_S);
     else if (on) ctx.resume().catch(() => {});
-  });
+  }
+  // Ausgang vom jetzigen Wert linear aufs Ziel. Steht der Kontext, wartet die Rampe und läuft beim Weiterlaufen ab.
+  function ramp(to, s) {
+    const p = n.out.gain, t = ctx.currentTime;
+    p.cancelScheduledValues(t);
+    p.setValueAtTime(p.value, t);
+    p.linearRampToValueAtTime(to, t + s);
+  }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) leave(); else back(); });
+  window.addEventListener('pagehide', leave);
+  window.addEventListener('blur', leave);
+  window.addEventListener('pageshow', back);
+  window.addEventListener('focus', back);
 
   function setOn(next) {
     on = !!next;
@@ -284,7 +322,7 @@ export function createSound(g) {
   // ---------- Ereignisse aus dem Spiel ----------
 
   function event(type, d) {
-    if (!ctx || !on) return;
+    if (!ctx || !on || away) return; // beim Verlassen keine Einmal-Klänge mehr, sie kämen sonst beim Zurückkommen
     const s = g.skier;
     switch (type) {
       case 'press': if (g.state === 'running') swish(s.v, false); break;

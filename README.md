@@ -99,6 +99,7 @@ Alles synthetisch über die Web Audio API (`src/audio.js`), keine Audiodateien. 
 - **Aufprall**: kurzer dumpfer Schlag, am Baum mit knappem Knacken, am Fels mit Klonk, an der Lawine schwerer.
 - **Super-G**: Pieptöne des Countdowns (der lange ist das Go), ein kurzes Schlagen des Fähnchens beim Durchfahren, ein doppelter Buzzer beim Torfehler, Klacken an der Stange, Doppelton im Ziel (Countdown und Zielton auch im Duell). Beim App-Start ist der Ton erst nach dem ersten Tipp frei, deshalb wartet der Modus dort auf den Tipp.
 - Lautstärke gesamt und je Gruppe im Tuning-Panel, Abschnitt „Ton“.
+- **App verlassen**: Beim Schließen, beim App-Wechsel, beim Sperren und beim Tab-Wechsel geht der Ton in 20 ms auf null und wird erst danach angehalten, beim Zurückkommen blendet er weich wieder ein. Ein harter Stopp klang auf dem iPhone beim Schließen verzerrt, weil iOS den Rest im Ausgabepuffer kurz in Schleife spielt.
 
 ## Lokal starten
 
