@@ -255,7 +255,6 @@ export function draw(R, g, t) {
 function drawMarks(R, g, ox, oy) {
   const { ctx, Sv: S, W, H } = R;
   const y0 = -oy / S, y1 = (H - oy) / S;
-  ctx.lineWidth = C.MARK_PX;
   ctx.font = TAG_FONT;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -270,8 +269,8 @@ function drawMarks(R, g, ox, oy) {
   for (const f of g.runMarks) {
     if (f.m < y0 || f.m > y1) continue;
     const sy = f.m * S + oy;
-    labelY = Math.min(sy - 3, labelY - C.BOARD_LABEL_GAP_PX);
-    markLine(ctx, W, sy, f.name + ' · ' + nf.format(f.m) + ' m', C.MARK_FRIEND_RGBA, TAG_WHITE, labelY);
+    labelY = Math.min(sy - C.MARK_SPRAY_PX / 2 - 2, labelY - C.BOARD_LABEL_GAP_PX);
+    sprayMark(R, g, ox, oy, sy, f.name + ' · ' + nf.format(f.m) + ' m', C.MARK_FRIEND_RGBA, TAG_WHITE, labelY);
   }
   const b = g.runBest;
   if (b > 0 && b >= y0 && b <= y1) sprayMark(R, g, ox, oy, b * S + oy, 'Rekord · ' + nf.format(b) + ' m', C.MARK_BEST_RGBA, TAG_RED);
@@ -304,20 +303,24 @@ const TAG_PAPER = { fill: '#F4F3EF', ink: C.INK, text: C.INK };
 const TAG_WHITE = { fill: '#FFFFFF', ink: C.INK, text: C.INK };
 const TAG_RED = { fill: C.GATE_RED, ink: C.INK, text: '#F4F3EF' };
 
-// Pistenmarkierung wie mit der Spraydose (Meter-, Rekord- und Startlinie): ein gerades Band aus Farbpunkten, in der
-// Mitte dicht, zum Rand licht, mit vereinzelten Sprenkeln daneben, nie ganz deckend. Je Farbe und Breite einmal als
-// nahtloser Streifen (SPRAY_TILE_PX) vorgerendert und ab Bild-x 0 in ganzen Kacheln nebeneinandergesetzt. Das Muster
-// hängt bewusst am Bild, nicht an Welt-x: seitlich mitlaufende Punkte wirkten wie ein Effekt. Die Linie reicht ohnehin
-// über die ganze Breite, sie bewegt sich nur mit dem Hang nach oben. Das Schild sitzt über dem Band.
+// Pistenmarkierung wie mit der Spraydose (Meter-, Rekord-, Start- und Namenslinien): ein gerades Band aus
+// Farbpunkten, in der Mitte dicht, zum Rand licht, mit vereinzelten Sprenkeln daneben, nie ganz deckend. Je Farbe und
+// Breite einmal als nahtloser Streifen (SPRAY_TILE_PX) vorgerendert und in ganzen Kacheln nebeneinandergesetzt.
+// Das Muster liegt fest im Schnee (Welt-x über ox) wie Bäume und Spur: am Bild festgemacht fuhr es mit dem Fahrer
+// seitlich mit. Die Lage ist auf ganze Gerätepixel gerundet, sonst flimmern die Punkte beim Verschieben. Das Schild
+// sitzt am rechten Rand über dem Band.
 const SPRAY_TILE_PX = 256;
 
 // Wo die Ski über das Band fahren, verwischt die Farbe wie beim Schriftzug (snow-scrub.js); das Schild bleibt heil.
-function sprayMark(R, g, ox, oy, sy, label, color, tag) {
-  const { ctx, W } = R;
+function sprayMark(R, g, ox, oy, sy, label, color, tag, labelY = sy - C.MARK_SPRAY_PX / 2 - 2) {
+  const { ctx, W, dpr } = R;
   const t = sprayTile(R, color);
-  for (let x = 0; x < W; x += SPRAY_TILE_PX) ctx.drawImage(t.c, x, sy - t.h, SPRAY_TILE_PX, 2 * t.h);
+  const TW = SPRAY_TILE_PX;
+  const x0 = Math.round((((ox % TW) + TW) % TW - TW) * dpr) / dpr; // erste Kachel links vom Bildrand, im Takt der Welt
+  const top = Math.round((sy - t.h) * dpr) / dpr;
+  for (let x = x0; x < W; x += TW) ctx.drawImage(t.c, x, top, TW, 2 * t.h);
   scrubRect(R, g, ox, oy, { x: 0, y: sy - t.h - 2, w: W, h: 2 * t.h + 4 }, railsOf(g.rider));
-  drawTag(ctx, W - 8, sy - C.MARK_SPRAY_PX / 2 - 2, label, tag);
+  drawTag(ctx, W - 8, labelY, label, tag);
 }
 
 function sprayTile(R, color) {
@@ -351,12 +354,6 @@ function sprayTile(R, color) {
   const t = { c, h };
   R.sprayTiles.set(key, t);
   return t;
-}
-
-function markLine(ctx, W, sy, label, color, tag, labelY = sy - 3) {
-  ctx.strokeStyle = color;
-  ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
-  drawTag(ctx, W - 8, labelY, label, tag);
 }
 
 // Ein Schild mit rechter Unterkante bei (right, bottom): Schatten, Platte mit Rand, Text zentriert. Leicht gedreht

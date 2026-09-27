@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.24.7';
+export const VERSION = '0.24.8';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -210,12 +210,10 @@ export const C = {
   FINISH_RGBA: 'rgba(20,20,15,0.5)', // karierte Ziellinie
 
   // Markierungen im Schnee (render.js): alle MARK_M eine blaue Querlinie mit Meterzahl, der Bestwert des Modus
-  // als rote Rekordlinie. Meter-, Rekord- und Super-G-Startlinie sind wie mit der Spraydose auf den Schnee gesprüht:
-  // ein MARK_SPRAY_PX breites Band aus Farbpunkten, nie ganz deckend, gerade und fest im Bild (ein Muster, das seitlich
-  // mit dem Hang mitläuft, wirkt wie ein Effekt). Die Namenslinien bleiben dünn (MARK_PX).
-  // In CSS-Pixeln, unabhängig vom Zoom; Spur, Bäume und Fahrer liegen darüber.
+  // als rote Rekordlinie. Alle Linien (Meter, Rekord, Super-G-Start, Namen der Bestenliste) sind wie mit der
+  // Spraydose auf den Schnee gesprüht: ein MARK_SPRAY_PX breites, gerades Band aus Farbpunkten, nie ganz deckend und
+  // fest im Schnee wie die Bäume. In CSS-Pixeln, unabhängig vom Zoom; Spur, Bäume und Fahrer liegen darüber.
   MARK_M: 1000,
-  MARK_PX: 1.5,
   MARK_SPRAY_PX: 5,          // (Tuning) Breite des Sprühbands
   MARK_RGBA: 'rgba(70,120,200,0.45)',
   MARK_BEST_RGBA: 'rgba(192,52,42,0.75)',
