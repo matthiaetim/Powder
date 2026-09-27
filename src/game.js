@@ -96,7 +96,7 @@ export function reset(g, seed, intro) {
   const sg = isSuperG(g);
   // Super-G: flache Pistenmitte, die bei 0 in der Mitte beginnt, und ein hindernisfreier Streifen um sie herum
   g.world = sg
-    ? createWorld(seed, { lane: { amp: C.SG_LANE_AMP_M, wave: C.SG_LANE_WAVE_M, amp2: 0, wave2: 97 }, phase: 0, pisteHalf: C.SG_PISTE_HALF_M })
+    ? createWorld(seed, { lane: { amp: C.SG_LANE_AMP_M, wave: C.SG_LANE_WAVE_M, amp2: 0, wave2: 97 }, phase: 0, pisteHalf: C.SG_PISTE_HALF_M, startLine: false })
     : createWorld(seed);
   g.course = sg ? createCourse(seed, g.world) : null;
   g.av = createAvalanche(0);

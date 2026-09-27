@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.24.4';
+export const VERSION = '0.24.5';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -121,6 +121,12 @@ export const C = {
   LANE_HALF0: 3.0,
   LANE_HALF1: 1.75,
   START_CLEAR_M: 15,
+  // Startlinie (world.js): wer nach dem Start einfach geradeaus beschleunigt, darf auf den ersten START_LINE_M nichts
+  // treffen. Gestrichen wird nur, was die Linie x = 0 bis auf START_LINE_HALF_M an die Hindernismitte plus Radius
+  // berührt, also nur echte Treffer mit einem halben Meter Luft; eine sichtbare Schneise soll es nicht geben.
+  // Nicht im Super-G, dort sind Piste und Kurs fest.
+  START_LINE_M: 50,
+  START_LINE_HALF_M: 1.0,
   START_EASY_M: 100,
   START_EASY_FACTOR: 0.3,
 

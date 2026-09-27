@@ -37,6 +37,7 @@ export function createWorld(seed, opts = {}) {
     // Korridor-Mitte: zwei überlagerte Sinuswellen; Super-G nur die flache erste, damit die Tore fahrbar bleiben
     lane: opts.lane || { amp: C.LANE_AMP, wave: C.LANE_WAVELENGTH, amp2: 6, wave2: 97 },
     pisteHalf: opts.pisteHalf || 0, // > 0: so weit ist die Piste um die Mitte frei von Hindernissen (Super-G)
+    startLine: opts.startLine ?? true, // Linie unter dem Start freihalten (Classic, Lawine, Duell), nicht im Super-G
     cx0: NaN, cx1: NaN, cy0: NaN, cy1: NaN, // zuletzt sichergestellter Zellbereich (ensureCells)
   };
 }
@@ -85,6 +86,7 @@ function rawCell(w, cx, cy) {
     const variant = (rng() * 3) | 0;
     const h = isRock ? 0.8 + rng() * 0.6 : 2.0 + rng() * 1.2;
     if (x * x + y * y < C.START_CLEAR_M * C.START_CLEAR_M) continue;
+    if (w.startLine && y > 0 && y < C.START_LINE_M && Math.abs(x) < C.START_LINE_HALF_M + r) continue; // gerade Anfahrt
     if (Math.abs(y - C.SIGN_Y_M) < C.SIGN_BAND_M) continue; // Schriftzug: kein Hindernis im ganzen Streifen
     if (Math.abs(y - C.EVEREST_Y_M) < C.SIGN_BAND_M) continue; // Gipfelschild ebenso
     if (Math.abs(x - laneX(w, y)) < laneHalf(y) + r) continue;
