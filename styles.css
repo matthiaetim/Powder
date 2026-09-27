@@ -350,6 +350,27 @@ body[data-state="ready"][data-overlay="1"] #ov-dead { display: flex; } /* ready:
 .sound-icon .mute, #btn-sound.off .wave { display: none; }
 #btn-sound.off .mute { display: inline; }
 body[data-panel="riders"] #btn-rider { background: var(--mark); }
+/* Neustart (Super-G): oben rechts, solange gefahren wird (Countdown, Fahrt, Pause); dieselbe Kachel wie das Ton-Icon,
+   das erst auf der Fresh-Seite an dieser Stelle steht. Ein Tipp bricht den Lauf ab, es geht mit dem Countdown von
+   vorn los. */
+#btn-restart {
+  display: none;
+  position: fixed;
+  right: 16px;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  padding: 3px;
+  background: #fff;
+  border: 2.5px solid var(--ink);
+  border-radius: var(--r-tile);
+  box-shadow: 3px 4px 0 var(--ink);
+  transform: rotate(2deg);
+  transition: transform var(--press), box-shadow var(--press);
+}
+#btn-restart:active { transform: rotate(2deg) translate(3px, 4px); box-shadow: 0 0 0 var(--ink); }
+body[data-race="1"][data-state="count"] #btn-restart, body[data-race="1"][data-state="running"] #btn-restart,
+body[data-race="1"][data-state="paused"] #btn-restart { display: block; }
+.restart-icon { display: block; width: 40px; height: 40px; }
+.restart-icon path { fill: none; stroke: var(--ink); stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
 .rider-preview { display: block; width: 40px; height: 40px; border-radius: 9px; }
 #rider-card, #stats-card, #modes-card, #duel-card { display: none; }
 body[data-panel="riders"] #rider-card, body[data-panel="stats"] #stats-card, body[data-panel="modes"] #modes-card,

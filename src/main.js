@@ -65,7 +65,8 @@ const input = createInput(canvas, {
   pause: () => { if (G.togglePause(game)) input.cancelAll(); },
   fresh: freshOrUpdate,
 });
-const hud = createHud(game, document, { fresh: freshOrUpdate, onTune: onResize, sound: snd, board, duel, net });
+// onRestart: gedrückte Tasten und Finger vergessen, sonst lenkte der neue Lauf gleich los
+const hud = createHud(game, document, { fresh: freshOrUpdate, onTune: onResize, onRestart: () => input.cancelAll(), sound: snd, board, duel, net });
 if (roomParam) hud.openDuel(roomParam);
 
 // Debug-Haken (?debug=1): Simulation gezielt vorspulen, z. B. powder.advance(2) in der Konsole.

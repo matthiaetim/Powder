@@ -488,6 +488,13 @@ export function animating(g) {
 export function freshReady(g) {
   return ended(g) && endedMs(g) >= overlayMs(g) + C.FRESH_GUARD_MS;
 }
+// Neustart mitten im Super-G (Knopf oben rechts, hud.js): der Lauf zählt nicht, es geht mit dem Countdown von vorn
+// los. Nur im Countdown, in der Fahrt oder in der Pause; im Duell würde es das Rennen zerreißen.
+export function restart(g) {
+  if (!isSuperG(g) || !(g.state === 'count' || g.state === 'running' || g.state === 'paused')) return false;
+  reset(g, seedFor(g), false);
+  return true;
+}
 export function fresh(g) {
   if (freshReady(g)) reset(g, seedFor(g), false);
 }

@@ -2,7 +2,7 @@
 // Moduswahl (drei Vorschauen unter Fresh und Kachel mit allen Modi), Ton-Icon, Debug-Text.
 // Super-G: dazu die laufende Zeit, Hinweise zu Torfehler und Zwischenzeit, der Countdown in der Bildmitte.
 import { C, VERSION } from './constants.js';
-import { overlayReady, togglePause, pauseIfRunning, fresh, selectMode, selectRider } from './game.js';
+import { overlayReady, togglePause, pauseIfRunning, fresh, restart, selectMode, selectRider } from './game.js';
 import { createTunePanel, isTuned } from './tune.js';
 import { verdictText } from './board.js';
 import { MODES, MODE_ORDER, lowerIsBetter } from './modes.js';
@@ -77,6 +77,9 @@ export function createHud(g, doc, hooks = {}) {
     soundEl.classList.toggle('off', !on);
   };
   onTap(soundEl, () => { if (snd) { snd.toggle(); syncSound(); } });
+
+  // Neustart im Super-G: sichtbar über body[data-race] und den Zustand (styles.css), ein Tipp beginnt von vorn
+  onTap($('btn-restart'), () => { if (restart(g) && hooks.onRestart) hooks.onRestart(); });
   syncSound();
 
   // Tuning-Panel: langer Druck auf das Versions-Label öffnet es, Spiel pausiert derweil.
@@ -450,6 +453,7 @@ export function createHud(g, doc, hooks = {}) {
     if (g.mode !== lastMode) {
       lastMode = g.mode;
       doc.body.dataset.mode = g.mode;
+      doc.body.dataset.race = g.mode === 'superg' ? '1' : ''; // Torlauf: Neustart-Knopf
       hintEl.textContent = g.mode === 'superg' ? 'Tippen zum Start' : hintDefault;
     }
     if (g.state !== lastState) {
