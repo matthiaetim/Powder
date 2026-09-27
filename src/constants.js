@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.24.2';
+export const VERSION = '0.24.3';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -291,6 +291,21 @@ export const C = {
   SG_COUNT_BEEPS: 3,         // kurze Pieptöne vor dem Go
   SG_GO_SHOW_S: 0.6,         // so lange steht „Go“ im Bild
   SG_COAST_DECEL: 8,         // Auslauf nach dem Ziel: zusätzliche Verzögerung in m/s²
+
+  // Markierung an den Innenstangen (gate-marks.js): gesprühter ovaler Bogen, Scheitel an der Stange, Winkel wie auf
+  // dem Kompass (0° bergauf, 90° Scheitel zur Toröffnung, 180° talwärts). An den Zwischenzeit-Toren dazu Fleck und
+  // Linie zur Außenstange, die nach der Zwischenzeit grün oder rot aufleuchten (Farben wie --fast/--slow in styles.css).
+  GM_RGB: '58,210,252',      // #3ad2fc
+  GM_FAST_RGB: '46,125,70',  // #2E7D46
+  GM_SLOW_RGB: '192,52,42',  // #C0342A
+  GM_ARC_FROM_DEG: 17,       // Bogen beginnt bergauf …
+  GM_ARC_TO_DEG: 172,        // … und läuft talwärts aus
+  GM_ARC_W_M: 2.5,           // halbe Breite des Ovals (Scheitel bis Mitte)
+  GM_ARC_OVAL: 2.0,          // Höhe zu Breite
+  GM_SPRAY_PX: 10,           // Strichbreite des Bogens
+  GM_DOT_PX: 16,             // Fleck an der Stange (Zwischenzeit-Tor)
+  GM_LINE_PX: 8,             // Linie zur Außenstange (Zwischenzeit-Tor)
+  GM_PULSE_S: 0.5,           // so lange leuchtet die Markierung nach der Zwischenzeit auf
   SG_FINISH_OVERLAY_MS: 1200, // nach dem Ziel so lange Auslauf, dann die Fresh-Seite
 
   // Duell (duel.js, room.js, duel-card.js, render.js, hud.js): zwei Geräte fahren dieselbe Welt (Seed aus dem Raum),

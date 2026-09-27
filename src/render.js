@@ -4,6 +4,7 @@ import { TREE } from './physics.js';
 import { forEachTrackPoint, forEachRecentTrackPoint } from './track.js';
 import { drawAvalanche, drawCloud, makeAvSprites } from './avalanche-view.js';
 import { laneX } from './world.js';
+import { drawGateMarks } from './gate-marks.js';
 
 const TAU = Math.PI * 2;
 const D2R = Math.PI / 180;
@@ -232,6 +233,7 @@ export function draw(R, g, t) {
   drawMarks(R, g, ox, oy);
   drawSignature(R, g, ox, oy);
   drawYeti(R, g, ox, oy);
+  if (g.course) drawGateMarks(R, g, ox, oy, railsOf(g.rider)); // Farbe im Schnee an den Innenstangen, die Ski verwischen sie
   drawTrack(R, g, ox, oy);
   drawWorld(R, g, ox, oy);
   // drawHockeyFog(R, g, ox, oy); // Hockeystop deaktiviert

@@ -36,6 +36,8 @@ export function createCourse(seed, w) {
     const red = i % 2 === 0;
     gates.push({
       i, y, x, half, red,
+      side,                   // Seite der Pistenmitte (1 rechts): die Innenstange ist die zur Mitte hin (render.js, Markierung)
+      split: -1,              // Index der Zwischenzeit, deren Tor es ist (erstes Tor hinter der Marke), sonst -1
       state: 0,               // 0 offen, 1 durchfahren, 2 verpasst
       hitL: false, hitR: false, hitLo: false, hitRo: false, // Stange schon berührt (je Stange einmal; o = äußere)
       // zwei Render-Objekte je Tor, einmal angelegt: drawWorld sortiert sie mit dem Fahrer nach y
@@ -45,12 +47,18 @@ export function createCourse(seed, w) {
     side = -side;
     y += C.SG_GATE_SPACING_M;
   }
+  // Zwischenzeit-Tore: je Marke das erste Tor dahinter, dort färbt sich die Markierung nach der Zwischenzeit
+  C.SG_SPLITS_M.forEach((m, i) => {
+    const gt = gates.find((g) => g.y >= m);
+    if (gt && gt.split < 0) gt.split = i;
+  });
   return {
     gates, finishY,
     next: 0,                  // Index des nächsten offenen Tors
     misses: 0, penalty: 0,    // verpasste Tore und Strafe in s
     hits: 0,                  // berührte Stangen
     splits: [], splitNext: 0, // wirksame Zwischenzeiten in Hundertstel, Index der nächsten Marke
+    splitRes: [],             // je Zwischenzeit { kind: 'fast' | 'slow' | '', t: Laufzeit } für die Markierung (render.js)
     finished: false, time: 0, total: 0, // Ziel: reine Laufzeit und Gesamtzeit (mit Strafen) in s
     note: null,               // HUD-Hinweis { kind: 'miss' | 'fast' | 'slow' | 'split', value, t }
     wobbling: [],             // getroffene Stangen, deren Schwingung noch läuft
@@ -128,6 +136,7 @@ export function updateCourse(cs, s, prevX, prevY, runT, dt, bestSplits, on) {
     const best = bestSplits && bestSplits[i] > 0 ? bestSplits[i] : 0;
     const diff = best ? (cs100 - best) / 100 : 0;
     cs.note = best ? { kind: diff > 0 ? 'slow' : 'fast', value: diff, t: 0 } : { kind: 'split', value: t, t: 0 };
+    cs.splitRes[i] = { kind: best ? (diff > 0 ? 'slow' : 'fast') : '', t: runT };
     if (on) on('split', { i, t, diff, best });
     cs.splitNext++;
   }
