@@ -5,7 +5,8 @@
 // den Bildrand und rollt mit Pace-Tempo heran.
 // Gnade beim Schuss (AV_MERCY_K): fährt er gerade bergab, spielt sie nur einen Teil ihres Tempo-Vorsprungs aus;
 // je stärker die Kurve, desto mehr davon. Der Schneepflug zählt nicht als Schuss.
-// Startphase (AV_INTRO_M): bis dahin hält holdAvalanche sie sichtbar am oberen Bildrand, danach übernimmt updateAvalanche.
+// Startphase (AV_INTRO_M): bis dahin rollt holdAvalanche sie beim Losfahren ins Bild und hält sie dort, danach
+// übernimmt updateAvalanche.
 import { C } from './constants.js';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -40,18 +41,24 @@ function measure(av, skier, topDist) {
   av.threat = clamp(1 - av.gap / topDist, 0, 1);
 }
 
-// Startphase: die Front hängt AV_INTRO_IN_M ins Bild und fährt mit dem Fahrer und der Kamera mit. Kein Erwischen und
-// kein Stillstand-Zähler, sonst holte ein Anfahren unter AV_STALL_KMH sie beim Übergang sofort an den Bildrand.
+// Startphase: vor dem Start wartet die Front AV_INTRO_OUT_M über dem Bildrand, ab dem Losfahren (runT) rollt sie in
+// AV_INTRO_ENTER_S herein und fährt dann AV_INTRO_IN_M im Bild mit Fahrer und Kamera mit. Das Hereinrollen bremst
+// zum Ende ab (ease-out), sonst schlüge sie hart auf der Endposition auf. Kein Erwischen und kein Stillstand-Zähler,
+// sonst holte ein Anfahren unter AV_STALL_KMH sie beim Übergang sofort an den Bildrand.
 export function holdAvalanche(av, skier, runT, dt, topDist) {
   av.t += dt;
   av.pace = paceSpeed(runT);
   av.stallT = 0;
   av.mercy = 0;
-  // Tempo wie der Fahrer hangabwärts, nicht aus dem Positionssprung: der erste Aufruf holt sie von
-  // AV_START_GAP_M an den Bildrand, das wäre sonst ein Riesenwert für Wolkenfluss und Sturz-Schub.
-  av.speed = skier.alive ? Math.max(0, skier.v * Math.cos(skier.theta)) : 0;
+  const way = C.AV_INTRO_OUT_M + C.AV_INTRO_IN_M; // Weg vom Warten bis ins Bild, relativ zum Bildrand
+  const k = C.AV_INTRO_ENTER_S > 0 ? clamp(runT / C.AV_INTRO_ENTER_S, 0, 1) : 1;
+  const rest = 1 - k;
+  // Tempo analytisch (Fahrer hangabwärts plus Hereinrollen), nicht aus dem Positionssprung: der erste Aufruf holt sie
+  // von AV_START_GAP_M in die Wartestellung, das wäre sonst ein Riesenwert für Wolkenfluss und Sturz-Schub.
+  const down = skier.alive ? Math.max(0, skier.v * Math.cos(skier.theta)) : 0;
+  av.speed = down + (runT > 0 && k < 1 ? (2 * way * rest) / C.AV_INTRO_ENTER_S : 0);
   av.roll += av.speed * dt;
-  av.frontY = skier.y - Math.max(C.AV_CATCH_M + 1, topDist - C.AV_INTRO_IN_M);
+  av.frontY = skier.y - Math.max(C.AV_CATCH_M + 1, topDist + C.AV_INTRO_OUT_M - way * (1 - rest * rest));
   measure(av, skier, topDist);
 }
 

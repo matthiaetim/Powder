@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.25.1';
+export const VERSION = '0.25.2';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -80,11 +80,14 @@ export const C = {
   AV_ENTER_M: 6,             // beim Erscheinen beginnt die Front so weit über dem Bildrand (der Staub stiebt 6 m vor)
   AV_CATCH_M: 0,             // (Tuning) Abstand, bei dem sie den Fahrer erwischt
   AV_START_GAP_M: 60,        // Abstand beim Start des Laufs
-  // Startphase: damit man sieht, wovor man flieht, hängt die Front schon auf dem Startbildschirm AV_INTRO_IN_M ins
-  // Bild und fährt so mit, bis der Fahrer AV_INTRO_M weit ist. Erwischen kann sie in dieser Zeit nicht. Danach gelten
-  // die Regeln oben, und weil der Fahrer dann schneller ist als ihr Pace, rutscht sie von selbst aus dem Bild.
+  // Startphase: damit man sieht, wovor man flieht, wartet die Front auf dem Startbildschirm AV_INTRO_OUT_M über dem
+  // Bildrand, rollt beim Losfahren in AV_INTRO_ENTER_S herein (bremst dabei ab) und fährt dann AV_INTRO_IN_M im Bild
+  // mit, bis der Fahrer AV_INTRO_M weit ist. Erwischen kann sie in dieser Zeit nicht. Danach gelten die Regeln oben,
+  // und weil der Fahrer dann schneller ist als ihr Pace, rutscht sie von selbst aus dem Bild.
   AV_INTRO_M: 40,            // (Tuning) so weit fährt sie am Start sichtbar mit, 0 = aus (Verhalten bis v0.24.12)
   AV_INTRO_IN_M: 5,          // (Tuning) so weit ragt ihre Front dabei über den oberen Bildrand ins Bild
+  AV_INTRO_ENTER_S: 1,       // (Tuning) so lange rollt sie beim Losfahren herein, 0 = steht sofort im Bild
+  AV_INTRO_OUT_M: 8,         // Wartestellung über dem Bildrand: der Staub stiebt bis 7,5 m vor die Front
   AV_RUMBLE_PX: 0.5,         // (Tuning) Bildbeben in px, wenn sie nah ist
   // Schrägfahrt: die Front vergleicht ihren Pace nicht mit dem reinen Höhenverlust (Tempo × cos Winkel), sondern
   // mit Höhenverlust plus AV_DIAG_K des Rests bis zum vollen Tempo. Bei 1 zählt das Tempo entlang der Ski, wer
@@ -421,6 +424,7 @@ export const TUNABLES = [
   { key: 'AV_STALL_KMH', label: 'Stillstand unter', unit: 'km/h', min: 0, max: 80, step: 1 },
   { key: 'AV_INTRO_M', label: 'Im Bild beim Start für', unit: 'm', min: 0, max: 100, step: 5 },
   { key: 'AV_INTRO_IN_M', label: 'Ragt beim Start ins Bild', unit: 'm', min: 0, max: 15, step: 1 },
+  { key: 'AV_INTRO_ENTER_S', label: 'Rollt beim Start herein in', unit: 's', min: 0, max: 3, step: 0.1 },
   { key: 'AV_CATCH_M', label: 'Erwischt ab Abstand', unit: 'm', min: 0, max: 6, step: 0.5 },
   { key: 'AV_RUMBLE_PX', label: 'Beben bei Nähe', unit: 'px', min: 0, max: 8, step: 0.5 },
   { key: 'AV_DIAG_K', label: 'Schräg zählt Tempo', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
