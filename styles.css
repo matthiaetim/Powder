@@ -476,6 +476,24 @@ body[data-panel="duel"] #dead-card { display: none; }
 #duel-error { margin-top: 10px; font-size: 12px; color: var(--slow); text-align: center; }
 #duel-error:empty { display: none; }
 #btn-duel-leave { margin-top: 14px; }
+/* Duell gegen den Bot: sechs Stufen-Knöpfe unter den Startnummern, die gewählte gelb wie die eigene Startnummer */
+.duel-levels { display: flex; gap: 6px; margin-top: 14px; }
+.duel-level {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  font-family: var(--display);
+  font-size: 20px;
+  line-height: 1;
+  color: var(--ink);
+  background: #fff;
+  border: 2.5px solid var(--ink);
+  border-radius: 10px;
+  box-shadow: 2px 3px 0 var(--ink);
+  -webkit-tap-highlight-color: transparent;
+}
+.duel-level.active { background: var(--mark); transform: translate(2px, 3px); box-shadow: 0 0 0 var(--ink); }
+#btn-duel-bot, #btn-duel-human { margin-top: 14px; }
 
 /* kleine flache Knöpfe: Modus auswählen, Zurück, Tuning-Aktionen */
 .btn-flat, .tune-actions button {

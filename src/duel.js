@@ -4,12 +4,17 @@
 // den Geist, der Sende-Takt, die Wertung und der lokale Siegzähler. duel-card.js zeigt das an, main.js ruft beforeFrame
 // und afterFrame je Bild. Gewertet wird die eigene Wanduhr-Zeit ab dem gemeinsamen Go (startAt, Serverzeit): so
 // spielen Netzlaufzeit und Bildrate keine Rolle, und eine Pause kostet Zeit, statt sie anzuhalten.
+// Gegen den Bot (bot.js) läuft dasselbe Duell ohne Netz: der Raum liegt nur im Speicher (bot-room.js), der Spieler ist
+// Host, der Bot fährt auf diesem Gerät mit und wird je Bild bis zur Rennzeit gerechnet. Zwei Unterschiede: eine Pause
+// hält Uhr und Bot an, und gezählt wird nichts.
 import { C, VERSION } from './constants.js';
 import { createRoom, validCode, validRoom, SV } from './room.js';
 import { reset, beginCount, endRun, randomSeed } from './game.js';
 import { suspendTune, restoreTune } from './tune.js';
 import { nameKey } from './board.js';
-import { loadDuelTally, bumpDuelTally } from './storage.js';
+import { loadDuelTally, bumpDuelTally, loadBotLevel, saveBotLevel } from './storage.js';
+import { createBotRoom } from './bot-room.js';
+import { createBot, advanceBot, stopBot, botPose, botLive } from './bot.js';
 
 const other = (role) => (role === 'host' ? 'guest' : 'host');
 const round2 = (v) => Math.round(v * 100) / 100;
@@ -63,11 +68,15 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
     samples: [], lastSampleAt: 0, myHist: [], oppStale: false, oppGone: false,
     verdict: null, tallied: 0, doneWritten: false,
     lastSend: -1e9, sending: false, sentFinal: false, failed: 0, lastBeat: 0, targetTimer: 0,
+    vsBot: false, bot: null, frameAt: 0, // Duell gegen den Bot, sein Fahrer im laufenden Rennen, Wanduhr des letzten Bildes
   };
+  const pose = {};
   const listeners = [];
   const emit = () => { for (const fn of listeners) fn(); };
-  const room = createRoom(net, { onChange: onRoom, onStatus: (s) => { d.stream = s; emit(); }, debug });
-  const me = () => ({ name: board.name(), rider: g.rider });
+  const netRoom = createRoom(net, { onChange: onRoom, onStatus: (s) => { d.stream = s; emit(); }, debug });
+  const botRoom = createBotRoom({ onChange: onRoom });
+  let room = netRoom; // der Raum des laufenden Duells: im Netz oder, gegen den Bot, im Speicher
+  const me = () => ({ name: board.name() || (d.vsBot ? 'Du' : ''), rider: g.rider });
   const raceT = () => (Date.now() - d.goWall) / 1000;
   const countClock = () => raceT() + C.SG_COUNT_BEEPS * C.SG_COUNT_STEP_S;
   const oppRole = () => other(d.role);
@@ -102,7 +111,16 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
     d.phase = 'off'; d.role = ''; d.error = ''; d.busy = false; d.verdict = null; d.samples = []; d.myHist = [];
     d.fin = 0; d.done = false; d.out = false; d.round = 0;
     room.reset();
+    useNet();
     emit();
+  }
+
+  // Zurück zum Raum im Netz; der Bot-Raum ist danach leer
+  function useNet() {
+    botRoom.reset();
+    room = netRoom;
+    d.vsBot = false;
+    d.bot = null;
   }
 
   // Laufender Lauf ist vorbei (Zeit überschritten, Raum weg): Auslauf, keine Weiterfahrt mehr
@@ -114,6 +132,7 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
   function newRound() {
     d.fin = 0; d.done = false; d.out = false; d.outAt = 0; d.samples = []; d.myHist = []; d.lastSampleAt = 0;
     d.oppStale = false; d.oppGone = false; d.verdict = null; d.doneWritten = false; d.sentFinal = false;
+    d.bot = null;
     g.ghost.on = false;
   }
 
@@ -133,6 +152,8 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
     g.raceOver = false;
     g.onFinish = onFinish;
     d.goWall = r.startAt - room.offset();
+    // Der Bot fährt mit den Standard-Reglern (applyTune oben) dieselbe Strecke, Stufe aus dem Raum
+    d.bot = d.vsBot ? createBot({ seed: r.seed >>> 0, level: r.bot, target: r.target, pause: r.pause }) : null;
     d.raceStartedAt = Date.now();
     d.lastSend = -1e9;
     d.phase = 'count';
@@ -194,7 +215,8 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
     };
     d.phase = 'result';
     d.lastBeat = 0;
-    if (opp && d.tallied !== d.round) { bumpDuelTally(nameKey(opp.name), opp.name, v.result); d.tallied = d.round; }
+    // Gegen den Bot wird nichts gezählt
+    if (opp && !d.vsBot && d.tallied !== d.round) { bumpDuelTally(nameKey(opp.name), opp.name, v.result); d.tallied = d.round; }
     if (d.role === 'host' && !d.doneWritten) { d.doneWritten = true; room.patch('', { state: 'done', ts: SV }, true); }
     emit();
   }
@@ -202,6 +224,7 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
   // Pose des Gegners für render.js: bei meiner Rennzeit minus Geist-Verzögerung, damit seine Proben schon da sind
   function ghostTick(r) {
     const opp = oppPlayer(r);
+    if (d.bot && opp) { botGhost(opp); return; }
     const t = raceT() - C.DUEL_GHOST_DELAY_S;
     const p = sampleAt(d.samples, t, C.DUEL_GHOST_EXTRAP_S);
     const gh = g.ghost;
@@ -215,6 +238,33 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
     gh.stale = d.oppStale || (!p.live && !(ol && ol.done)); // im Ziel steht er zu Recht still
     gh.gone = d.oppGone;
     gh.gap = p.y - myYAt(t); // positiv: der Gegner liegt vorn
+  }
+
+  // Der Bot je Bild: bis zur Rennzeit rechnen, seinen Stand in den Raum legen, als käme er von einem Gegner. Ist der
+  // Spieler im Ziel und die Uhr des Bots darüber, ist der Bot über der Zeit (dieselbe Regel wie für den Spieler).
+  function botTick() {
+    const b = d.bot;
+    if (!b) return;
+    if (!b.done) {
+      advanceBot(b, raceT());
+      if (!b.done && d.fin > 0 && b.t > d.fin) stopBot(b);
+    }
+    botRoom.setLive('guest', botLive(b, Date.now()));
+  }
+
+  // Geist des Bots: seine Pose zur Rennzeit, ohne Verzögerung, er fährt ja auf diesem Gerät
+  function botGhost(opp) {
+    const t = raceT();
+    const p = botPose(d.bot, t, pose);
+    const gh = g.ghost;
+    gh.on = true;
+    gh.x = p.x; gh.y = p.y; gh.theta = p.th; gh.v = p.v;
+    gh.carve = Math.min(1, Math.abs(p.th) / (Math.PI / 2));
+    gh.name = opp.name;
+    gh.rider = opp.rider;
+    gh.stale = false;
+    gh.gone = false;
+    gh.gap = p.y - myYAt(t);
   }
 
   function heartbeatTick() {
@@ -242,6 +292,11 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
 
   function beforeFrame() {
     if (d.phase === 'off') return;
+    // Gegen den Bot hält die Pause das Rennen an (auch der Wechsel in den Hintergrund): das Go rückt um die Pause
+    // nach hinten, damit stehen die eigene Uhr, der Countdown und der Bot
+    const now = Date.now();
+    if (d.bot && g.state === 'paused' && d.frameAt > 0 && (d.phase === 'count' || d.phase === 'race')) d.goWall += now - d.frameAt;
+    d.frameAt = now;
     const r = room.data();
     if (d.role && room.streaming() && r === null) { roomGone(); return; }
     if (!validRoom(r)) return;
@@ -257,6 +312,7 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
     }
     if (d.phase === 'race' || d.phase === 'result') {
       trackMe();
+      botTick();
       raceRules(r);
       updateVerdict(r);
       ghostTick(r);
@@ -270,7 +326,7 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
   // Ziel war), und wird nach einem Fehlschlag wiederholt. Bis v0.23.0 blieb es aus, sobald in dem Bild noch ein
   // Positions-Paket unterwegs war: der andere sah nie „im Ziel“ und bekam keine Revanche.
   function afterFrame() {
-    if (d.sending || !d.role) return;
+    if (d.sending || !d.role || d.vsBot) return; // gegen den Bot hört niemand zu
     const racing = d.phase === 'count' || d.phase === 'race';
     const finalDue = d.done && !d.sentFinal && d.phase !== 'lobby';
     if (!(racing && !d.done) && !finalDue) return;
@@ -300,14 +356,41 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
     d.pendingCode = validCode(code);
     d.error = ''; d.notice = '';
     if (d.phase === 'off') d.phase = 'join';
+    if (d.vsBot && !d.pendingCode) { emit(); return; } // die Bot-Lobby steht schon
     if (!board.name()) { emit(); return; }
     if (d.pendingCode) await join(d.pendingCode); else if (!room.code()) await create();
     else emit();
   }
 
-  async function create() {
-    if (!net.enabled) { d.error = JOIN_ERROR.error; d.phase = 'join'; emit(); return; }
+  // Gegen den Bot: ein Raum im Speicher, der Bot sitzt schon bereit. Braucht weder Netz noch Namen.
+  async function openBot() {
+    if (d.phase === 'count' || d.phase === 'race') return;
     if (room.code()) await dropRoom();
+    room = botRoom;
+    d.vsBot = true;
+    d.pendingCode = ''; d.error = ''; d.notice = ''; d.busy = false;
+    botRoom.create(me(), randomSeed(), loadBotLevel());
+    d.role = 'host'; d.round = 0;
+    enterLobby();
+  }
+
+  // Von der Bot-Lobby zurück zum Duell gegen einen Mitspieler
+  async function openHuman() {
+    if (!d.vsBot || d.phase === 'count' || d.phase === 'race') return;
+    await dropRoom();
+    d.phase = 'join';
+    await open('');
+  }
+
+  function setBotLevel(n) {
+    if (!d.vsBot || d.phase !== 'lobby') return;
+    botRoom.setLevel(n);
+    saveBotLevel(botRoom.data().bot);
+  }
+
+  async function create() {
+    if (room.code()) await dropRoom();
+    if (!net.enabled) { d.error = JOIN_ERROR.error; d.phase = 'join'; emit(); return; }
     d.busy = true; d.error = ''; d.phase = 'join'; emit();
     const res = await room.create(me(), randomSeed());
     d.busy = false;
@@ -318,6 +401,7 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
   async function join(raw) {
     const code = validCode(raw);
     if (!code) { d.error = 'Der Code hat vier Buchstaben, ohne I und O'; emit(); return; }
+    if (d.vsBot) await dropRoom();
     if (!board.name()) { d.pendingCode = code; d.phase = 'join'; emit(); return; }
     if (room.code() === code) return;
     if (room.code()) await dropRoom();
@@ -334,6 +418,7 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
     d.role = '';
     const p = role === 'host' ? room.remove() : role === 'guest' ? room.leaveGuest() : Promise.resolve();
     room.reset();
+    useNet();
     await p;
   }
 
@@ -357,7 +442,8 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
   function go() {
     const v = view();
     if (!v.canGo) return;
-    room.patch('', { state: 'count', startAt: room.serverNow() + C.DUEL_COUNT_LEAD_MS, pause: C.DUEL_CRASH_PAUSE_S, ts: SV, 'players/guest/ready': false }, true);
+    // der Bot bleibt bereit
+    room.patch('', { state: 'count', startAt: room.serverNow() + C.DUEL_COUNT_LEAD_MS, pause: C.DUEL_CRASH_PAUSE_S, ts: SV, 'players/guest/ready': d.vsBot }, true);
   }
 
   // Revanche: der Host würfelt neu und schickt beide in die Lobby, der Gast meldet nur seinen Wunsch (ready). Hat er
@@ -365,7 +451,7 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
   function rematch() {
     if (d.role === 'host') {
       const body = { state: 'lobby', round: d.round + 1, seed: randomSeed(), startAt: 0, ts: SV, 'live/host': null, 'live/guest': null };
-      if (!view().oppWantsRematch) body['players/guest/ready'] = false;
+      if (!d.vsBot && !view().oppWantsRematch) body['players/guest/ready'] = false;
       room.patch('', body, true);
     } else setReady(true);
   }
@@ -401,6 +487,7 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
     const seenOk = (p) => !p || typeof p.seen !== 'number' || now - p.seen < C.DUEL_LOBBY_GONE_S * 1000;
     return {
       phase: d.phase, role: d.role, code: room.code(), error: d.error, notice: d.notice, busy: d.busy,
+      vsBot: d.vsBot, botLevel: d.vsBot && ok ? r.bot : 0,
       hasName: !!board.name(), myName: board.name(), pendingCode: d.pendingCode, netOk: net.enabled,
       target: ok ? r.target : C.DUEL_TARGET_DEFAULT_M, pause: ok ? r.pause : C.DUEL_CRASH_PAUSE_S,
       round: ok ? r.round : 0, state: ok ? r.state : '',
@@ -410,8 +497,8 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
       ready: d.role === 'guest' ? !!(guest && guest.ready) : true,
       streaming: room.streaming(), healthy: room.healthy(),
       verdict: d.verdict, myFin: d.fin, myCrashes: g.crashes, done: d.done, out: d.out, outAt: d.outAt,
-      oppLive: oppLive(r), oppWantsRematch: d.role === 'host' && d.phase === 'result' && !!(guest && guest.ready),
-      tally: opp ? tallyFor(opp.name) : null,
+      oppLive: oppLive(r), oppWantsRematch: !d.vsBot && d.role === 'host' && d.phase === 'result' && !!(guest && guest.ready),
+      tally: opp && !d.vsBot ? tallyFor(opp.name) : null,
     };
   }
 
@@ -432,6 +519,8 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
 
   return {
     open, create, join, setReady, setTarget, setRider, go, rematch, leave, shareData, view, hud,
+    openBot, openHuman, setBotLevel,
+    vsBot: () => d.vsBot,
     beforeFrame, afterFrame,
     event: (type) => { if (type === 'crash' || type === 'respawn') d.lastSend = -1e9; },
     resume: () => { if (d.role) room.reopen(); },

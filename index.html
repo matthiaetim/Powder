@@ -30,6 +30,8 @@
   <link rel="modulepreload" href="./src/board.js">
   <link rel="modulepreload" href="./src/room.js">
   <link rel="modulepreload" href="./src/duel.js">
+  <link rel="modulepreload" href="./src/bot.js">
+  <link rel="modulepreload" href="./src/bot-room.js">
   <link rel="modulepreload" href="./src/duel-card.js">
   <link rel="modulepreload" href="./src/physics.js">
   <link rel="modulepreload" href="./src/world.js">
@@ -99,6 +101,7 @@
     <button id="btn-duel-create" class="btn-main" type="button">Neuer Raum</button>
     <div id="duel-code-row" class="duel-code-row"><span id="duel-code" class="duel-code"></span><button id="btn-duel-share" class="btn-flat native" type="button">Teilen</button></div>
     <div id="duel-bibs" class="duel-bibs"></div>
+    <div id="duel-levels" class="duel-levels" role="group" aria-label="Stufe des Bots"></div>
     <div id="duel-target" class="duel-sign">
       <div class="duel-sign-row"><span class="duel-sign-label">Ziel</span><span id="duel-target-val" class="duel-sign-val">1.000 m</span></div>
       <input id="duel-target-range" class="native" type="range" min="1000" max="10000" step="500" value="1000" aria-label="Zielweite">
@@ -112,6 +115,8 @@
              autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-label="Raum-Code">
       <button id="btn-duel-join" class="btn-flat" type="button">Beitreten</button>
     </div>
+    <button id="btn-duel-bot" class="btn-flat" type="button">Gegen Bot</button>
+    <button id="btn-duel-human" class="btn-flat" type="button">Gegen Mitspieler</button>
     <div id="duel-error"></div>
     <button id="btn-duel-leave" class="btn-flat" type="button">Zurück</button>
    </div>

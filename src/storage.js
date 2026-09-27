@@ -1,6 +1,8 @@
-// Bestwert je Modus (Meter), Bestzeit (Super-G), Name, Fahrer, Ton, Duell-Zähler und die zuletzt gespielten Modi im
+// Bestwert je Modus (Meter), Bestzeit (Super-G), Name, Fahrer, Ton, Duell-Zähler, Bot-Stufe und die zuletzt gespielten Modi im
 // localStorage. Fällt still auf 0 bzw. '' zurück, wenn Speicher fehlt. Der gewählte Modus selbst wird bewusst nicht
 // gespeichert (game.js).
+import { C } from './constants.js';
+
 const bestKey = (mode) => (mode === 'classic' || !mode ? 'powder.best' : 'powder.best.' + mode);
 
 export function loadBest(mode) {
@@ -160,6 +162,24 @@ export function loadYetiIn() {
 export function saveYetiIn(n) {
   try {
     localStorage.setItem(YETI_KEY, String(n));
+  } catch {
+    /* egal */
+  }
+}
+
+// Duell gegen den Bot (duel.js, bot.js): nur die zuletzt gewählte Stufe, Siege gegen den Bot werden nicht gezählt
+const BOT_LEVEL_KEY = 'powder.bot.level';
+export function loadBotLevel() {
+  try {
+    const v = parseInt(localStorage.getItem(BOT_LEVEL_KEY), 10);
+    return v >= 1 && v <= C.BOT_LEVELS.length ? v : C.BOT_LEVEL_DEFAULT;
+  } catch {
+    return C.BOT_LEVEL_DEFAULT;
+  }
+}
+export function saveBotLevel(v) {
+  try {
+    localStorage.setItem(BOT_LEVEL_KEY, String(v));
   } catch {
     /* egal */
   }

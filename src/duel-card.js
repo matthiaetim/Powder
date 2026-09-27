@@ -1,6 +1,7 @@
 // Kachel „Duell“ (DOM) auf der Fresh-Seite, wie die anderen Kacheln über body[data-panel="duel"] sichtbar (hud.js).
 // Drei Ansichten aus einem Satz Elemente: Beitritt (Name, neuer Raum, Code eingeben), Lobby (Raum-Code, Teilen,
-// Startnummern, Zielschild, Los/Bereit, Code eingeben) und Ergebnis (Sieger, Zeiten, Stürze, Zähler, Revanche). Zeigt
+// Startnummern, Zielschild, Los/Bereit, Code eingeben) und Ergebnis (Sieger, Zeiten, Stürze, Zähler, Revanche). Gegen
+// den Bot (Knopf „Gegen Bot“) stehen in der Lobby statt Raum-Code und Beitreten die sechs Stufen zur Wahl. Zeigt
 // den Stand aus duel.js (view) an und reicht Tipps weiter. Eingabefelder, Regler und der Teilen-Knopf tragen .native:
 // input.js lässt ihnen den nativen Tipp, nur so kommen Tastatur, Wischen und der click für navigator.share.
 import { C } from './constants.js';
@@ -15,6 +16,7 @@ export function createDuelCard(doc, g, duel, { onTap, board, fmtClock, nf, onLea
   const bibsEl = $('duel-bibs'), targetEl = $('duel-target'), targetVal = $('duel-target-val'), range = $('duel-target-range');
   const goBtn = $('btn-duel-go'), verdictEl = $('duel-verdict'), linesEl = $('duel-lines'), againBtn = $('btn-duel-again');
   const joinRow = $('duel-join-row'), codeIn = $('duel-code-in'), joinBtn = $('btn-duel-join'), leaveBtn = $('btn-duel-leave');
+  const levelsEl = $('duel-levels'), botBtn = $('btn-duel-bot'), humanBtn = $('btn-duel-human');
   range.min = String(C.DUEL_TARGET_MIN_M);
   range.max = String(C.DUEL_TARGET_MAX_M);
   range.step = String(C.DUEL_TARGET_STEP_M);
@@ -29,6 +31,14 @@ export function createDuelCard(doc, g, duel, { onTap, board, fmtClock, nf, onLea
   };
   const meters = (m) => nf.format(m) + ' m';
   const nf1 = new Intl.NumberFormat(C.HUD_LOCALE, { maximumFractionDigits: 1 }); // Sturzpause: 1,5 s
+  const levelBtns = C.BOT_LEVELS.map((lv, i) => {
+    const b = el('button', 'duel-level', String(i + 1));
+    b.type = 'button';
+    b.setAttribute('aria-label', `Stufe ${i + 1}: ${lv.name}`);
+    onTap(b, () => duel.setBotLevel(i + 1));
+    levelsEl.append(b);
+    return b;
+  });
   const crashText = (n) => (n === 0 ? 'kein Sturz' : n === 1 ? '1 Sturz' : nf.format(n) + ' Stürze');
 
   // Startnummer eines Spielers (Host 1, Gast 2); ohne Spieler eine gestrichelte Leerstelle
@@ -38,9 +48,10 @@ export function createDuelCard(doc, g, duel, { onTap, board, fmtClock, nf, onLea
     const cv = el('canvas', 'rider-preview');
     drawRiderPreview(cv, p.rider, 40);
     let state = mine ? 'du' : '';
-    if (num === 1) state = mine ? 'du · Host' : 'Host';
+    if (num === 1) state = mine ? (v.vsBot ? 'du' : 'du · Host') : 'Host';
     if (num === 2 && p.ready) { state = mine ? 'du · bereit' : 'bereit'; b.classList.add('ready'); }
     if (num === 2 && !p.ready) state = mine ? 'du' : 'noch nicht bereit';
+    if (p.bot) state = `Bot · Stufe ${p.bot}`;
     if (!mine && v.oppVersion && !v.versionOk) { state = 'Version ' + v.oppVersion; b.classList.add('warn'); }
     if (!mine && v.oppGone) { state = 'weg?'; b.classList.add('warn'); }
     b.append(el('div', 'bib-num', String(num)), cv, el('div', 'bib-name', p.name), el('div', 'bib-state', state));
@@ -58,7 +69,7 @@ export function createDuelCard(doc, g, duel, { onTap, board, fmtClock, nf, onLea
     } else {
       title = r.result === 'w' ? 'Gewonnen!' : r.result === 'l' ? 'Verloren' : 'Unentschieden';
       if (r.reason === 'gone') sub = `${oppName} ist weg`;
-      else if (r.reason === 'out') sub = r.result === 'w' ? `${oppName} hat die Zeit überschritten` : 'Zeit überschritten';
+      else if (r.reason === 'out') sub = r.result === 'w' ? (v.vsBot ? `${oppName} war langsamer` : `${oppName} hat die Zeit überschritten`) : 'Zeit überschritten';
     }
     verdictEl.append(doc.createTextNode(title));
     if (sub) verdictEl.append(el('span', 'sub', sub));
@@ -69,7 +80,8 @@ export function createDuelCard(doc, g, duel, { onTap, board, fmtClock, nf, onLea
     const oppFin = r ? r.oppFin : ol && ol.fin > 0 ? ol.fin : 0;
     const oppDone = r ? true : !!(ol && ol.done);
     theirs.append(el('span', '', oppName),
-      el('span', 'num', oppFin > 0 ? fmtClock(oppFin, false) : oppDone ? 'kein Ziel' : ol && ol.y > 0 ? meters(Math.floor(ol.y)) : '…'),
+      // der Bot hört auf, sobald er verloren hat: statt „kein Ziel“ steht, wie weit er war
+      el('span', 'num', oppFin > 0 ? fmtClock(oppFin, false) : oppDone && !(v.vsBot && ol && ol.y > 0) ? 'kein Ziel' : ol && ol.y > 0 ? meters(Math.floor(ol.y)) : '…'),
       el('span', 'sub', ol ? crashText(ol.c || 0) : ''));
     linesEl.replaceChildren(mine, theirs);
     if (v.tally) {
@@ -89,19 +101,24 @@ export function createDuelCard(doc, g, duel, { onTap, board, fmtClock, nf, onLea
     const show = (node, on) => { node.hidden = !on; };
     show(nameRow, view === 'join' && !v.hasName);
     show(createBtn, view === 'join' && v.hasName);
-    show(codeRow, view === 'lobby');
+    const lobbyOpen = view === 'lobby' && v.phase === 'lobby';
+    show(codeRow, view === 'lobby' && !v.vsBot);
+    show(levelsEl, view === 'lobby' && v.vsBot);
+    // Gegen den Bot geht es, solange kein Mitspieler im Raum ist; zurück zum Mitspieler aus der Bot-Lobby
+    show(botBtn, view === 'join' || (lobbyOpen && !v.vsBot && v.role === 'host' && !v.guest));
+    show(humanBtn, lobbyOpen && v.vsBot);
     show(bibsEl, view === 'lobby');
     show(targetEl, view === 'lobby');
     show(goBtn, view === 'lobby');
     show(verdictEl, view === 'result');
     show(linesEl, view === 'result');
     show(againBtn, view === 'result' && !!v.verdict);
-    show(joinRow, view !== 'result' && v.hasName);
+    show(joinRow, view !== 'result' && v.hasName && !v.vsBot);
     errEl.textContent = v.error || '';
 
     if (view === 'join') {
-      noteEl.textContent = v.notice || (!v.hasName ? 'Für das Duell brauchst du einen Namen.' : v.busy ? 'Verbinde …'
-        : !v.netOk ? 'Das Duell braucht Internet.' : 'Neuen Raum eröffnen oder mit einem Code beitreten.');
+      noteEl.textContent = v.notice || (!v.hasName ? 'Gegen einen Mitspieler brauchst du einen Namen.' : v.busy ? 'Verbinde …'
+        : !v.netOk ? 'Gegen einen Mitspieler brauchst du Internet.' : 'Neuen Raum eröffnen oder mit einem Code beitreten.');
       if (v.pendingCode && !codeIn.value) codeIn.value = v.pendingCode;
       if (nameIn.value === '' && v.myName) nameIn.value = v.myName;
       return;
@@ -113,8 +130,10 @@ export function createDuelCard(doc, g, duel, { onTap, board, fmtClock, nf, onLea
       bibsEl.replaceChildren(hostBib, guestBib);
       if (!sliding) { range.value = String(v.target); targetVal.textContent = meters(v.target); }
       range.disabled = v.role !== 'host';
+      levelBtns.forEach((b, i) => { b.classList.toggle('active', i + 1 === v.botLevel); b.disabled = v.phase !== 'lobby'; });
       const hints = [];
       if (v.phase === 'count') hints.push('Start …');
+      else if (v.vsBot) hints.push('Stufe wählen, dann „Los“', 'Pause hält das Rennen an');
       else if (v.role === 'host') hints.push(v.guest ? (v.canGo ? 'Alles bereit' : v.versionOk ? `Warte, bis ${v.guest.name} bereit ist` : 'Der andere muss die App neu laden') : 'Teile den Code, dann kann der andere beitreten');
       else hints.push(v.ready ? `Warte auf ${v.host ? v.host.name : 'den Host'}` : 'Tipp auf „Bereit“');
       hints.push(`Sturzpause ${nf1.format(v.pause)} s`);
@@ -140,6 +159,8 @@ export function createDuelCard(doc, g, duel, { onTap, board, fmtClock, nf, onLea
   codeIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); codeIn.blur(); duel.join(codeIn.value); } });
   onTap(joinBtn, () => { codeIn.blur(); duel.join(codeIn.value); });
   onTap(createBtn, () => duel.create());
+  onTap(botBtn, () => duel.openBot());
+  onTap(humanBtn, () => duel.openHuman());
   onTap(goBtn, () => {
     const v = duel.view();
     if (v.role === 'host') duel.go(); else duel.setReady(!v.ready);

@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.25.2';
+export const VERSION = '0.26.0';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -371,6 +371,46 @@ export const C = {
   DUEL_CODE_LEN: 4,
   DUEL_EDGE_PAD_PX: 10,        // Abstand des Randschilds („Jo +37 m“) vom Bildrand
   DUEL_HUD_CLEAR_PX: 175,      // so viel Platz lässt das untere Randschild rechts für das HUD frei
+
+  // Bot-Gegner im Duell (bot.js, bot-room.js, duel.js): fährt auf dem eigenen Gerät mit derselben Physik durch
+  // dieselbe Welt, ohne Netz. Sechs Stufen, je Stufe:
+  //   kmh     Wunschtempo: darüber bremst er durch Schwünge
+  //   lookS   Vorausschau in s: so weit rechnet er seine Eingaben voraus
+  //   thinkS  Reaktionszeit in s: so oft entscheidet er neu
+  //   tapS    Tipp-Takt in s: schneller wechselt er die Eingabe nicht
+  //   margin  Sicherheitsabstand in m, den er zu Hindernissen halten will
+  //   lane    Bindung an den freien Korridor (Kosten je m Abstand): hoch = bleibt auf der sicheren Linie
+  //   miss    Anteil der Hindernisse, die er erst BOT_LATE_S davor sieht: daraus entstehen seine Stürze
+  BOT_LEVELS: [
+    { name: 'Anfänger', kmh: 72, lookS: 1.2, thinkS: 0.3, tapS: 0.14, margin: 1.6, lane: 0.6, miss: 0.04 },
+    { name: 'Hobby', kmh: 86, lookS: 1.3, thinkS: 0.22, tapS: 0.12, margin: 1.4, lane: 0.4, miss: 0.03 },
+    { name: 'Fortgeschritten', kmh: 102, lookS: 1.4, thinkS: 0.16, tapS: 0.1, margin: 1.2, lane: 0.25, miss: 0.024 },
+    { name: 'Profi', kmh: 122, lookS: 1.5, thinkS: 0.12, tapS: 0.08, margin: 1.0, lane: 0.15, miss: 0.016 },
+    { name: 'Weltcup', kmh: 144, lookS: 1.6, thinkS: 0.08, tapS: 0.06, margin: 0.8, lane: 0.1, miss: 0.008 },
+    { name: 'Legende', kmh: 160, lookS: 1.8, thinkS: 0.05, tapS: 0.05, margin: 0.6, lane: 0.08, miss: 0 },
+  ],
+  BOT_LEVEL_DEFAULT: 3,
+  BOT_RIDER: 'ski',            // Aussehen des Bots (riders.js)
+  BOT_HEAD_DEG: [5, 10, 16, 24, 34, 48, 70], // Fahrwinkel, die er je Seite durchprobiert …
+  BOT_HOLDS_S: [0.2, 0.45, 0.9, 2],          // … und wie lange er sie hält, bevor es zurück in die Falllinie geht
+  BOT_DEAD_RAD: 0.03,          // so genau hält er den Fahrwinkel (knapp 2°), darunter ändert er die Eingabe nicht
+  BOT_SOFT_RAD: 0.25,          // bis zu diesem Abstand (rund 14°) lässt er zum Aufrichten nur los, darüber lenkt er gegen
+  BOT_LATE_S: 0.12,            // ein übersehenes Hindernis fällt ihm erst so kurz davor auf, meist zu spät …
+  BOT_LATE_MIN_M: 2,           // … spätestens aber in diesem Abstand
+  BOT_REACH_PAD_M: 6,          // so viel weiter als die Vorausschau sammelt er Hindernisse ein
+  BOT_HIT_PAD_M: 0.1,          // so knapp vorbei zählt in der Vorausrechnung schon als Aufprall
+  BOT_PASS_M: 4,               // Hindernisse weiter als das vor oder hinter ihm prüft ein Schritt der Vorausrechnung nicht
+  BOT_W_HIT: 1000,             // Kosten eines Aufpralls in der Vorausrechnung, in Metern Strecke
+  BOT_W_NEAR: 60,              // Kosten je s dicht am Hindernis (innerhalb margin)
+  BOT_W_SPEED: 0.6,            // Kosten je s und (m/s)² über dem Wunschtempo
+  BOT_W_HEAD: 2,               // Kosten je rad Schräglage am Ende der Vorausschau
+  BOT_W_KEEP: 0.3,             // Bonus für den laufenden Plan, gegen Flattern
+  BOT_VIEW_SIDE_M: 60,         // Welt des Bots: so weit um ihn herum entstehen Zellen
+  BOT_VIEW_BACK_M: 6,
+  BOT_VIEW_AHEAD_M: 130,
+  BOT_SIDE_MIN_M: 8,           // Blickfeld: Hindernisse seitlich bis hierhin …
+  BOT_SIDE_K: 0.6,             // … plus so viel je m voraus zählen zur Vorausrechnung
+  BOT_MAX_STEPS: 600,          // höchstens so viele Schritte je Bild nachholen (5 s), etwa nach dem Hintergrund
 
   // Hockeystop deaktiviert (Tim und Jürgen wollen ihn nicht) — auskommentiert statt gelöscht, physics.js/
   // game.js/render.js haben die zugehörigen Blöcke ebenfalls auskommentiert.

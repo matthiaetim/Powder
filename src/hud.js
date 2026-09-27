@@ -151,10 +151,10 @@ export function createHud(g, doc, hooks = {}) {
   // gewählten), deshalb werden sie beim Öffnen frisch gelesen. Die Vorschauen zeigen den gewählten Fahrer und werden
   // bei einem Fahrerwechsel neu gezeichnet.
   const modesList = $('modes-list');
-  const modeOff = (id) => id === 'duel' && !duelOn; // Duell braucht die Datenbank (BOARD_URL)
+  const modeOff = (id) => id === 'duel' && !duel; // ohne Datenbank (BOARD_URL) bleibt im Duell der Bot
   const bestText = (id) => {
     if (id === 'duel') {
-      if (!duelOn) return 'offline';
+      if (!duelOn) return 'Bot';
       const w = Object.values(loadDuelTally()).reduce((n, e) => n + (e && e.w ? e.w : 0), 0);
       return w > 0 ? (w === 1 ? '1 Sieg' : nf.format(w) + ' Siege') : '–';
     }
@@ -462,7 +462,7 @@ export function createHud(g, doc, hooks = {}) {
       doc.body.dataset.intro = g.state === 'ready' && g.intro && !g.hold ? '1' : '';
       // Bestwert steht fest: die() bzw. finish() lief im Physikschritt davor; das Duell hat keine Liste
       if ((g.state === 'dead' || g.state === 'finished') && boardOn && MODES[g.runMode].board) board.onRunEnd(g);
-      if (pauseSub && g.state === 'paused') pauseSub.textContent = duel && duel.racing() ? 'Die Zeit läuft weiter · Tippen zum Weiterfahren' : pauseDefault;
+      if (pauseSub && g.state === 'paused') pauseSub.textContent = duel && duel.racing() && !duel.vsBot() ? 'Die Zeit läuft weiter · Tippen zum Weiterfahren' : pauseDefault;
     }
     // Hinweis unter dem Fahrer, verschwindet nach SG_NOTE_S (gates.js zählt note.t hoch)
     const note = cs && cs.note && cs.note.t < C.SG_NOTE_S && g.state !== 'finished' ? cs.note : null;
