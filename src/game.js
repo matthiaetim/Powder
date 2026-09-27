@@ -555,21 +555,24 @@ export function selectRider(g, id) {
   saveRider(id);
   return true;
 }
-// Welche Bestweiten der anderen als Linie im Schnee liegen: die BOARD_MARKS_N nächsten Weiten vor dem eigenen Rekord
-// (ohne Rekord ab 0 m, also die leichtesten Ziele), untereinander mindestens BOARD_MARKS_GAP_M auseinander. Aus einem
-// Klumpen bleibt die nähere Weite, das nächste erreichbare Ziel. Gibt es vorn zu wenige (Platz 1 oder kurz davor),
-// füllen die Weiten knapp hinter dem Rekord auf, mit demselben Abstand zu allen Linien. Alle Weiten würden mit
-// wachsender Spielerzahl den Hang zupflastern. Ergebnis Meter absteigend, wie drawMarks (render.js) es erwartet.
+// Welche Bestweiten der anderen als Linie im Schnee liegen: die BOARD_MARKS_N nächsten Weiten hinter dem eigenen Rekord
+// (die Ziele; ohne Rekord ab 0 m, also die leichtesten) und die BOARD_MARKS_N nächsten davor (die Verfolger, die man auf
+// dem Weg zum Rekord noch einmal überholt). Fest je Seite, fehlt eine Seite, füllt die andere nicht auf. Alle Linien
+// liegen mindestens BOARD_MARKS_GAP_M auseinander; aus einem Klumpen bleibt die Weite, die dem Rekord näher liegt.
+// Alle Weiten würden mit wachsender Spielerzahl den Hang zupflastern. Ergebnis Meter absteigend, wie drawMarks
+// (render.js) es erwartet.
 function runMarksFor(g) {
   const all = [...(g.marks[g.mode] || [])].sort((a, b) => a.m - b.m);
   const out = [];
   const free = (m) => out.every((f) => Math.abs(f.m - m) >= C.BOARD_MARKS_GAP_M);
+  let n = 0;
   for (const f of all) {
-    if (out.length >= C.BOARD_MARKS_N) break;
-    if (f.m > g.best && free(f.m)) out.push(f);
+    if (n >= C.BOARD_MARKS_N) break;
+    if (f.m > g.best && free(f.m)) { out.push(f); n++; }
   }
-  for (let i = all.length - 1; i >= 0 && out.length < C.BOARD_MARKS_N; i--) {
-    if (all[i].m <= g.best && free(all[i].m)) out.push(all[i]);
+  n = 0;
+  for (let i = all.length - 1; i >= 0 && n < C.BOARD_MARKS_N; i--) {
+    if (all[i].m <= g.best && free(all[i].m)) { out.push(all[i]); n++; }
   }
   return out.sort((a, b) => b.m - a.m);
 }
