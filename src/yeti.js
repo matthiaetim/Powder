@@ -14,7 +14,8 @@ const nextGap = () => C.YETI_EVERY_MIN + Math.floor(Math.random() * (C.YETI_EVER
 // Beim Start jedes Classic-Laufs: zählt den gespeicherten Abstand herunter und legt, wenn er abgelaufen ist, die Spur.
 // Der Lauf verbraucht sie, auch wenn der Fahrer vorher stürzt. Beim allerersten Mal wird der Abstand erst gewürfelt.
 export function rollYeti(world) {
-  let left = loadYetiIn();
+  // Auf YETI_EVERY_MAX gekappt, damit ein noch unter einem größeren Abstand gespeicherter Rest nicht nachwirkt
+  let left = Math.min(loadYetiIn(), C.YETI_EVERY_MAX);
   if (!(left > 0)) left = nextGap();
   left--;
   if (left > 0) { saveYetiIn(left); return null; }
@@ -22,12 +23,14 @@ export function rollYeti(world) {
   return createYeti(world);
 }
 
-// Länge und Beginn gewürfelt. Das Minimum zweier Zufallszahlen macht frühe Stellen wahrscheinlicher: rund drei
-// Viertel der Spuren beginnen in der ersten Hälfte der Spanne. Die Länge ist Bogenlänge, die Spur endet so
-// spätestens bei YETI_Y_MAX.
+// Länge und Beginn gewürfelt. Das Minimum von YETI_EARLY Zufallszahlen macht frühe Stellen wahrscheinlicher, damit
+// auch Fahrer die Spur finden, die selten weit kommen. Die Länge ist Bogenlänge, die Spur endet so spätestens bei
+// YETI_Y_MAX.
 export function createYeti(world) {
   const len = between(C.YETI_LEN_MIN_M, C.YETI_LEN_MAX_M);
-  const y0 = C.YETI_Y_MIN + (C.YETI_Y_MAX - C.YETI_Y_MIN - len) * Math.min(Math.random(), Math.random());
+  let u = 1;
+  for (let i = 0; i < C.YETI_EARLY; i++) u = Math.min(u, Math.random());
+  const y0 = C.YETI_Y_MIN + (C.YETI_Y_MAX - C.YETI_Y_MIN - len) * u;
   // Der Yeti schlendert um die Korridor-Mitte, bleibt aber mit beiden Füßen im freien Streifen
   const wander = Math.max(0, laneHalf(y0) - C.YETI_GAIT_M - C.YETI_FOOT_W_M);
   const amp = wander * between(0.4, 1), wave = between(25, 60), ph = Math.random() * TAU;

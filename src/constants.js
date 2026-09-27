@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.24.5';
+export const VERSION = '0.24.6';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -246,10 +246,11 @@ export const C = {
 
   // Easter Egg (Classic, yeti.js): Yeti-Spuren. Bewusst ohne Regler und ohne Anzeige im Debug-Overlay, der Zufall
   // soll auch für die Entwickler eine Überraschung bleiben.
-  YETI_EVERY_MIN: 4,         // frühestens jeder 4. Classic-Lauf …
-  YETI_EVERY_MAX: 8,         // … spätestens jeder 8.
-  YETI_Y_MIN: 2000,          // Spanne, in der die Spur liegt; frühe Stellen sind wahrscheinlicher (createYeti)
-  YETI_Y_MAX: 4000,
+  YETI_EVERY_MIN: 2,         // frühestens jeder 2. Classic-Lauf …
+  YETI_EVERY_MAX: 3,         // … spätestens jeder 3.
+  YETI_Y_MIN: 1000,          // Spanne, in der die Spur liegt; weit, damit sie Fahrer jeder Weite treffen kann,
+  YETI_Y_MAX: 10000,         // frühe Stellen sind wahrscheinlicher (createYeti)
+  YETI_EARLY: 3,             // so viele Zufallszahlen, von denen die kleinste den Beginn setzt; mehr = früher
   YETI_LEN_MIN_M: 50,        // Länge der Spur entlang des Wegs
   YETI_LEN_MAX_M: 75,
   YETI_STRIDE_M: 1.8,        // Abstand zweier Abdrücke, größer als ein Mensch
