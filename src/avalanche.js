@@ -3,8 +3,9 @@
 // mit der Differenz auf. Als Fahrertempo wertet sie (AV_DIAG_K) das Tempo entlang der Ski, nicht nur den
 // Höhenverlust, sonst wäre jede Schrägfahrt trotz Tempo ein Einholen. Steht er, kommt sie nach AV_STALL_S an
 // den Bildrand und rollt mit Pace-Tempo heran.
-// Gnade beim Schuss (AV_MERCY_K, Standard aus): fährt er gerade bergab, spielt sie nur einen Teil ihres Tempo-
-// Vorsprungs aus; je stärker die Kurve, desto mehr davon. Der Schneepflug zählt nicht als Schuss.
+// Gnade beim Schuss (AV_MERCY_K): fährt er gerade bergab, spielt sie nur einen Teil ihres Tempo-Vorsprungs aus;
+// je stärker die Kurve, desto mehr davon. Der Schneepflug zählt nicht als Schuss.
+// Startphase (AV_INTRO_M): bis dahin hält holdAvalanche sie sichtbar am oberen Bildrand, danach übernimmt updateAvalanche.
 import { C } from './constants.js';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -30,6 +31,28 @@ export function createAvalanche(skierY) {
 export function paceSpeed(runT) {
   const k = clamp(runT / Math.max(1, C.AV_RAMP_S), 0, 1);
   return (C.AV_PACE0_KMH + (C.AV_PACE1_KMH - C.AV_PACE0_KMH) * k) / 3.6;
+}
+
+// Werte für Anzeige, Ton und Warnschnee aus dem Abstand
+function measure(av, skier, topDist) {
+  av.gap = skier.y - av.frontY;
+  av.near = clamp(1 - av.gap / (topDist + C.AV_LURK_M), 0, 1);
+  av.threat = clamp(1 - av.gap / topDist, 0, 1);
+}
+
+// Startphase: die Front hängt AV_INTRO_IN_M ins Bild und fährt mit dem Fahrer und der Kamera mit. Kein Erwischen und
+// kein Stillstand-Zähler, sonst holte ein Anfahren unter AV_STALL_KMH sie beim Übergang sofort an den Bildrand.
+export function holdAvalanche(av, skier, runT, dt, topDist) {
+  av.t += dt;
+  av.pace = paceSpeed(runT);
+  av.stallT = 0;
+  av.mercy = 0;
+  // Tempo wie der Fahrer hangabwärts, nicht aus dem Positionssprung: der erste Aufruf holt sie von
+  // AV_START_GAP_M an den Bildrand, das wäre sonst ein Riesenwert für Wolkenfluss und Sturz-Schub.
+  av.speed = skier.alive ? Math.max(0, skier.v * Math.cos(skier.theta)) : 0;
+  av.roll += av.speed * dt;
+  av.frontY = skier.y - Math.max(C.AV_CATCH_M + 1, topDist - C.AV_INTRO_IN_M);
+  measure(av, skier, topDist);
 }
 
 // topDist: Abstand vom Fahrer zum oberen Bildrand in m. Gibt true zurück, wenn sie den Fahrer erwischt.
@@ -65,8 +88,6 @@ export function updateAvalanche(av, skier, runT, dt, topDist) {
   av.speed = sp;
   av.frontY += sp * dt;
   av.roll += sp * dt;
-  av.gap = skier.y - av.frontY;
-  av.near = clamp(1 - av.gap / lurk, 0, 1);
-  av.threat = clamp(1 - av.gap / topDist, 0, 1);
+  measure(av, skier, topDist);
   return skier.alive && av.gap <= C.AV_CATCH_M;
 }

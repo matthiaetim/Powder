@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.24.12';
+export const VERSION = '0.25.0';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -76,10 +76,15 @@ export const C = {
   AV_LURK_M: 14,             // (Tuning) Lauerabstand über dem oberen Bildrand, solange der Fahrer schneller ist
   AV_FOLLOW_MS: 3,           // Nachrücken auf den Lauerabstand: so viel schneller als der Fahrer, in m/s
   AV_STALL_KMH: 40,          // (Tuning) darunter gilt der Fahrer als stehend
-  AV_STALL_S: 0.8,           // (Tuning) so lange stehen, dann erscheint die Lawine am Bildrand
+  AV_STALL_S: 0.3,           // (Tuning) so lange stehen, dann erscheint die Lawine am Bildrand
   AV_ENTER_M: 6,             // beim Erscheinen beginnt die Front so weit über dem Bildrand (der Staub stiebt 6 m vor)
   AV_CATCH_M: 0,             // (Tuning) Abstand, bei dem sie den Fahrer erwischt
   AV_START_GAP_M: 60,        // Abstand beim Start des Laufs
+  // Startphase: damit man sieht, wovor man flieht, hängt die Front schon auf dem Startbildschirm AV_INTRO_IN_M ins
+  // Bild und fährt so mit, bis der Fahrer AV_INTRO_M weit ist. Erwischen kann sie in dieser Zeit nicht. Danach gelten
+  // die Regeln oben, und weil der Fahrer dann schneller ist als ihr Pace, rutscht sie von selbst aus dem Bild.
+  AV_INTRO_M: 40,            // (Tuning) so weit fährt sie am Start sichtbar mit, 0 = aus (Verhalten bis v0.24.12)
+  AV_INTRO_IN_M: 5,          // (Tuning) so weit ragt ihre Front dabei über den oberen Bildrand ins Bild
   AV_RUMBLE_PX: 0.5,         // (Tuning) Bildbeben in px, wenn sie nah ist
   // Schrägfahrt: die Front vergleicht ihren Pace nicht mit dem reinen Höhenverlust (Tempo × cos Winkel), sondern
   // mit Höhenverlust plus AV_DIAG_K des Rests bis zum vollen Tempo. Bei 1 zählt das Tempo entlang der Ski, wer
@@ -90,10 +95,10 @@ export const C = {
   // Tempo-Vorsprungs aus. Bei 0 ist die Gnade aus und sie rollt immer mit vollem Pace (Verhalten bis v0.9.1);
   // bei 1 rollt sie beim Schuss AV_MERCY_KMH langsamer als er und fällt zurück (v0.10.0, zu leicht). Je stärker
   // die Kurve, desto weniger Gnade: voll bis AV_MERCY_DEG, keine ab AV_CURVE_DEG. Der Schneepflug zählt nicht als Schuss.
-  AV_MERCY_K: 0,             // (Tuning) Stärke der Gnade, 0 = aus
+  AV_MERCY_K: 0.5,           // (Tuning) Stärke der Gnade, 0 = aus
   AV_MERCY_DEG: 25,          // (Tuning) bis zu diesem Fahrwinkel volle Gnade
-  AV_CURVE_DEG: 60,          // (Tuning) ab diesem Fahrwinkel keine Gnade mehr
-  AV_MERCY_KMH: 5,           // (Tuning) so viel langsamer als der Fahrer rollt sie beim Schuss
+  AV_CURVE_DEG: 65,          // (Tuning) ab diesem Fahrwinkel keine Gnade mehr
+  AV_MERCY_KMH: 27,          // (Tuning) so viel langsamer als der Fahrer rollt sie beim Schuss
   AV_WHITEOUT_DELAY_S: 0.3,  // nach dem Erwischen: kurz die Front über dem Fahrer zeigen, dann Weiß
 
   // Ton (audio.js): Lautstärke gesamt und je Gruppe, 0..1. Fahrtwind und Schneezischen sind ab SND_SPEED_REF_KMH voll.
@@ -414,6 +419,8 @@ export const TUNABLES = [
   { key: 'AV_LURK_M', label: 'Lauert über dem Bild', unit: 'm', min: 0, max: 60, step: 2 },
   { key: 'AV_STALL_S', label: 'Kommt bei Stillstand nach', unit: 's', min: 0.3, max: 5, step: 0.1 },
   { key: 'AV_STALL_KMH', label: 'Stillstand unter', unit: 'km/h', min: 0, max: 80, step: 1 },
+  { key: 'AV_INTRO_M', label: 'Im Bild beim Start für', unit: 'm', min: 0, max: 100, step: 5 },
+  { key: 'AV_INTRO_IN_M', label: 'Ragt beim Start ins Bild', unit: 'm', min: 0, max: 15, step: 1 },
   { key: 'AV_CATCH_M', label: 'Erwischt ab Abstand', unit: 'm', min: 0, max: 6, step: 0.5 },
   { key: 'AV_RUMBLE_PX', label: 'Beben bei Nähe', unit: 'px', min: 0, max: 8, step: 0.5 },
   { key: 'AV_DIAG_K', label: 'Schräg zählt Tempo', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },

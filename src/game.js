@@ -5,7 +5,7 @@
 import { C } from './constants.js';
 import * as P from './physics.js';
 import { createWorld, ensureCells, laneX } from './world.js';
-import { createAvalanche, updateAvalanche } from './avalanche.js';
+import { createAvalanche, updateAvalanche, holdAvalanche } from './avalanche.js';
 import { checkCollision } from './collision.js';
 import { createTrack, clearTrack, pushTrack } from './track.js';
 import { createParticles, clearParticles, spawnParticle, updateParticles } from './particles.js';
@@ -152,6 +152,7 @@ export function update(g, dt, left = 0) {
   switch (g.state) {
     case 'ready':
       g.readyT += dt;
+      if (hasAvalanche(g) && C.AV_INTRO_M > 0) holdAvalanche(g.av, g.skier, 0, dt, topDist(g)); // schon vor dem Start im Bild
       // Super-G wartet im Intro auf den Tipp: der gibt zugleich den Ton frei, sonst wäre der erste Countdown stumm.
       // Im Duell (hold) startet nur der gemeinsame Countdown (beginCount).
       if (!g.hold && g.readyT * 1000 >= g.readyDelayMs && !(isSuperG(g) && g.intro)) launch(g);
@@ -253,7 +254,10 @@ function step(g, dt, left) {
   if (g.graceT > 0) g.graceT = Math.max(0, g.graceT - dt); // Schonfrist nach der Weiterfahrt (Duell)
   const hit = g.graceT > 0 ? null : checkCollision(g.world, s);
   if (hit) { die(g, hit.t === P.TREE ? 'tree' : 'rock', hit); return; }
-  if (hasAvalanche(g) && updateAvalanche(g.av, s, g.runT, dt, topDist(g))) { die(g, 'avalanche'); return; }
+  if (hasAvalanche(g)) {
+    if (g.dist < C.AV_INTRO_M) holdAvalanche(g.av, s, g.runT, dt, topDist(g)); // Startphase: sichtbar, harmlos
+    else if (updateAvalanche(g.av, s, g.runT, dt, topDist(g))) { die(g, 'avalanche'); return; }
+  }
   if (g.course && updateCourse(g.course, s, px, py, g.runT, dt, g.bestSplits, g.onCourse)) finish(g);
 }
 
