@@ -2,7 +2,7 @@
 // durchrechnen kann. Die Tore stehen abwechselnd links und rechts der Pistenmitte (laneX der Welt, in Super-G
 // eine flache Sinuskurve) und abwechselnd rot und blau. Gewertet wird beim Kreuzen der Torlinie: die Position
 // wird auf den Schnittpunkt interpoliert, damit die Wertung nicht vom Zeitschritt abhängt. Dasselbe gilt für
-// Zwischenzeiten und Zielzeit. Alle Zeiten im HUD sind „wirksame“ Zeiten: Laufzeit plus bisherige Strafen, so
+// Zwischenzeiten (an der Torlinie der Zeit-Tore) und Zielzeit. Alle Zeiten im HUD sind „wirksame“ Zeiten: Laufzeit plus bisherige Strafen, so
 // springt die Uhr beim Torfehler sichtbar und die Zwischenzeit sagt, ob man den besten Lauf wirklich schlägt.
 import { C } from './constants.js';
 import { laneX, mulberry32 } from './world.js';
@@ -37,7 +37,7 @@ export function createCourse(seed, w) {
     gates.push({
       i, y, x, half, red,
       side,                   // Seite der Pistenmitte (1 rechts): die Innenstange ist die zur Mitte hin (render.js, Markierung)
-      split: -1,              // Index der Zwischenzeit, deren Tor es ist (erstes Tor hinter der Marke), sonst -1
+      split: -1,              // Index der Zwischenzeit, die an diesem Tor genommen wird, sonst -1
       state: 0,               // 0 offen, 1 durchfahren, 2 verpasst
       hitL: false, hitR: false, hitLo: false, hitRo: false, // Stange schon berührt (je Stange einmal; o = äußere)
       // zwei Render-Objekte je Tor, einmal angelegt: drawWorld sortiert sie mit dem Fahrer nach y
@@ -47,18 +47,14 @@ export function createCourse(seed, w) {
     side = -side;
     y += C.SG_GATE_SPACING_M;
   }
-  // Zwischenzeit-Tore: je Marke das erste Tor dahinter, dort färbt sich die Markierung nach der Zwischenzeit
-  C.SG_SPLITS_M.forEach((m, i) => {
-    const gt = gates.find((g) => g.y >= m);
-    if (gt && gt.split < 0) gt.split = i;
-  });
+  // Zwischenzeit-Tore: jedes SG_SPLIT_EVERY-te ab SG_SPLIT_FIRST, kurz vor dem Ziel keins mehr
+  for (let n = C.SG_SPLIT_FIRST - 1, i = 0; n < gates.length - C.SG_SPLIT_FREE_LAST; n += C.SG_SPLIT_EVERY) gates[n].split = i++;
   return {
     gates, finishY,
     next: 0,                  // Index des nächsten offenen Tors
     misses: 0, penalty: 0,    // verpasste Tore und Strafe in s
     hits: 0,                  // berührte Stangen
-    splits: [], splitNext: 0, // wirksame Zwischenzeiten in Hundertstel, Index der nächsten Marke
-    splitRes: [],             // je Zwischenzeit { kind: 'fast' | 'slow' | '', t: Laufzeit } für die Markierung (render.js)
+    splits: [],               // wirksame Zwischenzeiten in Hundertstel
     finished: false, time: 0, total: 0, // Ziel: reine Laufzeit und Gesamtzeit (mit Strafen) in s
     note: null,               // HUD-Hinweis { kind: 'miss' | 'fast' | 'slow' | 'split', value, t }
     wobbling: [],             // getroffene Stangen, deren Schwingung noch läuft
@@ -74,6 +70,17 @@ export function tickCourse(cs, dt) {
     p.wob += dt;
     if (p.wob >= C.SG_POLE_WOBBLE_S) { p.wob = -1; cs.wobbling.splice(i, 1); }
   }
+}
+
+// Zwischenzeit i an ihrem Tor: wirksame Zeit t (mit Strafen, ein verpasstes Zeit-Tor zählt schon mit) gegen die des
+// besten Laufs. Der Hinweis ersetzt einen Torfehler-Hinweis im selben Tor, die Strafe steckt ja in der Zeit.
+function split(cs, i, t, bestSplits, on) {
+  const cs100 = Math.round(t * 100);
+  cs.splits[i] = cs100;
+  const best = bestSplits && bestSplits[i] > 0 ? bestSplits[i] : 0;
+  const diff = best ? (cs100 - best) / 100 : 0;
+  cs.note = best ? { kind: diff > 0 ? 'slow' : 'fast', value: diff, t: 0 } : { kind: 'split', value: t, t: 0 };
+  if (on) on('split', { i, t, diff, best });
 }
 
 // Ein Physik-Schritt ist gelaufen: (prevX, prevY) ist die Position davor, s die danach, runT die Laufzeit nach
@@ -97,6 +104,7 @@ export function updateCourse(cs, s, prevX, prevY, runT, dt, bestSplits, on) {
       cs.note = { kind: 'miss', value: C.SG_PENALTY_S, t: 0 };
     }
     if (on) on('gate', { ok, i: gt.i });
+    if (gt.split >= 0) split(cs, gt.split, runT - dt * (1 - f) + cs.penalty, bestSplits, on);
     cs.next++;
   }
 
@@ -124,21 +132,6 @@ export function updateCourse(cs, s, prevX, prevY, runT, dt, bestSplits, on) {
       pole.wob = 0;
       if (on) on('pole', { x: px, y: gt.y });
     }
-  }
-
-  // Zwischenzeiten: wirksame Zeit (mit Strafen) gegen die des besten Laufs
-  const marks = C.SG_SPLITS_M;
-  while (cs.splitNext < marks.length && s.y >= marks[cs.splitNext]) {
-    const i = cs.splitNext;
-    const t = runT - dt * (1 - at(marks[i])) + cs.penalty;
-    const cs100 = Math.round(t * 100);
-    cs.splits.push(cs100);
-    const best = bestSplits && bestSplits[i] > 0 ? bestSplits[i] : 0;
-    const diff = best ? (cs100 - best) / 100 : 0;
-    cs.note = best ? { kind: diff > 0 ? 'slow' : 'fast', value: diff, t: 0 } : { kind: 'split', value: t, t: 0 };
-    cs.splitRes[i] = { kind: best ? (diff > 0 ? 'slow' : 'fast') : '', t: runT };
-    if (on) on('split', { i, t, diff, best });
-    cs.splitNext++;
   }
 
   // Ziel

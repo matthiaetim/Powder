@@ -274,26 +274,32 @@ function drawMarks(R, g, ox, oy) {
   }
   const b = g.runBest;
   if (b > 0 && b >= y0 && b <= y1) sprayMark(R, g, ox, oy, b * S + oy, 'Rekord · ' + nf.format(b) + ' m', C.MARK_BEST_RGBA, TAG_RED);
-  if (g.finishM > 0) drawFinishLine(R, g.finishM, oy, y0, y1); // Duell: Zielweite aus dem Raum
+  if (g.finishM > 0) drawFinishLine(R, g.finishM, ox, oy, y0, y1); // Duell: Zielweite aus dem Raum
 }
 
 // Super-G: Startlinie bei 0 und karierte Ziellinie bei SG_FINISH_M statt Meter- und Rekordlinien (die blaue
 // 1000-m-Linie läge genau auf dem Ziel).
 function drawCourseLines(R, g, ox, oy, y0, y1) {
   if (y0 <= 0 && 0 <= y1) sprayMark(R, g, ox, oy, oy, 'Start', C.MARK_RGBA, TAG_WHITE);
-  drawFinishLine(R, g.course.finishY, oy, y0, y1);
+  drawFinishLine(R, g.course.finishY, ox, oy, y0, y1);
 }
 
 // Karierte Ziellinie bei fy mit Schild „Ziel“ (Super-G und Duell). Die Zeit wird auf der Fuge zwischen den beiden
-// Karo-Reihen genommen.
-function drawFinishLine(R, fy, oy, y0, y1) {
-  const { ctx, Sv: S, W } = R;
+// Karo-Reihen genommen. Die Karos liegen fest im Schnee (Welt-x über ox) wie die Sprühlinien, bis v0.24.9 fuhren sie
+// seitlich mit dem Fahrer mit. Kanten auf ganze Gerätepixel gerundet, damit sie beim Verschieben nicht flimmern und
+// zwischen zwei Karos keine Fuge aufblitzt.
+function drawFinishLine(R, fy, ox, oy, y0, y1) {
+  const { ctx, Sv: S, W, dpr } = R;
   const cell = Math.max(4, 0.7 * S);
   if (fy + cell / S < y0 || fy - cell / S > y1) return;
   const sy = fy * S + oy;
+  const px = (v) => Math.round(v * dpr) / dpr;
+  const top = px(sy - cell), mid = px(sy), bot = px(sy + cell);
   ctx.fillStyle = C.FINISH_RGBA;
-  for (let row = 0; row < 2; row++) {
-    for (let i = row; i * cell < W; i += 2) ctx.fillRect(i * cell, sy - cell + row * cell, cell, cell);
+  for (let i = Math.floor(-ox / cell); i * cell + ox < W; i++) {
+    const x0 = px(i * cell + ox), x1 = px((i + 1) * cell + ox);
+    if (i % 2 === 0) ctx.fillRect(x0, top, x1 - x0, mid - top); // obere Reihe: gerade Karos, untere: ungerade
+    else ctx.fillRect(x0, mid, x1 - x0, bot - mid);
   }
   drawTag(ctx, W - 8, sy - cell - 3, 'Ziel', TAG_WHITE);
 }

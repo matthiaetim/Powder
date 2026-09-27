@@ -1,18 +1,17 @@
 // Super-G: gesprühte Markierung an den Innenstangen, wie die Pistencrew sie mit Farbe in den Schnee sprüht. Die
 // Innenstange ist die zur Pistenmitte hin, um sie zieht der Fahrer den Schwung. Um sie liegt ein ovaler Bogen
 // (GM_ARC_*): sein Scheitel zeigt zur Toröffnung, und die Innenkante der Sprühlinie berührt die Stange, der Bogen
-// liegt also zur Pistenmitte hin. An den Zwischenzeit-Toren (gates.js, split) kommen ein Fleck an der Stange und eine
-// waagerechte Linie zur Außenstange dazu; sobald die Zwischenzeit genommen ist, leuchten Bogen, Fleck und Linie mit
-// einem kurzen Puls grün (schneller als der beste Lauf) oder rot (langsamer) auf und bleiben so.
-// Alles einmal als Sprite vorgerendert (je Seite und Farbe), gezeichnet unter der Spur; wo die Ski darüberfahren,
-// verwischt die Farbe wie beim Schriftzug bei 333 m (snow-scrub.js).
+// liegt also zur Pistenmitte hin, etwas blasser (GM_ARC_ALPHA). An den Zwischenzeit-Toren (gates.js, split) kommen
+// ein Fleck an der Stange und eine waagerechte Linie zur Außenstange dazu. Alles bleibt blau: ob man schneller ist,
+// zeigt nur der Hinweis unter dem Fahrer, im Schnee blinkt nichts.
+// Alles einmal als Sprite vorgerendert (je Seite), gezeichnet unter der Spur; wo die Ski darüberfahren, verwischt die
+// Farbe wie beim Schriftzug bei 333 m (snow-scrub.js).
 import { C } from './constants.js';
 import { mulberry32 } from './world.js';
 import { scrubRect } from './snow-scrub.js';
 
 const TAU = Math.PI * 2;
 const D2R = Math.PI / 180;
-const KINDS = ['c', 'f', 's']; // Grundfarbe, schneller, langsamer
 
 function makeCanvas(w, h, dpr) {
   const c = document.createElement('canvas');
@@ -78,29 +77,19 @@ function makeMark(strokes, rgb, seed, dpr) {
   return { img: c, w: x1 - x0, h: y1 - y0, ax: -x0, ay: -y0 };
 }
 
-// Sprites je Maßstab und Torbreite (Regler): arc[mir][kind], extra[mir][kind]
+// Sprites je Maßstab und Torbreite (Regler): arc[mir], extra[mir]
 function spritesFor(R, gateW) {
   const key = R.spriteKey + '|' + gateW;
   if (R.gateMarks && R.gateMarks.key === key) return R.gateMarks;
-  const rgb = { c: C.GM_RGB, f: C.GM_FAST_RGB, s: C.GM_SLOW_RGB };
   const sp = { key, arc: {}, extra: {} };
   for (const mir of [-1, 1]) {
-    sp.arc[mir] = {}; sp.extra[mir] = {};
-    for (const kind of KINDS) {
-      // gleicher Seed je Seite: beim Umfärben bleibt jeder Tupfer, wo er war
-      sp.arc[mir][kind] = makeMark(arcStrokes(R.S, mir), rgb[kind], mir > 0 ? 11 : 23, R.dpr);
-      sp.extra[mir][kind] = makeMark(splitStrokes(R.S, mir, gateW), rgb[kind], mir > 0 ? 37 : 41, R.dpr);
-    }
+    sp.arc[mir] = makeMark(arcStrokes(R.S, mir), C.GM_RGB, mir > 0 ? 11 : 23, R.dpr);
+    sp.extra[mir] = makeMark(splitStrokes(R.S, mir, gateW), C.GM_RGB, mir > 0 ? 37 : 41, R.dpr);
   }
   R.gateMarks = sp;
   return sp;
 }
 
-function blit(ctx, sp, sx, sy, k, alpha) {
-  if (alpha <= 0) return;
-  ctx.globalAlpha = alpha;
-  ctx.drawImage(sp.img, sx - sp.ax * k, sy - sp.ay * k, sp.w * k, sp.h * k);
-}
 
 // rails: Linien des Fahrers für das Verwischen (render.js railsOf)
 export function drawGateMarks(R, g, ox, oy, rails) {
@@ -115,22 +104,13 @@ export function drawGateMarks(R, g, ox, oy, rails) {
     const sx = pole.x * S + ox, sy = pole.y * S + oy;
     if (sy + reach < 0 || sy - reach > H || sx < -W || sx > 2 * W) continue;
     const mir = gt.side > 0 ? 1 : -1;
-    const res = gt.split >= 0 ? cs.splitRes[gt.split] : null;
-    const kind = res && res.kind ? (res.kind === 'fast' ? 'f' : 's') : 'c';
-    // Aufleuchten: in GM_PULSE_S von Hellblau in die Farbe, dabei kurz größer
-    const age = res ? g.runT - res.t : Infinity;
-    const u = kind === 'c' ? 1 : Math.min(1, age / (C.GM_PULSE_S * 0.4));
-    const pulse = kind !== 'c' && age < C.GM_PULSE_S ? 1 + 0.18 * Math.sin((Math.PI * age) / C.GM_PULSE_S) : 1;
-    const kk = k * pulse;
-    const layers = gt.split >= 0 ? [sps.arc[mir], sps.extra[mir]] : [sps.arc[mir]];
-    for (const set of layers) {
-      if (u < 1) blit(ctx, set.c, sx, sy, kk, 1 - u);
-      blit(ctx, set[kind], sx, sy, kk, u);
-    }
-    ctx.globalAlpha = 1;
-    for (const set of layers) {
-      const sp = set[kind];
-      scrubRect(R, g, ox, oy, { x: sx - sp.ax * kk, y: sy - sp.ay * kk, w: sp.w * kk, h: sp.h * kk }, rails);
+    const layers = gt.split >= 0 ? [[sps.arc[mir], C.GM_ARC_ALPHA], [sps.extra[mir], 1]] : [[sps.arc[mir], C.GM_ARC_ALPHA]];
+    for (const [sp, alpha] of layers) {
+      const r = { x: sx - sp.ax * k, y: sy - sp.ay * k, w: sp.w * k, h: sp.h * k };
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(sp.img, r.x, r.y, r.w, r.h);
+      ctx.globalAlpha = 1;
+      scrubRect(R, g, ox, oy, r, rails);
     }
   }
   ctx.globalAlpha = 1;

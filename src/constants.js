@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.24.10';
+export const VERSION = '0.24.11';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -277,7 +277,7 @@ export const C = {
   // (SG_LANE_AMP_M, SG_LANE_WAVE_M): der Korridor der anderen Modi schwingt mit seiner 97-m-Komponente zu schnell,
   // mit Torversatz wären das Bögen über 45°. Die Piste ist SG_PISTE_HALF_M je Seite frei, außen stehen Bäume wie
   // in Classic (Aufprall beendet den Lauf ohne Zeit). Ein verpasstes Tor kostet SG_PENALTY_S, eine berührte Stange
-  // SG_POLE_KMH Tempo, kein Sturz. Zwischenzeiten bei SG_SPLITS_M gegen die Bestzeit. Start mit Countdown
+  // SG_POLE_KMH Tempo, kein Sturz. Zwischenzeiten an jedem SG_SPLIT_EVERY-ten Tor (SG_SPLIT_*) gegen den besten Lauf. Start mit Countdown
   // (SG_COUNT_BEEPS kurze Pieptöne im Abstand SG_COUNT_STEP_S, dann der lange = Go). Nach dem Ziel macht der
   // Fahrer einen Hockeystop (STOP_*), dann kommt die Fresh-Seite.
   SG_FINISH_M: 1000,
@@ -302,7 +302,11 @@ export const C = {
   SG_POLE_WOBBLE_DEG: 60,    // erste Auslenkung
   SG_POLE_WOBBLE_HZ: 3.5,    // Schwingungen pro Sekunde
   SG_POLE_BEND: 0.5,         // Biegung je Bogenmaß Auslenkung, 0 = starre Stange
-  SG_SPLITS_M: [250, 500, 750], // Zwischenzeiten
+  // Zwischenzeiten beim Durchfahren eines Tors: ab Tor SG_SPLIT_FIRST (gezählt ab 1) jedes SG_SPLIT_EVERY-te, die
+  // letzten SG_SPLIT_FREE_LAST Tore ohne. Bei 21 Toren sind das Tor 2, 5, 8, 11, 14 und 17.
+  SG_SPLIT_FIRST: 2,
+  SG_SPLIT_EVERY: 3,
+  SG_SPLIT_FREE_LAST: 2,
   SG_NOTE_S: 2,              // so lange stehen Zwischenzeit und Torfehler im HUD
   SG_COUNT_STEP_S: 1,        // Abstand der Pieptöne im Countdown: echte Sekunden, 3 – 2 – 1 – Go dauert 3 s
   SG_COUNT_BEEPS: 3,         // kurze Pieptöne vor dem Go
@@ -310,18 +314,17 @@ export const C = {
 
   // Markierung an den Innenstangen (gate-marks.js): gesprühter ovaler Bogen, Scheitel an der Stange, Winkel wie auf
   // dem Kompass (0° bergauf, 90° Scheitel zur Toröffnung, 180° talwärts). An den Zwischenzeit-Toren dazu Fleck und
-  // Linie zur Außenstange, die nach der Zwischenzeit grün oder rot aufleuchten (Farben wie --fast/--slow in styles.css).
+  // Linie zur Außenstange. Alles bleibt blau, die Zwischenzeit ändert daran nichts (ab v0.24.11, vorher leuchtete es
+  // grün oder rot auf).
   GM_RGB: '58,210,252',      // #3ad2fc
-  GM_FAST_RGB: '46,125,70',  // #2E7D46
-  GM_SLOW_RGB: '192,52,42',  // #C0342A
   GM_ARC_FROM_DEG: 17,       // Bogen beginnt bergauf …
   GM_ARC_TO_DEG: 172,        // … und läuft talwärts aus
   GM_ARC_W_M: 2.5,           // halbe Breite des Ovals (Scheitel bis Mitte)
   GM_ARC_OVAL: 2.0,          // Höhe zu Breite
-  GM_SPRAY_PX: 10,           // Strichbreite des Bogens
+  GM_SPRAY_PX: 9,            // Strichbreite des Bogens
+  GM_ARC_ALPHA: 0.75,        // Deckkraft des Bogens: blasser als Fleck und Linie, die das Zeit-Tor zeigen
   GM_DOT_PX: 16,             // Fleck an der Stange (Zwischenzeit-Tor)
   GM_LINE_PX: 8,             // Linie zur Außenstange (Zwischenzeit-Tor)
-  GM_PULSE_S: 0.5,           // so lange leuchtet die Markierung nach der Zwischenzeit auf
   SG_FINISH_OVERLAY_MS: 2200, // nach dem Ziel so lange Hockeystop und Wolke, dann die Fresh-Seite (Tipp springt hin)
 
   // Hockeystop nach dem Ziel (Super-G und Duell; hockey.js, hockey-view.js, game.js coast): der Fahrer reißt die Ski

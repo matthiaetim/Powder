@@ -9,7 +9,7 @@ import { createAvalanche, updateAvalanche } from './avalanche.js';
 import { checkCollision } from './collision.js';
 import { createTrack, clearTrack, pushTrack } from './track.js';
 import { createParticles, clearParticles, spawnParticle, updateParticles } from './particles.js';
-import { loadBest, saveBest, loadBestTime, saveBestTime, loadBestSplits, saveBestSplits, loadRider, saveRider, noteRecentMode } from './storage.js';
+import { loadBest, saveBest, loadBestTime, saveBestTime, loadSplitRef, saveSplitRef, loadRider, saveRider, noteRecentMode } from './storage.js';
 import { MODES, DEFAULT_MODE, lowerIsBetter } from './modes.js';
 import { RIDERS, validRider } from './riders.js';
 import { createCourse, updateCourse, tickCourse, crossFrac } from './gates.js';
@@ -34,7 +34,8 @@ export function createGame(opts = {}) {
     runBest: 0, // Bestwert beim Start des Laufs: dort steht die Rekordlinie, auch wenn best beim Aufprall schon steigt
     marks: {}, runMarks: [], // Bestweiten der anderen je Modus (board.js) und der beim Start eingefrorene Satz für die Linien
     runTainted: false,       // Regler mitten im Lauf verstellt: zählt nicht für die Bestenliste (board.js)
-    bestTime: 0, bestSplits: [], newBestTime: false, // Super-G: Bestzeit in Hundertstel, ihre Zwischenzeiten, neue Bestzeit im Lauf
+    bestTime: 0, newBestTime: false, // Super-G: Bestzeit in Hundertstel, neue Bestzeit im Lauf
+    bestSplits: [], splitRefT: 0,    // Zwischenzeiten des schnellsten eigenen Laufs und dessen Gesamtzeit (storage.js)
     seed: 0, fixedSeed: opts.fixedSeed ?? null,
     mode: DEFAULT_MODE, runMode: DEFAULT_MODE, intro: true, readyDelayMs: C.READY_AUTO_START_MS,
     rider: validRider(loadRider()), // Fahrer (riders.js), nur Aussehen und Spur
@@ -82,7 +83,9 @@ function seedFor(g) {
 function loadBests(g) {
   g.best = loadBest(g.mode);
   g.bestTime = loadBestTime(g.mode);
-  g.bestSplits = loadBestSplits(g.mode);
+  const ref = loadSplitRef(g.mode);
+  g.bestSplits = ref.s;
+  g.splitRefT = ref.t;
 }
 
 function emit(g, type, data) {
@@ -327,16 +330,19 @@ export function endRun(g, data) {
   emit(g, 'finish', data);
 }
 
-// Ziel gekreuzt (Super-G): Zeit steht, Bestzeit samt Zwischenzeiten speichern, Fahrer in den Auslauf
+// Ziel gekreuzt (Super-G): Zeit steht, Bestzeit und Zwischenzeiten des schnellsten Laufs speichern, Fahrer in den Auslauf
 function finish(g) {
   const cs = g.course;
   const total = Math.round(cs.total * 100);
   if (g.bestTime === 0 || total < g.bestTime) {
     g.bestTime = total;
-    g.bestSplits = cs.splits.slice();
     g.newBestTime = true;
     saveBestTime(g.runMode, total);
-    saveBestSplits(g.runMode, g.bestSplits);
+  }
+  if (g.splitRefT === 0 || total < g.splitRefT) {
+    g.splitRefT = total;
+    g.bestSplits = cs.splits.slice();
+    saveSplitRef(g.runMode, total, g.bestSplits);
   }
   endRun(g, { total: cs.total, misses: cs.misses, best: g.newBestTime });
 }
@@ -573,14 +579,13 @@ export function setMarks(g, byMode) {
 // Der Server kennt für den eigenen Namen mehr als dieses Gerät (Zweitgerät, gelöschte Daten): lokal übernehmen, damit
 // „Bester Lauf“ und die rote Linie zur Bestenliste passen. Die Linie rückt erst beim nächsten Lauf.
 // Im Super-G ist m die Gesamtzeit in Hundertstel; die Zwischenzeiten des fremden Laufs kennt der Server nicht, darum
-// fallen sie weg (die Hinweise zeigen dann die reine Zwischenzeit, bis ein eigener Lauf die Bestzeit unterbietet).
+// bleibt der Vergleich beim schnellsten Lauf auf diesem Gerät (storage.js).
 export function adoptBest(g, mode, m) {
   if (lowerIsBetter(mode)) {
     const cur = loadBestTime(mode);
     if (!(m >= 1) || (cur > 0 && !(m < cur))) return;
     saveBestTime(mode, m);
-    saveBestSplits(mode, []);
-    if (g.mode === mode) { g.bestTime = m; g.bestSplits = []; g.newBestTime = false; }
+    if (g.mode === mode) { g.bestTime = m; g.newBestTime = false; }
     return;
   }
   if (!(m > loadBest(mode))) return;

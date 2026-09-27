@@ -20,10 +20,13 @@ export function saveBest(mode, v) {
   }
 }
 
-// Super-G: Bestzeit je Modus in ganzen Hundertstelsekunden (0 = keine) und die Zwischenzeiten des besten Laufs
-// (Hundertstel, eine je SG_SPLITS_M), damit das HUD unterwegs den Vergleich zeigen kann.
+// Super-G: Bestzeit je Modus in ganzen Hundertstelsekunden (0 = keine) und die Zwischenzeiten des schnellsten
+// eigenen Laufs mit seiner Gesamtzeit, damit das HUD unterwegs den Vergleich zeigen kann. Die Zwischenzeiten stehen
+// seit v0.24.11 unter eigenem Schlüssel: davor wurden sie an Metermarken genommen, nicht an Toren, und passen nicht
+// mehr. Sie hängen nicht an der Bestzeit: eine vom Server übernommene Bestzeit hat keine Zwischenzeiten, verglichen
+// wird dann weiter gegen den schnellsten Lauf auf diesem Gerät.
 const timeKey = (mode) => 'powder.besttime.' + mode;
-const splitsKey = (mode) => 'powder.bestsplits.' + mode;
+const splitsKey = (mode) => 'powder.splitref.' + mode;
 
 export function loadBestTime(mode) {
   try {
@@ -42,18 +45,21 @@ export function saveBestTime(mode, cs) {
   }
 }
 
-export function loadBestSplits(mode) {
+// { t: Gesamtzeit des Laufs in Hundertstel (0 = keiner), s: seine Zwischenzeiten }
+export function loadSplitRef(mode) {
   try {
-    const arr = JSON.parse(localStorage.getItem(splitsKey(mode)) || '[]');
-    return Array.isArray(arr) ? arr.map((v) => (Number.isFinite(v) && v > 0 ? v : 0)) : [];
+    const ref = JSON.parse(localStorage.getItem(splitsKey(mode)) || '{}');
+    const t = Number.isFinite(ref.t) && ref.t > 0 ? ref.t : 0;
+    const s = t && Array.isArray(ref.s) ? ref.s.map((v) => (Number.isFinite(v) && v > 0 ? v : 0)) : [];
+    return { t, s };
   } catch {
-    return [];
+    return { t: 0, s: [] };
   }
 }
 
-export function saveBestSplits(mode, arr) {
+export function saveSplitRef(mode, t, s) {
   try {
-    localStorage.setItem(splitsKey(mode), JSON.stringify(arr));
+    localStorage.setItem(splitsKey(mode), JSON.stringify({ t, s }));
   } catch {
     /* egal */
   }
