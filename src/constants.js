@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.27.0';
+export const VERSION = '0.27.1';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -196,7 +196,7 @@ export const C = {
   // Duell-Platz, die Regeln lassen nur ihren Besitzer schreiben. AUTH_KEY ist der Web-API-Schlüssel des Projekts
   // (Firebase-Konsole, Projekteinstellungen); er ist öffentlich und kein Geheimnis. Leer = ohne Anmeldung, dann lehnen
   // die neuen Regeln jedes Schreiben ab.
-  AUTH_KEY: '',
+  AUTH_KEY: 'AIzaSyBCnhy5JU77IGhwnn98tr8QUdHxj_C5nLg',
   AUTH_PREFIX: 'https://',   // vor identitytoolkit.googleapis.com/…; Emulator und Mock setzen ihren Host davor
   AUTH_EARLY_S: 300,         // Token (1 h gültig) so lange vor Ablauf erneuern, damit kein Aufruf mit altem Token läuft
   MARK_FRIEND_RGBA: 'rgba(20,20,15,0.35)', // Namenslinien fremder Bestweiten: blasse Tinte, die eigene bleibt rot
