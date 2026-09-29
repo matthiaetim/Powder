@@ -1,11 +1,12 @@
-// Slalom: der orangefarbene Fangzaun am Pistenrand (Wand und Beule: fence.js), nach Jürgens Entwurf. Von oben als Band
-// mit Rautenmuster auf Pfosten, die wie Bäume und Stangen nach oben stehen; er folgt der Pistenmitte (laneX). Das Netz
+// Slalom: der orangefarbene Fangzaun am Pistenrand (Wand und Beule: fence.js), nach Jürgens Entwurf; im Super-G nur
+// der Trichter vor dem Zielbogen. Von oben als Band mit Rautenmuster auf Pfosten, die wie Bäume und Stangen nach oben
+// stehen; er folgt den Innenkanten aus fence.js (fenceAt). Das Netz
 // liegt in Stücken von Pfosten zu Pfosten; nur dort, wo der Fahrer drinhängt, wird es feiner geteilt, damit es sich
 // nach außen beulen kann (weicher Buckel über ±SL_NET_BULGE_M, Tiefe aus fence.js). Die Pfosten geben halb so weit
 // nach. Textur einmal je Maßstab vorgerendert, gezeichnet vor dem Fahrer: wer im Netz hängt, liegt davor.
 import { C } from './constants.js';
-import { laneX } from './world.js';
-import { halfAt } from './fence.js';
+import { cv } from './gates.js';
+import { hasFence, fenceAt } from './fence.js';
 
 const FINE = 4;       // so viele Stücke je Pfostenfeld im Bereich der Beule
 const POST_H_M = 1.2;
@@ -61,13 +62,15 @@ function piece(ctx, img, u0, u1, ax, ay, bx, by, wPx, shadow) {
 
 export function drawFence(R, g, ox, oy) {
   const cs = g.course;
-  if (!cs || !cs.spec.fence) return;
+  if (!cs || !hasFence(cs.spec)) return;
   const { ctx, Sv: S, H } = R;
   const net = netFor(R);
   const w = g.world, P = C.SL_FENCE_POST_M;
-  // Mit Zielstadion endet der Zaun an den Türmen des Zielbogens, dahinter stehen die Banden
+  // Mit Zielstadion endet der Zaun an den Türmen des Zielbogens, dahinter stehen die Banden. Der Trichter (Super-G)
+  // beginnt erst SG_FUNNEL_M vor dem Ziel, am ersten Pfosten dahinter.
   const yEnd = cs.spec.stadium ? cs.finishY : cs.finishY + AFTER_M;
-  const yTop = Math.max(-40, -oy / S - 2), yBot = Math.min(yEnd, (H - oy) / S + POST_H_M + 1);
+  const yStart = cs.spec.fence ? -40 : Math.ceil((cs.finishY - cv(cs.spec, 'funnel')) / P + 1e-6) * P;
+  const yTop = Math.max(yStart, -oy / S - 2), yBot = Math.min(yEnd, (H - oy) / S + POST_H_M + 1);
   if (yBot <= yTop) return;
   // Beule: weicher Buckel um die Lage des Fahrers, nur auf seiner Seite
   const f = cs.fence, B = C.SL_NET_BULGE_M;
@@ -77,9 +80,10 @@ export function drawFence(R, g, ox, oy) {
     const u = (y - f.y) / B;
     return Math.abs(u) < 1 ? f.depth * 0.5 * (1 + Math.cos(Math.PI * u)) : 0;
   };
-  const pt = (y, side) => [(laneX(w, y) + side * (halfAt(cs, y) + bulge(y, side))) * S + ox, y * S + oy];
+  const pt = (y, side) => { const a = fenceAt(cs, w, y); return [(a.c + side * (a.h + bulge(y, side))) * S + ox, y * S + oy]; };
   const nw = C.SL_FENCE_NET_M * S, shadow = `rgba(${C.SHADOW_RGB},0.16)`;
-  for (let ya = Math.floor(yTop / P) * P; ya < yBot; ya += P) {
+  const y0 = Math.floor(yTop / P) * P; // yStart liegt auf einem Pfosten, der Trichter fängt also nicht davor an
+  for (let ya = y0; ya < yBot; ya += P) {
     for (const side of [-1, 1]) {
       const n = live && f.side === side && ya + P > f.y - B && ya < f.y + B ? FINE : 1;
       for (let k = 0; k < n; k++) {
@@ -93,9 +97,10 @@ export function drawFence(R, g, ox, oy) {
   // Pfosten obendrauf, sie geben halb so weit nach wie das Netz
   const pw = Math.max(2, 0.12 * S), ph = POST_H_M * S;
   ctx.fillStyle = C.INK;
-  for (let ya = Math.floor(yTop / P) * P; ya < yBot; ya += P) {
+  for (let ya = y0; ya < yBot; ya += P) {
     for (const side of [-1, 1]) {
-      const px = (laneX(w, ya) + side * (halfAt(cs, ya) + C.SL_FENCE_NET_M / 2 + 0.5 * bulge(ya, side))) * S + ox, py = ya * S + oy;
+      const a = fenceAt(cs, w, ya);
+      const px = (a.c + side * (a.h + C.SL_FENCE_NET_M / 2 + 0.5 * bulge(ya, side))) * S + ox, py = ya * S + oy;
       ctx.fillRect(px - pw / 2, py - ph, pw, ph);
     }
   }

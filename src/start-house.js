@@ -1,4 +1,5 @@
-// Slalom: Starthaus und Starthügel im Bild (der Schub auf dem steilen Stück: game.js startBoost), Idee von Jürgen.
+// Torlauf: Starthaus (Slalom und Super-G) und Starthügel (nur Slalom, der Schub auf dem steilen Stück: game.js
+// startBoost) im Bild, Idee von Jürgen.
 // Das Starthaus steht wie Bäume und Stangen vom Fußpunkt nach oben, knapp oberhalb der Startlinie auf der Pistenmitte,
 // der Fahrer steht im offenen Tor: ein Blockhaus mit verschneitem Satteldach, roten Ortgängen und dem Schild „Start“
 // im Giebel, daneben zwei Fahnenmasten mit Wimpelketten. Über dem Tor läuft die Uhr, rechts steht die Startampel:

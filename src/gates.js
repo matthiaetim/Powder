@@ -15,8 +15,12 @@ const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 // Torlauf-Modi: welche Konstanten (Namen in constants.js) für welchen Modus gelten. Gelesen wird immer frisch aus C
 // (cv), so wirken die Regler im Tuning-Panel sofort und pro Schritt entsteht kein neues Objekt.
 // single: nur eine Kippstange je Tor, außen vorbei; die Ideallinie dazu rechnet guideX.
-// fence: Fangzaun am Pistenrand (fence.js). rhythm: Abschnitte mit eigenem Torabstand und Versatz. ramp, boost:
-// Starthügel (game.js startBoost). house: Starthaus (start-house.js). stadium: Zielstadion (stadium.js).
+// fence: Fangzaun am Pistenrand (fence.js). funnel: nur der Trichter zum Zielbogen auf den letzten Metern, ohne Zaun an
+// der Strecke (fence.js fenceAt). rhythm: Abschnitte mit eigenem Torabstand und Versatz. ramp, boost: Starthügel
+// (game.js startBoost). house: Starthaus (start-house.js). stadium: Zielstadion (stadium.js). atGate: das Stadion
+// steht unter dem letzten Tor statt auf der Pistenmitte (createCourse, arenaX). ad: Name auf den Werbebanden.
+// Der Super-G hat Starthaus und Stadion, aber keinen Starthügel: der Schub machte die Zeiten schneller, und das
+// Stadion steht dort, wo jede Linie durchs letzte Tor ohnehin hinführt. So bleiben die Bestzeiten vergleichbar.
 export const COURSES = {
   superg: {
     finishM: 'SG_FINISH_M', seed: 'SG_SEED', first: 'SG_GATE_FIRST_M', spacing: 'SG_GATE_SPACING_M',
@@ -24,7 +28,8 @@ export const COURSES = {
     laneAmp: 'SG_LANE_AMP_M', laneWave: 'SG_LANE_WAVE_M', pisteHalf: 'SG_PISTE_HALF_M', penalty: 'SG_PENALTY_S',
     poleKmh: 'SG_POLE_KMH', maxKmh: 'SG_MAX_SPEED_KMH', boardKmh: 'BOARD_SG_MAX_AVG_KMH',
     splitFirst: 'SG_SPLIT_FIRST', splitEvery: 'SG_SPLIT_EVERY', splitFreeLast: 'SG_SPLIT_FREE_LAST',
-    rhythm: null, single: false, fence: false, ramp: null, boost: null, house: false, stadium: false,
+    rhythm: null, single: false, fence: false, funnel: 'SG_FUNNEL_M', ramp: null, boost: null, house: true,
+    stadium: true, atGate: true, ad: 'SUPER-G',
   },
   slalom: {
     finishM: 'SL_FINISH_M', seed: 'SL_SEED', first: 'SL_GATE_FIRST_M', spacing: 'SL_GATE_SPACING_M',
@@ -32,7 +37,8 @@ export const COURSES = {
     laneAmp: 'SL_LANE_AMP_M', laneWave: 'SL_LANE_WAVE_M', pisteHalf: 'SL_PISTE_HALF_M', penalty: 'SL_PENALTY_S',
     poleKmh: 'SL_POLE_KMH', maxKmh: 'SL_MAX_SPEED_KMH', boardKmh: 'BOARD_SL_MAX_AVG_KMH',
     splitFirst: 'SL_SPLIT_FIRST', splitEvery: 'SL_SPLIT_EVERY', splitFreeLast: 'SL_SPLIT_FREE_LAST',
-    rhythm: 'SL_RHYTHM', single: true, fence: true, ramp: 'SL_START_RAMP_M', boost: 'SL_START_BOOST', house: true, stadium: true,
+    rhythm: 'SL_RHYTHM', single: true, fence: true, funnel: null, ramp: 'SL_START_RAMP_M', boost: 'SL_START_BOOST',
+    house: true, stadium: true, atGate: false, ad: 'SLALOM',
   },
 };
 export const courseOf = (mode) => COURSES[mode] || null;
@@ -98,7 +104,10 @@ export function createCourse(seed, w, spec = COURSES.superg) {
   return {
     gates, finishY, spec,
     guide: spec.single ? guideOf(gates, w, finishY) : null, // Slalom: Stützpunkte der Ideallinie (guideX)
-    fence: null,              // Slalom: Beule im Fangzaun (fence.js)
+    // Mitte von Zielbogen und Stadion (stadium.js, Trichter in fence.js): Super-G unter der Mitte des letzten Tors,
+    // wer dort durchfährt und geradeaus weiter, trifft den Bogen; Slalom auf der Pistenmitte an der Ziellinie
+    arenaX: spec.atGate && gates.length ? gates[gates.length - 1].x : laneX(w, finishY),
+    fence: null,              // Beule im Fangzaun (fence.js), im Super-G nur am Trichter
     next: 0,                  // Index des nächsten offenen Tors
     misses: 0, penalty: 0,    // verpasste Tore und Strafe in s
     hits: 0,                  // berührte Stangen

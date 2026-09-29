@@ -5,7 +5,7 @@
 // (Grollen, das mit der Nähe lauter und heller wird, Bass, Knacken, Zischen ganz nah, Krachen beim Losbrechen)
 // und Aufprall (kurzer dumpfer Schlag, an der Lawine schwerer). Super-G hat einen eigenen Bus: Pieptöne des
 // Countdowns, Fähnchen beim Durchfahren, Buzzer beim Torfehler, Klacken an der Stange, Doppelton im Ziel.
-// Das Zielstadion im Slalom hat den Bus crowd: Publikum als Rauschen mit zwei Formanten, das mit der Stimmung
+// Das Zielstadion (Slalom, Super-G) hat den Bus crowd: Publikum als Rauschen mit zwei Formanten, das mit der Stimmung
 // anschwillt, Kuhglocken, im Ziel ein Aufbrüllen mit Tröte. Am Starthaus klackt beim Go der Startbügel.
 // iOS gibt Ton erst nach einer Berührung frei: der Kontext entsteht beim ersten Tipp, davor bleibt alles still.
 // Beim Verlassen der App (Heimgeste, App-Umschalter, Sperrtaste, Tab-Wechsel) blendet der Ton aus, bevor er angehalten
@@ -385,7 +385,7 @@ export function createSound(g) {
         if (d && d.kipp) { shot(n.race, 'bandpass', 2300, 5, 0.5, 0.001, 0.03); thud(n.race, 'triangle', 1100, 420, 0.03, 0.28, 0.05); }
         else { shot(n.race, 'bandpass', 1400, 3, 0.6, 0.002, 0.05); thud(n.race, 'triangle', 700, 250, 0.05, 0.3, 0.08); }
         break;
-      // Fangzaun (Slalom): das Netz fängt dumpf und raschelt nach, lauter bei mehr Tempo
+      // Fangzaun (Slalom, Trichter im Super-G): das Netz fängt dumpf und raschelt nach, lauter bei mehr Tempo
       case 'fence': {
         const k = clamp(d.v / 18, 0.35, 1);
         thud(n.fx, 'sine', 170, 60, 0.12, 0.5 * k, 0.22);

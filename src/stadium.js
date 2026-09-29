@@ -1,12 +1,14 @@
-// Zielstadion (Slalom; stadium-view.js zeichnet es), Idee und erste Fassung von Jürgen. Bis zur Ziellinie bleibt die
-// Piste beim Fangzaun, der sich auf den letzten Metern trichterförmig auf den Zielbogen verengt (fence.js halfAt). Erst
+// Zielstadion (Slalom und Super-G; stadium-view.js zeichnet es), Idee und erste Fassung von Jürgen. Bis zur Ziellinie
+// bleibt die Piste beim Fangzaun, der sich auf den letzten Metern trichterförmig auf den Zielbogen verengt (fence.js
+// fenceAt; im Super-G steht nur dieser Trichter, und der Bogen steht unter dem letzten Tor, gates.js arenaX). Erst
 // hinter der Linie beginnt das Stadion: ein Zielraum von STAD_FIN_HALF_M je Seite zwischen Werbebanden, dahinter
 // Stehplätze und Tribünen, unten geschlossen durch einen Halbkreis um (cx, yc). Der Fahrer gleitet nach dem Ziel
 // hinein (glide) und macht den Hockeystop so, dass er in der Mitte des Runds steht (game.js coast, hockey.js).
 // Reines Modul ohne DOM wie gates.js: Lage, Publikum, Stimmung (hype), La Ola, Blitzlichter und Konfetti. Eigener
 // Zufallsstrom, Welt und Tore bleiben unberührt. Bäume und Felsen im Stadion räumt die Welt weg (clearsWorld).
 import { C } from './constants.js';
-import { laneX, mulberry32 } from './world.js';
+import { mulberry32 } from './world.js';
+import { cv } from './gates.js';
 
 const SALT = 0x5354; // „ST“
 const TAU = Math.PI * 2;
@@ -24,10 +26,13 @@ export function rings() {
   return { fin, standIn, tribIn, tribOut };
 }
 
-export function createStadium(cs, w) {
+export function createStadium(cs) {
   const fy = cs.finishY, rg = rings();
+  const spec = cs.spec;
   const st = {
-    fy, cx: laneX(w, fy), // ab der Ziellinie läuft alles gerade
+    fy, cx: cs.arenaX, // ab der Ziellinie läuft alles gerade
+    funnel: spec.funnel ? cv(spec, 'funnel') : C.STAD_FUNNEL_M, // so weit vor der Linie beginnt der Trichter
+    ad: spec.ad,       // Name auf den Werbebanden (stadium-view.js)
     yc: fy + C.STAD_BOWL_M, // Mittelpunkt des Runds, dort steht der Fahrer am Ende
     ...rg,
     y1: fy + C.STAD_BOWL_M + rg.tribOut + 1,
@@ -44,7 +49,7 @@ export function createStadium(cs, w) {
 
 // Welt (world.js): Hindernisse im Stadion und im Trichter davor weglassen
 export function clearsWorld(st, x, y, r) {
-  if (y < st.fy - C.STAD_FUNNEL_M - 6 || y > st.y1 + 3) return false;
+  if (y < st.fy - st.funnel - 6 || y > st.y1 + 3) return false;
   if (y > st.yc) return Math.hypot(x - st.cx, y - st.yc) < st.tribOut + 4.5 + r; // Bäume ragen nach oben ins Bild
   return Math.abs(x - st.cx) < st.tribOut + 2.5 + r + (y < st.fy ? 4 : 0); // vor dem Ziel schwingt die Piste noch
 }
@@ -117,11 +122,17 @@ export function stopDist(v) {
 
 // Auslauf nach dem Ziel, ein Schritt: der Fahrer richtet sich auf die Mitte des Runds aus und gleitet, etwas gebremst,
 // aber nie langsamer als STAD_GLIDE_MIN, sonst käme ein langsamer Zieleinlauf nie an. Gibt true zurück, sobald der
-// Rest genau für den Hockeystop reicht: dann übernimmt hockey.js.
+// Rest genau für den Hockeystop reicht: dann übernimmt hockey.js, und der Stopp rutscht genau auf die Mitte zu. Aus
+// Super-G-Tempo braucht der Stopp schon fast das ganze Rund, zum Ausrichten bleiben nur ein paar Meter; ohne das
+// letzte Nachführen endete er schief oder hinter der Bande. Im Slalom ist er nach dem langen Gleiten längst ausgerichtet.
 export function glide(st, s, dt) {
   const dx = st.cx - s.x, dy = st.yc - s.y;
   const rest = Math.hypot(dx, dy);
-  if (rest <= stopDist(s.v) + 0.05 || dy <= 0.3) { st.gliding = false; return true; }
+  if (rest <= stopDist(s.v) + 0.05 || dy <= 0.3) {
+    if (dy > 0.3) s.theta = Math.atan2(dx, dy);
+    st.gliding = false;
+    return true;
+  }
   const aim = Math.atan2(dx, dy);
   s.theta += (aim - s.theta) * (1 - Math.exp(-dt / C.STAD_AIM_S));
   s.omega = 0;

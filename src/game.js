@@ -13,7 +13,7 @@ import { loadBest, saveBest, loadBestTime, saveBestTime, loadSplitRef, saveSplit
 import { MODES, DEFAULT_MODE, lowerIsBetter } from './modes.js';
 import { RIDERS, validRider } from './riders.js';
 import { createCourse, updateCourse, tickCourse, crossFrac, courseOf, cv } from './gates.js';
-import { fenceClamp, fenceRelax } from './fence.js';
+import { hasFence, fenceClamp, fenceRelax } from './fence.js';
 import { rollYeti, updateYeti } from './yeti.js';
 import { startStop, speedAt, distAt, headingAt, stopClock } from './hockey.js';
 import { createStadium, updateStadium, clearsWorld, glide, partying } from './stadium.js';
@@ -29,7 +29,7 @@ export function createGame(opts = {}) {
     state: 'ready',
     skier: P.createSkier(), world: null, av: null,
     course: null, // Torlauf (Super-G, Slalom): Tore und Wertung (gates.js), in den anderen Modi null
-    stadium: null, // Slalom: Zielstadion (stadium.js)
+    stadium: null, // Torlauf: Zielstadion (stadium.js)
     yeti: null,   // Classic: Yeti-Spuren (yeti.js), nur in manchen Läufen
     summitT: -1,  // Classic: Laufzeit beim Erreichen der Everest-Höhe (HUD zeigt kurz „Everest“), < 0 = noch nicht
     track: createTrack(), particles: createParticles(),
@@ -114,7 +114,7 @@ export function reset(g, seed, intro) {
     : createWorld(seed);
   g.course = spec ? createCourse(seed, g.world, spec) : null;
   // Zielstadion: räumt seine Fläche in der Welt frei, bevor ensureView die ersten Zellen baut
-  const sd = g.stadium = spec && spec.stadium ? createStadium(g.course, g.world) : null;
+  const sd = g.stadium = spec && spec.stadium ? createStadium(g.course) : null;
   if (sd) g.world.clear = (x, y, r) => clearsWorld(sd, x, y, r);
   g.av = createAvalanche(0);
   g.yeti = null;
@@ -249,7 +249,7 @@ function step(g, dt, left) {
   // const wasHockey = s.hockeyT >= 0;
   P.updateSkier(s, dt, maxKmh(g));
   if (g.course && g.course.spec.ramp) startBoost(g, s, dt);
-  if (g.course && g.course.spec.fence && fenceClamp(g.course, g.world, s, dt)) emit(g, 'fence', { v: s.v });
+  if (g.course && hasFence(g.course.spec) && fenceClamp(g.course, g.world, s, dt)) emit(g, 'fence', { v: s.v });
   // if (!wasHockey && s.hockeyT >= 0) hockeyStop(g);
   // if (g.fogT >= 0) {
   //   g.fogT += dt;
@@ -316,11 +316,11 @@ function advanceTrail(g, dt) {
   updateParticles(g.particles, dt);
 }
 
-// Nach dem Ziel (Super-G und Duell): Hockeystop (hockey.js). Die Ski kommen schnell quer, der Fahrer rutscht in der
+// Nach dem Ziel (Torlauf und Duell): Hockeystop (hockey.js). Die Ski kommen schnell quer, der Fahrer rutscht in der
 // alten Fahrtrichtung weiter und steht nach knapp einer Sekunde; Lage, Tempo und Stellung folgen geschlossen aus
 // g.finT. Die Spur wird zur breiten Bremsspur (Pflug-Band quer zur Fahrt, siehe drawTrack); das normale Spray
 // entfällt, den Schnee übernimmt die Wolke (hockey-view.js). Hindernisse zählen nicht mehr, der Lauf ist gewertet.
-// Im Zielstadion (Slalom) gleitet er vorher ins Rund (stadium.js glide), der Hockeystop beginnt so, dass er in der
+// Im Zielstadion (Torlauf) gleitet er vorher ins Rund (stadium.js glide), der Hockeystop beginnt so, dass er in der
 // Mitte steht.
 function coast(g, dt) {
   const s = g.skier, sd = g.stadium;
@@ -348,7 +348,7 @@ function coast(g, dt) {
   s.plowK *= Math.exp(-dt / C.PLOW_EASE_S);
   if (g.course) {
     tickCourse(g.course, dt); // Stangen schwingen aus, Hinweis läuft ab (im Duell gibt es keinen Kurs)
-    if (g.course.spec.fence) fenceRelax(g.course, dt); // die Beule im Fangzaun schwingt aus
+    if (hasFence(g.course.spec)) fenceRelax(g.course, dt); // die Beule im Fangzaun schwingt aus
   }
   if (s.y - s.y0 > g.dist) g.dist = s.y - s.y0;
   updateCamera(g, dt);

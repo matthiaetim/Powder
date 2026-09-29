@@ -264,19 +264,19 @@ export function draw(R, g, t) {
   if (g.course) {
     // Farbe im Schnee, die Ski verwischen sie: Bögen an den Innenstangen (Super-G), Bögen an den Kippstangen (Slalom)
     drawStartRamp(R, g, ox, oy, railsOf(g.rider)); // Slalom: Starthügel
-    drawStadiumGround(R, g, ox, oy, railsOf(g.rider)); // Slalom: Schatten und Schriftzug im Zielraum
+    drawStadiumGround(R, g, ox, oy, railsOf(g.rider)); // Schatten und Schriftzug im Zielraum
     drawGateMarks(R, g, ox, oy, railsOf(g.rider));
     drawGuide(R, g, ox, oy, railsOf(g.rider));
   }
   drawTrack(R, g, ox, oy);
   if (g.course) {
-    drawFence(R, g, ox, oy); // Slalom: Fangzaun am Pistenrand
-    drawStadium(R, g, ox, oy, t); // Slalom: Ränge, Banden und Publikum des Zielstadions
-    drawStartHouse(R, g, ox, oy, t); // Slalom: Starthaus oberhalb der Linie, der Fahrer steht davor
+    drawFence(R, g, ox, oy); // Fangzaun am Pistenrand (Slalom), Trichter vor dem Ziel (Super-G)
+    drawStadium(R, g, ox, oy, t); // Ränge, Banden und Publikum des Zielstadions
+    drawStartHouse(R, g, ox, oy, t); // Starthaus oberhalb der Linie, der Fahrer steht davor
   }
   drawWorld(R, g, ox, oy);
   if (g.state === 'finished') drawHockey(R, g, ox, oy); // Hockeystop-Wolke über dem Fahrer
-  if (g.course) drawStadiumOver(R, g, ox, oy); // Slalom: Zielbogen, Blitzlichter und Konfetti über dem Fahrer
+  if (g.course) drawStadiumOver(R, g, ox, oy); // Zielbogen, Blitzlichter und Konfetti über dem Fahrer
   // drawHockeyFog(R, g, ox, oy); // Hockeystop deaktiviert
   drawParticles(R, g, ox, oy);
   if (g.ghost.on) drawDuelTags(R, g, ox, oy);
@@ -317,7 +317,7 @@ function drawMarks(R, g, ox, oy) {
 
 // Torlauf: Startlinie bei 0 und karierte Ziellinie am Ende des Kurses statt Meter- und Rekordlinien (die blaue
 // 1000-m-Linie läge im Super-G genau auf dem Ziel).
-// Im Slalom stehen Starthaus und Zielbogen für die Schilder, die Ziellinie liegt nur zwischen den Türmen des Bogens.
+// Starthaus und Zielbogen stehen für die Schilder, die Ziellinie liegt nur zwischen den Türmen des Bogens.
 function drawCourseLines(R, g, ox, oy, y0, y1) {
   const spec = g.course.spec, sd = g.stadium;
   if (y0 <= 0 && 0 <= y1) sprayMark(R, g, ox, oy, oy, spec.house ? '' : t('sign.start'), C.MARK_RGBA, TAG_WHITE);
@@ -328,7 +328,7 @@ function drawCourseLines(R, g, ox, oy, y0, y1) {
 // Karo-Reihen genommen. Die Karos liegen fest im Schnee (Welt-x über ox) wie die Sprühlinien, bis v0.24.9 fuhren sie
 // seitlich mit dem Fahrer mit. Kanten auf ganze Gerätepixel gerundet, damit sie beim Verschieben nicht flimmern und
 // zwischen zwei Karos keine Fuge aufblitzt.
-// span: [x0, x1] in Welt-Metern begrenzt die Linie (Zielbogen im Slalom), dann ohne Schild.
+// span: [x0, x1] in Welt-Metern begrenzt die Linie (Zielbogen im Torlauf), dann ohne Schild.
 function drawFinishLine(R, fy, ox, oy, y0, y1, span = null) {
   const { ctx, Sv: S, W, dpr } = R;
   const cell = Math.max(4, 0.7 * S);

@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.27.6';
+export const VERSION = '0.27.7';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -302,8 +302,9 @@ export const C = {
   // mit Torversatz wären das Bögen über 45°. Die Piste ist SG_PISTE_HALF_M je Seite frei, außen stehen Bäume wie
   // in Classic (Aufprall beendet den Lauf ohne Zeit). Ein verpasstes Tor kostet SG_PENALTY_S, eine berührte Stange
   // SG_POLE_KMH Tempo, kein Sturz. Zwischenzeiten an jedem SG_SPLIT_EVERY-ten Tor (SG_SPLIT_*) gegen den besten Lauf. Start mit Countdown
-  // (SG_COUNT_BEEPS kurze Pieptöne im Abstand SG_COUNT_STEP_S, dann der lange = Go). Nach dem Ziel macht der
-  // Fahrer einen Hockeystop (STOP_*), dann kommt die Fresh-Seite.
+  // (SG_COUNT_BEEPS kurze Pieptöne im Abstand SG_COUNT_STEP_S, dann der lange = Go) im Starthaus, aber ohne den
+  // Starthügel des Slaloms: sein Schub machte die Zeiten schneller als die der Bestenliste. Im Ziel wartet das
+  // Zielstadion wie im Slalom, dort macht der Fahrer den Hockeystop (STOP_*), dann kommt die Fresh-Seite.
   SG_FINISH_M: 1000,
   SG_SEED: 20260925,         // fester Kurs
   SG_GATE_FIRST_M: 50,
@@ -312,6 +313,10 @@ export const C = {
   SG_GATE_OFFSET_M: 10,      // (Tuning) Versatz der Tore zur Pistenmitte, abwechselnd links und rechts
   SG_GATE_JITTER: 0.5,       // zufälliger Anteil am Versatz: jedes Tor steht bei 50–100 % des vollen Versatzes
   SG_LAST_GATE_GAP_M: 30,    // so weit steht das letzte Tor mindestens vor dem Ziel
+  // Trichter zum Zielbogen: im Super-G gibt es keinen Fangzaun an der Strecke, nur auf den letzten SG_FUNNEL_M läuft
+  // das Netz von den Pistenrändern auf den Zielbogen zu. Nie länger als SG_LAST_GATE_GAP_M, sonst stünde es am letzten
+  // Tor. Länger als im Slalom (STAD_FUNNEL_M), bei gut 200 km/h ist die Strecke sonst in einem Wimpernschlag vorbei.
+  SG_FUNNEL_M: 30,
   SG_LANE_AMP_M: 8,          // Pistenmitte: Amplitude der Sinuskurve
   SG_LANE_WAVE_M: 400,       // Pistenmitte: Wellenlänge
   SG_PISTE_HALF_M: 17,       // (Tuning) freie Piste je Seite der Mitte, außerhalb Bäume und Felsen
@@ -431,13 +436,15 @@ export const C = {
   SH_LAMP_RED: '#E5392E', SH_LAMP_GREEN: '#2FB457', SH_LAMP_OFF: '#4A4A52',
   SH_RAMP_RGB: '120,150,185', // Schattierung des Starthügels
 
-  // Zielstadion (nur Slalom; stadium.js, stadium-view.js, nach Jürgens Entwurf): der Fangzaun verengt sich auf den
-  // letzten STAD_FUNNEL_M auf den Zielbogen, hinter der Ziellinie liegt der Zielraum zwischen Werbebanden, Stehplätzen
-  // und Tribünen, unten im Halbkreis geschlossen. Vor der Linie steht kein Publikum: man soll sehen, wo das Ziel ist.
+  // Zielstadion (Slalom und Super-G; stadium.js, stadium-view.js, nach Jürgens Entwurf): der Fangzaun verengt sich auf
+  // den letzten STAD_FUNNEL_M (Super-G: SG_FUNNEL_M) auf den Zielbogen, hinter der Ziellinie liegt der Zielraum zwischen
+  // Werbebanden, Stehplätzen und Tribünen, unten im Halbkreis geschlossen. Vor der Linie steht kein Publikum: man soll
+  // sehen, wo das Ziel ist.
   STAD_FIN_HALF_M: 7,        // halbe Breite von Zielbogen und Zielraum (Innenkante der Bande)
   STAD_FUNNEL_M: 18,         // so weit vor dem Ziel beginnt der Trichter …
   STAD_FUNNEL_END_M: 3,      // … und so weit vor dem Ziel ist er zu
-  STAD_BOWL_M: 26,           // Mitte des Runds hinter der Ziellinie: dort steht der Fahrer nach dem Hockeystop
+  STAD_BOWL_M: 26,           // Mitte des Runds hinter der Ziellinie: dort steht der Fahrer nach dem Hockeystop; der
+                             // Stopp aus 240 km/h (SG_MAX_SPEED_KMH) braucht gut 24 m, er passt also noch hinein
   STAD_AIM_S: 0.3,           // Auslauf: so schnell richtet er sich auf die Mitte aus
   STAD_GLIDE_DECEL: 2,       // m/s²: so viel Tempo verliert er beim Gleiten
   STAD_GLIDE_MIN: 9,         // m/s: langsamer gleitet niemand ins Rund
@@ -475,15 +482,16 @@ export const C = {
   STAD_SKIN: ['#F2C9A5', '#E0A97E', '#B87B52', '#8A5A3B'],
   STAD_CONFETTI_RGB: ['#C0342A', '#3568B5', '#FFD84A', '#FF7A1A', '#2FB457', '#F4F3EF'],
   STAD_STEP: '#D9E2EC', STAD_STEP_DARK: '#B9C6D4', // Stufen der Tribüne
-  // Werbebanden: [Text, Grund, Schrift]; später lassen sich hier echte Partner einsetzen
+  // Werbebanden: [Text, Grund, Schrift]; später lassen sich hier echte Partner einsetzen. Text null: der Name des
+  // Torlaufs (gates.js COURSES, ad), SLALOM oder SUPER-G
   STAD_ADS: [
-    ['POWDER', '#F4F3EF', '#C0342A'], ['FRESH', '#14140F', '#FFD84A'], ['SLALOM', '#3568B5', '#F4F3EF'],
+    ['POWDER', '#F4F3EF', '#C0342A'], ['FRESH', '#14140F', '#FFD84A'], [null, '#3568B5', '#F4F3EF'],
     ['HOPP HOPP', '#FFD84A', '#14140F'], ['POWDER', '#C0342A', '#F4F3EF'],
   ],
   FENCE_NET: '#FF7A1A',      // Netz
   FENCE_NET_RGB: '255,122,26',
   FENCE_EDGE: '#E8620C',     // Ober- und Unterkante
-  SG_FINISH_OVERLAY_MS: 2200, // nach dem Ziel so lange Hockeystop und Wolke, dann die Fresh-Seite (Tipp springt hin)
+  SG_FINISH_OVERLAY_MS: 2200, // ohne Zielstadion (Duell): nach dem Ziel so lange Hockeystop und Wolke, dann die Fresh-Seite (Tipp springt hin)
 
   // Hockeystop nach dem Ziel (Super-G und Duell; hockey.js, hockey-view.js, game.js coast): der Fahrer reißt die Ski
   // quer zu der Seite, zu der er lehnt (Zeitkonstante STOP_TURN_S), rutscht in der alten Fahrtrichtung weiter und

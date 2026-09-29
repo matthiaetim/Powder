@@ -1,4 +1,4 @@
-// Slalom: das Zielstadion im Bild (Lage, Publikum und Stimmung: stadium.js), Idee und erste Fassung von Jürgen.
+// Torlauf: das Zielstadion im Bild (Lage, Publikum und Stimmung: stadium.js), Idee und erste Fassung von Jürgen.
 // Drei Schichten, damit der Fahrer richtig dazwischen liegt (render.js draw):
 //   drawStadiumGround  auf dem Schnee, unter der Spur: Schatten des Zielbogens, Schriftzug im Zielraum
 //   drawStadium        nach der Spur, vor dem Fahrer: Tribüne, Werbebanden, Publikum, Videowand, Fahnen
@@ -131,7 +131,7 @@ function buildBase(R, st) {
   const cy = v0 + B * q;
   let n = 0;
   const panel = (path, tx, ty, rot, lenM) => {
-    const [text, bg, fg] = C.STAD_ADS[n++ % C.STAD_ADS.length];
+    const [ad, bg, fg] = C.STAD_ADS[n++ % C.STAD_ADS.length], text = ad ?? st.ad;
     path(); x.fillStyle = bg; x.fill();
     x.strokeStyle = C.INK; x.lineWidth = ol; x.stroke();
     x.save();
@@ -293,7 +293,7 @@ function buildArch(R, st) {
 
 // Bilder je Maßstab, Schrift und Sprache. all: alles sofort (das Stadion ist schon im Bild), sonst je Aufruf ein Teil.
 function assets(R, st, all) {
-  const key = [R.spriteKey, R.fontReady ? 1 : 0, getLang(), C.STAD_FIN_HALF_M, C.STAD_BOWL_M].join('|');
+  const key = [R.spriteKey, R.fontReady ? 1 : 0, getLang(), C.STAD_FIN_HALF_M, C.STAD_BOWL_M, st.ad].join('|');
   if (!R.stadium || R.stadium.key !== key) R.stadium = { key, fans: null, base: null, arch: null };
   const A = R.stadium;
   const steps = [['fans', () => buildFans(R)], ['arch', () => buildArch(R, st)], ['base', () => buildBase(R, st)]];
