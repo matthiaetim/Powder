@@ -103,8 +103,8 @@ button {
 #hud-speed { font-size: 17px; opacity: 0.75; }
 #hud-dist { font-size: 32px; }
 #hud-time { font-size: 32px; display: none; }
-body[data-mode="superg"] #hud-time, body[data-mode="duel"] #hud-time { display: block; }
-body[data-mode="superg"] #hud-dist, body[data-mode="duel"] #hud-dist { font-size: 17px; opacity: 0.75; }
+body[data-mode="superg"] #hud-time, body[data-mode="slalom"] #hud-time, body[data-mode="duel"] #hud-time { display: block; }
+body[data-mode="superg"] #hud-dist, body[data-mode="slalom"] #hud-dist, body[data-mode="duel"] #hud-dist { font-size: 17px; opacity: 0.75; }
 /* Duell: Zeile für den Gegner (Abstand, Vorgabe), rot wenn er vorn liegt, grün wenn er zurückliegt */
 #hud-opp { font-size: 17px; opacity: 0.75; }
 #hud-opp:empty { display: none; }

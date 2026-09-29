@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.27.5';
+export const VERSION = '0.27.6';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -110,7 +110,8 @@ export const C = {
   SND_SKI: 0.8,              // (Tuning) Ski: Zischen, Kanten, Kratzen
   SND_AV: 0.5,               // (Tuning) Lawine
   SND_CRASH: 0.75,           // (Tuning) Aufprall
-  SND_RACE: 0.65,            // (Tuning) Super-G: Countdown, Tore, Stangen, Ziel
+  SND_RACE: 0.65,            // (Tuning) Rennen (Super-G, Slalom, Duell): Countdown, Tore, Stangen, Ziel
+  SND_CROWD: 0.6,            // (Tuning) Publikum im Zielstadion (Slalom): Raunen, Kuhglocken, Jubel
   SND_SPEED_REF_KMH: 150,
   // App verlassen (audio.js): iOS hält die Seite beim Schließen an und spielt den letzten Rest im Ausgabepuffer kurz in
   // Schleife, das klingt verzerrt. Darum geht der Ausgang beim ersten Anzeichen fürs Verlassen schnell auf null, erst
@@ -190,6 +191,7 @@ export const C = {
   // steil bergab (echt bis 144 km/h), dort gilt fast das Endtempo. Die Regeln tragen die Werte in m/s und s.
   BOARD_MAX_AVG_KMH: 150,
   BOARD_SG_MAX_AVG_KMH: 185,
+  BOARD_SL_MAX_AVG_KMH: 80,  // Slalom: schneller als sein Endtempo (SL_MAX_SPEED_KMH) geht es nicht
 
   // Anmeldung (auth.js): anonymes Firebase-Konto je Gerät per REST ohne SDK. Die uid steht in jedem Eintrag und jedem
   // Duell-Platz, die Regeln lassen nur ihren Besitzer schreiben. AUTH_KEY ist der Web-API-Schlüssel des Projekts
@@ -347,6 +349,140 @@ export const C = {
   GM_ARC_ALPHA: 0.75,        // Deckkraft des Bogens: blasser als Fleck und Linie, die das Zeit-Tor zeigen
   GM_DOT_PX: 16,             // Fleck an der Stange (Zwischenzeit-Tor)
   GM_LINE_PX: 8,             // Linie zur Außenstange (Zwischenzeit-Tor)
+  // Slalom (nur slalom; gates.js COURSES wählt die Werte, Ablauf wie im Super-G: Countdown, Torwertung, Zwischenzeiten,
+  // Ziel mit Hockeystop): kurz und eng, SL_FINISH_M mit einzelnen Kippstangen, abwechselnd rot und blau und links und
+  // rechts der Pistenmitte. Gewertet ist das Tor, wenn der Fahrer außen an der Stange vorbeifährt. Die Stangen stehen
+  // weit genug auseinander, dass man richtig wedeln muss (bei Jürgens Entwurf standen sie fast in einer Linie); der
+  // Rhythmus wechselt zwischen eng, normal und weit. Eigener fester Kurs und eigene Bestenliste (Zeit).
+  SL_FINISH_M: 500,
+  SL_SEED: 20260929,         // fester Kurs
+  SL_GATE_FIRST_M: 40,
+  SL_GATE_SPACING_M: 15,     // (Tuning) Grundabstand der Tore, SL_RHYTHM staucht oder streckt ihn je Abschnitt
+  SL_POLE_OFFSET_M: 1.8,     // (Tuning) Grundabstand der Stange zur Pistenmitte, je Abschnitt mal SL_RHYTHM
+  // Rhythmus: Abschnitte ab Meter y mit Faktoren auf Torabstand und Stangenversatz. Abstand und Versatz wachsen
+  // zusammen, damit der Fahrwinkel in jedem Abschnitt ähnlich bleibt: eng (ab 110 m und ab 345 m, rund 11 m / 1,2 m)
+  // heißt schnelle kurze Schwünge, weit (ab 165 m und ab 395 m, rund 20 m / 2,6 m) lange runde Bögen. Vertikale (ab
+  // 225 m): Stangen fast in einer Linie, ein kurzer schneller Durchschlupf. Im Streifen um das Schild bei SIGN_Y_M
+  // stehen keine Tore (createCourse). Die Regler verschieben alles mit. Durchgerechnet mit einem Piloten, der die
+  // echte Physik vorausrechnet: 30 Tore, 31,7 s mit Starthügel, im Schnitt 62 km/h, nie unter 46 km/h; mit Jürgens Werten (12 m /
+  // 0,6 m) 30,2 s bei 66 km/h, mit 2 m Versatz auf 12 m Abstand dagegen 40 s bei 51 km/h.
+  SL_RHYTHM: [
+    [0, 1, 1], [110, 0.75, 0.65], [165, 1.35, 1.5], [225, 0.6, 0.2], [250, 1, 1],
+    [345, 0.75, 0.65], [395, 1.35, 1.5], [455, 1, 1],
+  ],
+  SL_GATE_JITTER: 0.1,       // zufälliger Anteil am Versatz, klein: der Rhythmus soll gleichmäßig bleiben
+  SL_LAST_GATE_GAP_M: 20,    // so weit steht das letzte Tor mindestens vor dem Ziel
+  SL_LANE_AMP_M: 6,          // Pistenmitte: Amplitude der Sinuskurve
+  SL_LANE_WAVE_M: 300,       // Pistenmitte: Wellenlänge
+  SL_PISTE_HALF_M: 9,        // (Tuning) freie Piste je Seite der Mitte, dort steht der Fangzaun
+  SL_PENALTY_S: 2,           // (Tuning) Zeitstrafe pro verpasstem Tor
+  SL_POLE_KMH: 5,            // (Tuning) Tempoverlust beim Berühren einer Stange
+  SL_MAX_SPEED_KMH: 80,      // (Tuning) Endtempo im Slalom, sonst sind die engen Tore nicht fahrbar
+  // Zwischenzeiten wie im Super-G an einem Tor, aber seltener: die Tore folgen im Sekundentakt, der Hinweis stünde
+  // sonst dauernd im Bild
+  SL_SPLIT_FIRST: 9,
+  SL_SPLIT_EVERY: 9,
+  SL_SPLIT_FREE_LAST: 3,
+  // Kippstange (render.js): dicker als die Super-G-Stange, damit man sie sieht, in der Torfarbe mit Tinte-Rand,
+  // hellem Streifen und Gelenk am Fuß. Getroffen klappt sie weiter um als das Super-G-Panel.
+  SL_POLE_W_M: 0.28,
+  SL_POLE_WOBBLE_DEG: 80,
+  // Führung im Schnee (guide-line.js): an jeder Stange ein gesprühter Bogen wie an den Super-G-Innenstangen, feiner
+  // gesprüht und kleiner, weil die Stangen dichter stehen. Farbe GM_RGB; die Ski verwischen ihn (snow-scrub.js). An
+  // den Zwischenzeit-Toren dazu Fleck und Linie nach außen. Eine durchgehende Ideallinie (gates.js guideX) gibt es
+  // als Regler, Standard aus: Tim fand Bögen und Linie zusammen zu viel Farbe im Schnee (29.09.2026).
+  SL_LINE_CLEAR_M: 0.9,      // Abstand der Ideallinie zur Stange: SKIER_R + SG_POLE_R sind 0,57 m, der Rest ist Luft
+  SL_LINE_PX: 0,             // (Tuning) Strichbreite der Ideallinie, 0 = aus
+  SL_LINE_ALPHA: 0.5,        // Deckkraft der Ideallinie: blasser als die Bögen, sie soll führen, nicht dominieren
+  SL_LINE_TILE_M: 10,        // die Linie wird in Stücken dieser Länge vorgerendert, je Bild höchstens eines neu
+  SL_ARC_W_M: 1.4,           // Bogen an der Stange: halbe Breite des Ovals (Super-G 2,5)
+  SL_ARC_OVAL: 2.2,          // Höhe zu Breite: gut 6 m hoch, die engsten Stangen stehen 9 m auseinander
+  SL_ARC_PX: 5,              // (Tuning) Strichbreite des Bogens (Super-G 9)
+  SL_SPLIT_LINE_M: 4,        // Zwischenzeit-Tor: Linie von der Stange nach außen
+  SL_SPLIT_DOT_PX: 11,       // Fleck an der Stange und Linie, feiner als im Super-G (GM_DOT_PX, GM_LINE_PX)
+  SL_SPLIT_LINE_PX: 5,
+  // Fangzaun (fence.js, fence-view.js, nach Jürgens Entwurf): orangefarbenes Netz auf Pfosten am Pistenrand
+  // (Innenkante bei SL_PISTE_HALF_M). Wer hineinfährt, prallt ab: kein Sturz, etwas Tempo weg, er rutscht entlang.
+  // Das Netz ist elastisch und beult sich dort aus, wo der Fahrer drinhängt; die Beule wandert mit ihm und schwingt
+  // danach zurück. Die Bäume rücken um SL_FENCE_CLEAR_M nach außen.
+  SL_FENCE_NET_M: 0.55,      // Breite des Netzes im Bild
+  SL_FENCE_POST_M: 3,        // Abstand der Pfosten
+  SL_FENCE_CLEAR_M: 3,       // so weit bleibt der Wald hinter der Innenkante frei
+  SL_FENCE_KEEP: 0.85,       // (Tuning) Tempo, das beim Anprall bleibt
+  SL_FENCE_BUMP_S: 0.4,      // nach einem Anprall so lange kein weiterer Tempoverlust, sonst bremste jedes Entlangrutschen
+  SL_NET_GIVE_M: 0.9,        // so tief gibt das Netz höchstens nach
+  SL_NET_SPRING: 3,          // 1/s: so schnell drückt es den Fahrer zurück
+  SL_NET_DAMP_S: 0.15,       // so schnell klingt die Fahrt nach außen im Netz ab
+  SL_NET_BULGE_M: 2.5,       // halbe Länge der Beule entlang des Zauns
+  SL_NET_K: 180,             // Rückschwingen nach dem Loslassen: Federkonstante (etwa 2 Hz) …
+  SL_NET_D: 9,               // … und Dämpfung (zwei, drei kleine Nachschwinger)
+  // Starthügel (nur Slalom; game.js startBoost, start-house.js): die ersten SL_START_RAMP_M sind steiler, dort wirkt
+  // zusätzlicher Hangabtrieb, oben SL_START_BOOST, zum Ende weich auf null. Davor steht das Starthaus.
+  SL_START_RAMP_M: 20,       // (Tuning) Länge des Starthügels, 0 = aus
+  SL_START_BOOST: 10,        // (Tuning) zusätzlicher Hangabtrieb oben am Starthügel in m/s²
+  // Starthaus im Bild (start-house.js): Holzhaus mit verschneitem Dach knapp oberhalb der Startlinie, der Fahrer
+  // steht im offenen Tor. Über dem Tor die Startampel (die Lampen folgen dem Countdown) und die Uhr, vor dem Tor der
+  // Startbügel, der beim Go aufschwingt.
+  SH_WAND_OPEN_S: 0.18,      // so schnell schwingt der Startbügel auf
+  SH_CHEVRONS: 6,            // gesprühte Winkel auf dem Starthügel, talwärts weiter auseinander
+  SH_WOOD: '#A9764B', SH_WOOD_DARK: '#7D5636', SH_WOOD_LIGHT: '#C08D5E', SH_DOOR: '#2E221A',
+  SH_SNOW: '#FFFFFF', SH_SNOW_SHADE: '#DCE6F0',
+  SH_LED: '#FFD84A',         // Ziffern der Uhren (Starthaus, Zielbogen, Videowand), wie --mark
+  SH_LAMP_RED: '#E5392E', SH_LAMP_GREEN: '#2FB457', SH_LAMP_OFF: '#4A4A52',
+  SH_RAMP_RGB: '120,150,185', // Schattierung des Starthügels
+
+  // Zielstadion (nur Slalom; stadium.js, stadium-view.js, nach Jürgens Entwurf): der Fangzaun verengt sich auf den
+  // letzten STAD_FUNNEL_M auf den Zielbogen, hinter der Ziellinie liegt der Zielraum zwischen Werbebanden, Stehplätzen
+  // und Tribünen, unten im Halbkreis geschlossen. Vor der Linie steht kein Publikum: man soll sehen, wo das Ziel ist.
+  STAD_FIN_HALF_M: 7,        // halbe Breite von Zielbogen und Zielraum (Innenkante der Bande)
+  STAD_FUNNEL_M: 18,         // so weit vor dem Ziel beginnt der Trichter …
+  STAD_FUNNEL_END_M: 3,      // … und so weit vor dem Ziel ist er zu
+  STAD_BOWL_M: 26,           // Mitte des Runds hinter der Ziellinie: dort steht der Fahrer nach dem Hockeystop
+  STAD_AIM_S: 0.3,           // Auslauf: so schnell richtet er sich auf die Mitte aus
+  STAD_GLIDE_DECEL: 2,       // m/s²: so viel Tempo verliert er beim Gleiten
+  STAD_GLIDE_MIN: 9,         // m/s: langsamer gleitet niemand ins Rund
+  STAD_CAM_FRAC: 0.56,       // Fahrerposition im Bild nach dem Ziel: Zielbogen und Rund sind beide zu sehen
+  STAD_HOLD_S: 2.4,          // so lange nach Beginn des Hockeystops kommt die Fresh-Seite (Tipp springt hin)
+  STAD_PARTY_S: 5,           // so lange nach dem Ziel mindestens volle Bildrate (Konfetti), danach Leerlauf
+  STAD_WALL_M: 0.9,          // Höhe der Werbebanden
+  STAD_PANEL_M: 4.2,         // Länge einer Werbetafel
+  STAD_ROWS: 2,              // Stehplatzreihen an der Bande
+  STAD_ROW_M: 0.8,
+  STAD_TRIB_GAP_M: 0.5,      // zwischen Stehplätzen und Tribüne
+  STAD_TRIB_ROWS: 4,         // mehr passt mit Banden und Stehplätzen nicht in die Sichtbreite
+  STAD_TRIB_ROW_M: 0.85,
+  STAD_TRIB_RISE_M: 0.32,    // so viel höher steht jede Reihe der Tribüne
+  STAD_SPACING_M: 0.82,      // Abstand der Fans in einer Reihe
+  STAD_EMPTY_P: 0.08,        // Anteil freier Plätze
+  STAD_FLAG_P: 0.05,         // Anteil mit Fahne
+  STAD_AISLE_M: 9,           // alle so viele Meter ein Gang in der Tribüne
+  STAD_ARCH_H_M: 4.2,        // Höhe des Zielbogens
+  STAD_HYPE_M: 120,          // ab dieser Entfernung zum Ziel wird das Publikum lauter
+  STAD_PEAK_S: 2,            // so lange nach dem Ziel volle Stimmung
+  STAD_OLA_AFTER_S: 1.6,     // La Ola: so lange nach dem Ziel beginnt die erste Welle …
+  STAD_OLA_PAUSE_S: 0.5,     // … mit dieser Pause folgt die nächste
+  STAD_OLA_S: 2.2,           // so lange läuft eine Welle um die Ränge
+  STAD_OLA_W: 0.09,          // Breite der Welle als Anteil der Ränge
+  STAD_OLA_N: 2,             // so viele Wellen
+  STAD_FLASH_BASE: 1,        // Blitzlichter pro Sekunde: immer, mit der Stimmung, im Ziel
+  STAD_FLASH_HYPE: 12,
+  STAD_FLASH_FINISH: 60,
+  STAD_FLASH_S: 0.16,
+  STAD_CONFETTI: 200,        // Stücke aus den Türmen des Zielbogens
+  STAD_BUILD_AT_M: 150,      // so weit vor dem Ziel entstehen die Bilder des Stadions, verteilt auf mehrere Bilder
+  // Farben: die Palette des Spiels, damit das Stadion nicht bunter wird als der Rest
+  STAD_JACKETS: ['#C0342A', '#3568B5', '#265A3A', '#FFD84A', '#FF7A1A', '#14140F', '#F4F3EF', '#7E8994', '#D25A50', '#5F8ACB', '#357350', '#6B4F3B'],
+  STAD_SKIN: ['#F2C9A5', '#E0A97E', '#B87B52', '#8A5A3B'],
+  STAD_CONFETTI_RGB: ['#C0342A', '#3568B5', '#FFD84A', '#FF7A1A', '#2FB457', '#F4F3EF'],
+  STAD_STEP: '#D9E2EC', STAD_STEP_DARK: '#B9C6D4', // Stufen der Tribüne
+  // Werbebanden: [Text, Grund, Schrift]; später lassen sich hier echte Partner einsetzen
+  STAD_ADS: [
+    ['POWDER', '#F4F3EF', '#C0342A'], ['FRESH', '#14140F', '#FFD84A'], ['SLALOM', '#3568B5', '#F4F3EF'],
+    ['HOPP HOPP', '#FFD84A', '#14140F'], ['POWDER', '#C0342A', '#F4F3EF'],
+  ],
+  FENCE_NET: '#FF7A1A',      // Netz
+  FENCE_NET_RGB: '255,122,26',
+  FENCE_EDGE: '#E8620C',     // Ober- und Unterkante
   SG_FINISH_OVERLAY_MS: 2200, // nach dem Ziel so lange Hockeystop und Wolke, dann die Fresh-Seite (Tipp springt hin)
 
   // Hockeystop nach dem Ziel (Super-G und Duell; hockey.js, hockey-view.js, game.js coast): der Fahrer reißt die Ski
@@ -498,6 +634,18 @@ export const TUNABLES = [
   { key: 'SG_PENALTY_S', label: 'Zeitstrafe pro Tor', unit: 's', min: 0, max: 10, step: 0.5, decimals: 1 },
   { key: 'SG_POLE_KMH', label: 'Stange kostet', unit: 'km/h', min: 0, max: 30, step: 1 },
   { key: 'SG_MAX_SPEED_KMH', label: 'Endtempo', unit: 'km/h', min: 100, max: 300, step: 10 },
+  { heading: 'Slalom', tone: 'green' },
+  { key: 'SL_GATE_SPACING_M', label: 'Torabstand', unit: 'm', min: 8, max: 30, step: 1 },
+  { key: 'SL_POLE_OFFSET_M', label: 'Stangenversatz', unit: 'm', min: 0, max: 6, step: 0.1, decimals: 1 },
+  { key: 'SL_PISTE_HALF_M', label: 'Piste frei je Seite', unit: 'm', min: 6, max: 30, step: 1 },
+  { key: 'SL_PENALTY_S', label: 'Zeitstrafe pro Tor', unit: 's', min: 0, max: 10, step: 0.5, decimals: 1 },
+  { key: 'SL_POLE_KMH', label: 'Stange kostet', unit: 'km/h', min: 0, max: 30, step: 1 },
+  { key: 'SL_MAX_SPEED_KMH', label: 'Endtempo', unit: 'km/h', min: 40, max: 160, step: 5 },
+  { key: 'SL_START_RAMP_M', label: 'Starthügel Länge', unit: 'm', min: 0, max: 40, step: 2 },
+  { key: 'SL_START_BOOST', label: 'Starthügel Schub', unit: 'm/s²', min: 0, max: 20, step: 1 },
+  { key: 'SL_FENCE_KEEP', label: 'Tempo nach Zaun', unit: '%', min: 0.3, max: 1, step: 0.05, scale: 100, decimals: 0 },
+  { key: 'SL_ARC_PX', label: 'Bogen an der Stange', unit: 'px', min: 2, max: 12, step: 1, visual: true },
+  { key: 'SL_LINE_PX', label: 'Ideallinie', unit: 'px', min: 0, max: 10, step: 1, visual: true },
   { heading: 'Duell', tone: 'orange' },
   { key: 'DUEL_CRASH_PAUSE_S', label: 'Sturzpause', unit: 's', min: 0.5, max: 5, step: 0.1, decimals: 1 },
   { key: 'DUEL_RESPAWN_GRACE_S', label: 'Schonfrist', unit: 's', min: 0, max: 5, step: 0.1, decimals: 1 },
@@ -515,5 +663,6 @@ export const TUNABLES = [
   { key: 'SND_SKI', label: 'Ski und Kurven', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0, user: true },
   { key: 'SND_AV', label: 'Lawine', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0, user: true },
   { key: 'SND_CRASH', label: 'Aufprall', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0, user: true },
-  { key: 'SND_RACE', label: 'Super-G: Start und Tore', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0, user: true },
+  { key: 'SND_RACE', label: 'Rennen: Start und Tore', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0, user: true },
+  { key: 'SND_CROWD', label: 'Publikum', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0, user: true },
 ];

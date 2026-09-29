@@ -5,7 +5,7 @@
 // je Index: Bild für Bild dieselbe, kein Zustand, eine Pause hält sie an.
 import { C } from './constants.js';
 import { lobeAt, dustAt } from './avalanche-view.js';
-import { stopTime, speedAt, distAt } from './hockey.js';
+import { stopTime, speedAt, distAt, stopClock } from './hockey.js';
 
 const frac = (v) => v - Math.floor(v);
 const hash = (n) => frac(Math.sin(n * 12.9898 + 78.233) * 43758.5453);
@@ -19,12 +19,12 @@ const SKI_HALF_M = 0.8; // und über die Länge der quergestellten Ski verteilt
 
 export function drawHockey(R, g, ox, oy) {
   const st = g.stop;
-  if (!st || g.finT >= C.STOP_CLOUD_S) return;
+  if (!st || stopClock(st, g.finT) >= C.STOP_CLOUD_S) return;
   const f = clamp(st.v0 / (C.STOP_REF_KMH / 3.6), 0, 1.3); // Größe nach Tempo im Ziel
   if (f < 0.05) return;
   const { ctx, Sv: S, dpr } = R;
   const spr = R.sprites.av;
-  const t = g.finT, T = stopTime(st);
+  const t = stopClock(st, g.finT), T = stopTime(st);
   const fx = Math.sin(st.dir), fy = Math.cos(st.dir); // Fahrtrichtung
   const qx = fy, qy = -fx;                             // quer dazu, entlang der Ski
 

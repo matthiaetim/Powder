@@ -5,6 +5,8 @@
 // (Grollen, das mit der Nähe lauter und heller wird, Bass, Knacken, Zischen ganz nah, Krachen beim Losbrechen)
 // und Aufprall (kurzer dumpfer Schlag, an der Lawine schwerer). Super-G hat einen eigenen Bus: Pieptöne des
 // Countdowns, Fähnchen beim Durchfahren, Buzzer beim Torfehler, Klacken an der Stange, Doppelton im Ziel.
+// Das Zielstadion im Slalom hat den Bus crowd: Publikum als Rauschen mit zwei Formanten, das mit der Stimmung
+// anschwillt, Kuhglocken, im Ziel ein Aufbrüllen mit Tröte. Am Starthaus klackt beim Go der Startbügel.
 // iOS gibt Ton erst nach einer Berührung frei: der Kontext entsteht beim ersten Tipp, davor bleibt alles still.
 // Beim Verlassen der App (Heimgeste, App-Umschalter, Sperrtaste, Tab-Wechsel) blendet der Ton aus, bevor er angehalten
 // wird, sonst schnarrt es auf dem iPhone beim Schließen verzerrt (siehe „App verlassen“ unten).
@@ -70,7 +72,7 @@ export function createSound(g) {
   const n = {};               // Knoten des Klanggraphen
   const last = new Map();     // zuletzt gesetzter Zielwert je AudioParam (spart Automationsereignisse)
   const dbg = { rush: 0, hiss: 0, scrape: 0, rumble: 0 };
-  let prevBreaks = 0, crackleAcc = 0, lastSwish = -1, lastFrame = 0;
+  let prevBreaks = 0, crackleAcc = 0, lastSwish = -1, lastFrame = 0, bellAcc = 0;
   let away = false, stopTimer = 0; // App wird verlassen: Ausgang auf null, dann Kontext anhalten
   prepareNoise();
 
@@ -163,7 +165,7 @@ export function createSound(g) {
     n.an = ctx.createAnalyser();
     n.an.fftSize = 1024;
     chain(n.master, n.comp, n.out, n.an, ctx.destination);
-    for (const b of ['wind', 'ski', 'av', 'fx', 'race']) { n[b] = gain(0); n[b].connect(n.master); }
+    for (const b of ['wind', 'ski', 'av', 'fx', 'race', 'crowd']) { n[b] = gain(0); n[b].connect(n.master); }
     n.white = makeNoise('white');
     const pink = makeNoise('pink'), brown = makeNoise('brown');
 
@@ -200,6 +202,16 @@ export function createSound(g) {
     n.avHissF = filt('bandpass', 1800, 0.6);
     n.avHiss = gain(0);
     chain(loop(n.white), n.avHissF, n.avHiss, n.av);
+
+    // Publikum: rosa Rauschen durch zwei Formanten („ah“ und „ey“), wogt langsam
+    n.crowdBed = gain(0);
+    n.crowdSwell = gain(1); lfo(0.23, 0.18, n.crowdSwell.gain); lfo(0.61, 0.08, n.crowdSwell.gain);
+    n.crowdF1 = filt('bandpass', 700, 0.9);
+    n.crowdF2 = filt('bandpass', 1900, 1.3);
+    const cp = loop(pink);
+    cp.connect(n.crowdF1); cp.connect(n.crowdF2);
+    n.crowdF1.connect(n.crowdBed); n.crowdF2.connect(n.crowdBed);
+    chain(n.crowdBed, n.crowdSwell, n.crowd);
   }
 
   // Ton mit fester Höhe (Countdown, Torfehler, Ziel): kurzer Anstieg, gehalten, kurzer Abfall. delay schiebt den
@@ -244,6 +256,25 @@ export function createSound(g) {
     shot(n.fx, 'lowpass', heavy ? 240 : 380, 1, 1.6 * k, 0.003, heavy ? 0.35 : 0.13);
     if (cause === 'tree') shot(n.fx, 'bandpass', 1400, 2, 0.5 * k, 0.002, 0.035);
     if (cause === 'rock') shot(n.fx, 'lowpass', 700, 1.5, 0.6 * k, 0.003, 0.06);
+  }
+
+  // Kuhglocke: zwei unharmonische Rechtecktöne durch ein Band, kurz und blechern, jede etwas anders gestimmt
+  function cowbell(level) {
+    const t0 = ctx.currentTime;
+    const f = 520 * (0.85 + Math.random() * 0.35);
+    const fl = filt('bandpass', 1500 + Math.random() * 600, 1.6);
+    const gn = gain(0);
+    envelope(gn.gain, t0, level, 0.002, 0.18 + Math.random() * 0.15);
+    const oscs = [f, f * 1.48].map((fr) => { const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = fr; o.connect(fl); o.start(t0); o.stop(t0 + 0.4); return o; });
+    chain(fl, gn, n.crowd);
+    oscs[0].onended = () => { for (const o of oscs) o.disconnect(); fl.disconnect(); gn.disconnect(); };
+  }
+
+  // Im Ziel: das Publikum brüllt auf, zweimal die Tröte
+  function roar() {
+    shot(n.crowd, 'bandpass', 1100, 0.7, 1.4, 0.25, 2.4);
+    shot(n.crowd, 'bandpass', 2600, 1.4, 0.5, 0.2, 1.6);
+    for (const d of [0.15, 0.6]) { tone(n.crowd, 'sawtooth', 233, 0.35, 0.07, d); tone(n.crowd, 'sawtooth', 294, 0.35, 0.05, d); }
   }
 
   // Lawine bricht los (nach Stillstand): fernes Krachen mit tiefem Nachhall
@@ -340,14 +371,28 @@ export function createSound(g) {
       case 'plow': if (d && g.state === 'running') swish(s.v * 0.6, false); break;
       case 'release': if (g.state === 'running' && s.carve > 0.25 && s.v > 3) swish(s.v, true); break;
       case 'crash': crash(d.cause, d.v); break;
-      // Super-G
-      case 'beep': if (d.go) tone(n.race, 'sine', 1175, 0.4, 0.5); else tone(n.race, 'sine', 880, 0.1, 0.4); break;
+      // Torlauf (Super-G, Slalom)
+      case 'beep':
+        if (d.go) tone(n.race, 'sine', 1175, 0.4, 0.5); else tone(n.race, 'sine', 880, 0.1, 0.4);
+        if (d.go && g.course && g.course.spec.house) shot(n.race, 'bandpass', 2200, 4, 0.6, 0.001, 0.05); // der Startbügel klappt auf
+        break;
       case 'gate':
         if (d.ok) shot(n.race, 'bandpass', 900, 1.2, 0.3, 0.004, 0.07); // das Fähnchen schlägt kurz
         else { tone(n.race, 'square', 220, 0.12, 0.2); tone(n.race, 'square', 220, 0.12, 0.2, 0.17); } // Buzzer
         break;
-      case 'pole': shot(n.race, 'bandpass', 1400, 3, 0.6, 0.002, 0.05); thud(n.race, 'triangle', 700, 250, 0.05, 0.3, 0.08); break;
-      case 'finish': tone(n.race, 'sine', 660, 0.15, 0.45); tone(n.race, 'sine', 990, 0.4, 0.45, 0.17); break;
+      case 'pole':
+        // Kippstange (Slalom): hohles Klacken des Gelenks, kürzer und heller als das Panel im Super-G
+        if (d && d.kipp) { shot(n.race, 'bandpass', 2300, 5, 0.5, 0.001, 0.03); thud(n.race, 'triangle', 1100, 420, 0.03, 0.28, 0.05); }
+        else { shot(n.race, 'bandpass', 1400, 3, 0.6, 0.002, 0.05); thud(n.race, 'triangle', 700, 250, 0.05, 0.3, 0.08); }
+        break;
+      // Fangzaun (Slalom): das Netz fängt dumpf und raschelt nach, lauter bei mehr Tempo
+      case 'fence': {
+        const k = clamp(d.v / 18, 0.35, 1);
+        thud(n.fx, 'sine', 170, 60, 0.12, 0.5 * k, 0.22);
+        shot(n.fx, 'bandpass', 1900, 0.8, 0.45 * k, 0.01, 0.25);
+        break;
+      }
+      case 'finish': tone(n.race, 'sine', 660, 0.15, 0.45); tone(n.race, 'sine', 990, 0.4, 0.45, 0.17); if (g.stadium) roar(); break;
       // Gipfel (Classic, Everest-Höhe): Dreiklang aufwärts, verwandt mit dem Zielton, deshalb in derselben Gruppe
       case 'summit': tone(n.race, 'sine', 660, 0.15, 0.4); tone(n.race, 'sine', 830, 0.15, 0.4, 0.15); tone(n.race, 'sine', 990, 0.5, 0.45, 0.3); break;
       default: break;
@@ -374,6 +419,7 @@ export function createSound(g) {
     set(n.av.gain, C.SND_AV, 0.05);
     set(n.fx.gain, C.SND_CRASH, 0.05);
     set(n.race.gain, C.SND_RACE, 0.05);
+    set(n.crowd.gain, C.SND_CROWD, 0.05);
 
     // Wind: Fahrtwind öffnet und wächst mit dem Tempo, der Bergwind bleibt, auf der Fresh-Seite etwas leiser
     dbg.rush = Math.pow(k, 0.9);
@@ -408,6 +454,15 @@ export function createSound(g) {
       crackleAcc += (2 + 14 * threat) * dt;
       while (crackleAcc >= 1) { crackleAcc -= 1; crackle(0.5 + threat); }
     } else crackleAcc = 0;
+
+    // Publikum: nur mit Zielstadion, lauter und heller mit der Stimmung, dazu Kuhglocken
+    const hype = g.stadium ? g.stadium.hype : 0;
+    set(n.crowdBed.gain, 0.5 * Math.pow(hype, 1.2), 0.25);
+    set(n.crowdF1.frequency, 650 + 250 * hype, 0.3);
+    if (hype > 0.1 && g.state !== 'paused') {
+      bellAcc += 9 * hype * hype * dt;
+      while (bellAcc >= 1) { bellAcc -= 1; cowbell(0.05 + 0.1 * Math.random() * hype); }
+    } else bellAcc = 0;
     lastFrame = ctx.currentTime;
   }
 

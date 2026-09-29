@@ -47,6 +47,10 @@ await expect('Zusatzfeld', 'deny', req('PUT', '/boards/chase/vy', e(V, { name: '
 await expect('Super-G 10 s', 'deny', req('PUT', '/boards/superg/vz', e(V, { name: 'VZ', m: 1000, t: 10 }), V.tok));
 await expect('Super-G Gesamt < Fahrzeit', 'deny', req('PUT', '/boards/superg/vz', e(V, { name: 'VZ', m: 2000, t: 25 }), V.tok));
 await expect('Super-G echt 25,05 s', 'ok', req('PUT', '/boards/superg/vz', e(V, { name: 'VZ', m: 2505, t: 25.05 }), V.tok));
+await expect('Slalom 20 s', 'deny', req('PUT', '/boards/slalom/vz', e(V, { name: 'VZ', m: 2000, t: 20 }), V.tok));
+await expect('Slalom echt 33,4 s mit einer Strafe', 'ok', req('PUT', '/boards/slalom/vz', e(V, { name: 'VZ', m: 3540, t: 33.4 }), V.tok));
+await expect('Slalom langsamer als der Bestand', 'deny', req('PUT', '/boards/slalom/vz', e(V, { name: 'VZ', m: 3600, t: 34 }), V.tok));
+await expect('unbekannter Modus', 'deny', req('PUT', '/boards/riesenslalom/vz', e(V, { name: 'VZ', m: 3540, t: 33.4 }), V.tok));
 await expect('löschen durch Besitzer', 'deny', req('DELETE', '/boards/classic/tim', undefined, A.tok));
 // Altbestand ohne uid, wie vor v0.27.0
 await fetch(`${DB}/boards/classic/luki.json?${NS}`, { method: 'PUT', headers: admin, body: JSON.stringify({ name: 'Luki', m: 8195, t: 553.22, ts: 1, v: '0.26.0' }) });

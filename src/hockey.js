@@ -1,15 +1,19 @@
-// Hockeystop nach dem Ziel (Super-G und Duell): der Fahrer reißt die Ski quer, rutscht in der alten Fahrtrichtung
+// Hockeystop nach dem Ziel (Super-G, Slalom und Duell): der Fahrer reißt die Ski quer, rutscht in der alten Fahrtrichtung
 // weiter und bremst scharf bis zum Stand. Beim Ziel wird festgehalten, wo er war, wohin und wie schnell er fuhr;
-// alles Weitere folgt geschlossen aus der Zeit seit dem Ziel (g.finT). So hängen Fahrer (game.js coast) und Wolke
+// alles Weitere folgt geschlossen aus der Zeit seit Beginn des Stopps (stopClock: g.finT, im Zielstadion des Slaloms
+// abzüglich der Zeit, die er vorher ins Rund geglitten ist). So hängen Fahrer (game.js coast) und Wolke
 // (hockey-view.js) exakt aneinander, Pause und Fresh müssen nichts zurücksetzen, und ein Tipp, der die Animation
 // überspringt, landet sauber im Endzustand.
 import { C } from './constants.js';
 
 // dir: Fahrtrichtung beim Ziel (wie skier.theta, 0 = Falllinie), side: zu dieser Seite kommen die Ski quer, nämlich
 // zu der er gerade lehnt (geradeaus: rechts).
-export function startStop(s) {
-  return { x0: s.x, y0: s.y, dir: s.theta, th0: s.theta, v0: s.v, side: s.theta >= 0 ? 1 : -1 };
+// t0: g.finT beim Beginn des Stopps
+export function startStop(s, t0 = 0) {
+  return { x0: s.x, y0: s.y, dir: s.theta, th0: s.theta, v0: s.v, side: s.theta >= 0 ? 1 : -1, t0 };
 }
+// Zeit seit Beginn des Stopps
+export const stopClock = (st, finT) => Math.max(0, finT - st.t0);
 
 // Verzögerung a + b·v bis zum Stand: v(t) = (v0 + a/b)·e^(−bt) − a/b, Stand nach T = ln(1 + b·v0/a) / b
 export function stopTime(st) {

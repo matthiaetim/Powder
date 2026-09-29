@@ -8,12 +8,16 @@ import { laneX, mulberry32 } from './world.js';
 import { scrubRect } from './snow-scrub.js';
 import { t, num } from './i18n.js';
 import { drawGateMarks } from './gate-marks.js';
+import { drawGuide } from './guide-line.js';
+import { drawFence } from './fence-view.js';
+import { drawStartRamp, drawStartHouse } from './start-house.js';
+import { drawStadiumGround, drawStadium, drawStadiumOver } from './stadium-view.js';
 
 const TAU = Math.PI * 2;
 const D2R = Math.PI / 180;
 const TREE_H = 3.2; // nominale Sprite-Höhe in Metern
 const ROCK_H = 1.4;
-const POLE_H = 1.8; // Torstange (Super-G)
+const POLE_H = 1.8; // Torstange (Super-G) und Kippstange (Slalom)
 // Texte im Schnee sitzen auf kleinen Schildern: weiße Platte, Tinte-Rand, harter Versatz-Schatten, leicht
 // schief, Display-Schrift wie im HUD (--display in styles.css). Die Display-Schrift ist Versalien-only, Rang und
 // Namen erscheinen also in Großbuchstaben, das gehört zum Look.
@@ -195,6 +199,26 @@ function makePole(S, dpr, red, dir) {
   return { img: c, w, h, ax, ay, nominal: POLE_H };
 }
 
+// Kippstange (Slalom): einzelne Stange ohne Fähnchen in der Torfarbe, dicker als die Super-G-Stange (SL_POLE_W_M),
+// damit man sie sieht. Runde Kappe, heller Streifen zum Licht (oben links), am Fuß das Gelenk in Tinte. Fußpunkt unten
+// in der Mitte wie bei den Bäumen; getroffen kippt sie um diesen Punkt (drawWorld), wie eine echte Kippstange.
+function makeKipp(S, dpr, red) {
+  const H = POLE_H * S, bw = Math.max(3, C.SL_POLE_W_M * S), pad = 0.8 * S;
+  const w = bw + pad * 2, h = H + pad * 2;
+  const [c, x] = makeCanvas(w, h, dpr);
+  const ax = w / 2, ay = pad + H, top = ay - H, left = ax - bw / 2, r = bw / 2;
+  softEllipse(x, ax + 0.4 * S, ay - 0.05 * S, 0.5 * S, 0.2 * S, C.SHADOW_RGB, 0.3);
+  x.fillStyle = red ? C.GATE_RED : C.GATE_BLUE;
+  x.beginPath();
+  x.moveTo(left, ay); x.lineTo(left, top + r); x.arc(ax, top + r, r, Math.PI, 0); x.lineTo(left + bw, ay);
+  x.closePath(); x.fill();
+  x.fillStyle = red ? C.GATE_RED_LIGHT : C.GATE_BLUE_LIGHT;
+  x.fillRect(left + bw * 0.15, top + r, bw * 0.3, H - r - 0.45 * S);
+  x.fillStyle = C.INK;
+  x.fillRect(left - 0.5, ay - 0.4 * S, bw + 1, Math.max(1.5, 0.14 * S)); // Gelenk
+  return { img: c, w, h, ax, ay, nominal: POLE_H };
+}
+
 // Stangen als [blau, rot][links, rechts]
 function makePoles(S, dpr) {
   return [false, true].map((red) => [-1, 1].map((dir) => makePole(S, dpr, red, dir)));
@@ -205,6 +229,7 @@ function makeSprites(S, dpr) {
     trees: [0, 1, 2].map((v) => makeTree(S, dpr, v)),
     rocks: [0, 1, 2].map((v) => makeRock(S, dpr, v)),
     poles: makePoles(S, dpr),
+    kipp: [false, true].map((red) => makeKipp(S, dpr, red)), // Slalom: [blau, rot]
     av: makeAvSprites(),
   };
 }
@@ -236,10 +261,22 @@ export function draw(R, g, t) {
   drawMarks(R, g, ox, oy);
   drawSignature(R, g, ox, oy);
   drawYeti(R, g, ox, oy);
-  if (g.course) drawGateMarks(R, g, ox, oy, railsOf(g.rider)); // Farbe im Schnee an den Innenstangen, die Ski verwischen sie
+  if (g.course) {
+    // Farbe im Schnee, die Ski verwischen sie: Bögen an den Innenstangen (Super-G), Bögen an den Kippstangen (Slalom)
+    drawStartRamp(R, g, ox, oy, railsOf(g.rider)); // Slalom: Starthügel
+    drawStadiumGround(R, g, ox, oy, railsOf(g.rider)); // Slalom: Schatten und Schriftzug im Zielraum
+    drawGateMarks(R, g, ox, oy, railsOf(g.rider));
+    drawGuide(R, g, ox, oy, railsOf(g.rider));
+  }
   drawTrack(R, g, ox, oy);
+  if (g.course) {
+    drawFence(R, g, ox, oy); // Slalom: Fangzaun am Pistenrand
+    drawStadium(R, g, ox, oy, t); // Slalom: Ränge, Banden und Publikum des Zielstadions
+    drawStartHouse(R, g, ox, oy, t); // Slalom: Starthaus oberhalb der Linie, der Fahrer steht davor
+  }
   drawWorld(R, g, ox, oy);
   if (g.state === 'finished') drawHockey(R, g, ox, oy); // Hockeystop-Wolke über dem Fahrer
+  if (g.course) drawStadiumOver(R, g, ox, oy); // Slalom: Zielbogen, Blitzlichter und Konfetti über dem Fahrer
   // drawHockeyFog(R, g, ox, oy); // Hockeystop deaktiviert
   drawParticles(R, g, ox, oy);
   if (g.ghost.on) drawDuelTags(R, g, ox, oy);
@@ -278,18 +315,21 @@ function drawMarks(R, g, ox, oy) {
   if (g.finishM > 0) drawFinishLine(R, g.finishM, ox, oy, y0, y1); // Duell: Zielweite aus dem Raum
 }
 
-// Super-G: Startlinie bei 0 und karierte Ziellinie bei SG_FINISH_M statt Meter- und Rekordlinien (die blaue
-// 1000-m-Linie läge genau auf dem Ziel).
+// Torlauf: Startlinie bei 0 und karierte Ziellinie am Ende des Kurses statt Meter- und Rekordlinien (die blaue
+// 1000-m-Linie läge im Super-G genau auf dem Ziel).
+// Im Slalom stehen Starthaus und Zielbogen für die Schilder, die Ziellinie liegt nur zwischen den Türmen des Bogens.
 function drawCourseLines(R, g, ox, oy, y0, y1) {
-  if (y0 <= 0 && 0 <= y1) sprayMark(R, g, ox, oy, oy, t('sign.start'), C.MARK_RGBA, TAG_WHITE);
-  drawFinishLine(R, g.course.finishY, ox, oy, y0, y1);
+  const spec = g.course.spec, sd = g.stadium;
+  if (y0 <= 0 && 0 <= y1) sprayMark(R, g, ox, oy, oy, spec.house ? '' : t('sign.start'), C.MARK_RGBA, TAG_WHITE);
+  drawFinishLine(R, g.course.finishY, ox, oy, y0, y1, sd ? [sd.cx - sd.fin, sd.cx + sd.fin] : null);
 }
 
 // Karierte Ziellinie bei fy mit Schild „Ziel“ (Super-G und Duell). Die Zeit wird auf der Fuge zwischen den beiden
 // Karo-Reihen genommen. Die Karos liegen fest im Schnee (Welt-x über ox) wie die Sprühlinien, bis v0.24.9 fuhren sie
 // seitlich mit dem Fahrer mit. Kanten auf ganze Gerätepixel gerundet, damit sie beim Verschieben nicht flimmern und
 // zwischen zwei Karos keine Fuge aufblitzt.
-function drawFinishLine(R, fy, ox, oy, y0, y1) {
+// span: [x0, x1] in Welt-Metern begrenzt die Linie (Zielbogen im Slalom), dann ohne Schild.
+function drawFinishLine(R, fy, ox, oy, y0, y1, span = null) {
   const { ctx, Sv: S, W, dpr } = R;
   const cell = Math.max(4, 0.7 * S);
   if (fy + cell / S < y0 || fy - cell / S > y1) return;
@@ -297,11 +337,14 @@ function drawFinishLine(R, fy, ox, oy, y0, y1) {
   const px = (v) => Math.round(v * dpr) / dpr;
   const top = px(sy - cell), mid = px(sy), bot = px(sy + cell);
   ctx.fillStyle = C.FINISH_RGBA;
-  for (let i = Math.floor(-ox / cell); i * cell + ox < W; i++) {
+  const from = span ? Math.max(0, span[0] * S + ox) : 0, to = span ? Math.min(W, span[1] * S + ox) : W;
+  if (span) { ctx.save(); ctx.beginPath(); ctx.rect(from, top, to - from, bot - top); ctx.clip(); }
+  for (let i = Math.floor((from - ox) / cell); i * cell + ox < to; i++) {
     const x0 = px(i * cell + ox), x1 = px((i + 1) * cell + ox);
     if (i % 2 === 0) ctx.fillRect(x0, top, x1 - x0, mid - top); // obere Reihe: gerade Karos, untere: ungerade
     else ctx.fillRect(x0, mid, x1 - x0, bot - mid);
   }
+  if (span) { ctx.restore(); return; }
   drawTag(ctx, W - 8, sy - cell - 3, t('sign.finish'), TAG_WHITE);
 }
 
@@ -327,7 +370,7 @@ function sprayMark(R, g, ox, oy, sy, label, color, tag, labelY = sy - C.MARK_SPR
   const top = Math.round((sy - t.h) * dpr) / dpr;
   for (let x = x0; x < W; x += TW) ctx.drawImage(t.c, x, top, TW, 2 * t.h);
   scrubRect(R, g, ox, oy, { x: 0, y: sy - t.h - 2, w: W, h: 2 * t.h + 4 }, railsOf(g.rider));
-  drawTag(ctx, W - 8, labelY, label, tag);
+  if (label) drawTag(ctx, W - 8, labelY, label, tag);
 }
 
 function sprayTile(R, color) {
@@ -671,7 +714,7 @@ function drawWorld(R, g, ox, oy) {
       list.push(o);
     }
   }
-  // Super-G: Torstangen wie Hindernisse einsortieren, damit der Fahrer vor oder hinter ihnen steht. Eine getroffene
+  // Torlauf: Stangen wie Hindernisse einsortieren, damit der Fahrer vor oder hinter ihnen steht. Eine getroffene
   // Stange kippt und schwingt, ihr Bild reicht dann bis zur Sprite-Höhe zur Seite: darum der großzügige Rand.
   if (g.course) {
     const gates = g.course.gates;
@@ -681,7 +724,7 @@ function drawWorld(R, g, ox, oy) {
       const gt = gates[i];
       const sy = gt.y * S + oy;
       if (sy + pr < 0 || sy - pr > H) continue;
-      for (let k = 0; k < 2; k++) {
+      for (let k = 0; k < gt.poles.length; k++) {
         const p = gt.poles[k], sx = p.x * S + ox;
         if (sx + pr < 0 || sx - pr > W) continue;
         list.push(p);
@@ -701,13 +744,13 @@ function drawWorld(R, g, ox, oy) {
     }
     if (o.ghost) { drawGhost(R, g, ox, oy); continue; }
     if (o.pole) {
-      const sp = R.sprites.poles[o.red ? 1 : 0][o.dir > 0 ? 1 : 0];
+      const sp = o.kipp ? R.sprites.kipp[o.red ? 1 : 0] : R.sprites.poles[o.red ? 1 : 0][o.dir > 0 ? 1 : 0];
       const sx = o.x * S + ox, sy = o.y * S + oy;
       if (o.wob >= 0) {
         // Getroffen: um den Fußpunkt vom Fahrer weg kippen, hin und her schwingen, abklingen; die Scherung im
         // gedrehten Bild lässt die Spitze weiter auswandern als den Fuß, das wirkt wie Biegen
         const k = 1 - o.wob / C.SG_POLE_WOBBLE_S;
-        const a = o.wdir * C.SG_POLE_WOBBLE_DEG * D2R * Math.sin(TAU * C.SG_POLE_WOBBLE_HZ * o.wob) * k * k;
+        const a = o.wdir * (o.kipp ? C.SL_POLE_WOBBLE_DEG : C.SG_POLE_WOBBLE_DEG) * D2R * Math.sin(TAU * C.SG_POLE_WOBBLE_HZ * o.wob) * k * k;
         ctx.save();
         ctx.translate(sx, sy);
         ctx.rotate(a);
@@ -1039,7 +1082,8 @@ function drawDebug(R, g, ox, oy) {
     if (y === y0) ctx.moveTo(x, y * S + oy); else ctx.lineTo(x, y * S + oy);
   }
   ctx.stroke();
-  // Super-G: Durchfahrt je Tor (blau offen, grün durchfahren, rot verpasst) und die Berührungszonen der Stangen
+  // Torlauf: Durchfahrt je Tor (blau offen, grün durchfahren, rot verpasst; im Slalom von der Kippstange nach außen)
+  // und die Berührungszonen der Stangen
   if (g.course) {
     const rr = (C.SKIER_R + C.SG_POLE_R) * S;
     for (const gt of g.course.gates) {
@@ -1047,11 +1091,11 @@ function drawDebug(R, g, ox, oy) {
       if (sy < -40 || sy > H + 40) continue;
       ctx.lineWidth = 2;
       ctx.strokeStyle = gt.state === 2 ? 'rgba(220,40,40,0.8)' : gt.state === 1 ? 'rgba(40,160,90,0.8)' : 'rgba(40,120,220,0.6)';
-      ctx.beginPath(); ctx.moveTo((gt.x - gt.half) * S + ox, sy); ctx.lineTo((gt.x + gt.half) * S + ox, sy); ctx.stroke();
+      const gx0 = gt.single ? gt.x : gt.x - gt.half, gx1 = gt.single ? gt.x + gt.side * 6 : gt.x + gt.half;
+      ctx.beginPath(); ctx.moveTo(gx0 * S + ox, sy); ctx.lineTo(gx1 * S + ox, sy); ctx.stroke();
       ctx.lineWidth = 1;
       ctx.strokeStyle = 'rgba(220,40,40,0.6)';
-      const fw = C.SG_FLAG_W_M;
-      for (const px of [gt.x - gt.half - fw, gt.x - gt.half, gt.x + gt.half, gt.x + gt.half + fw]) { ctx.beginPath(); ctx.arc(px * S + ox, sy, rr, 0, TAU); ctx.stroke(); }
+      for (const tp of gt.touch) { ctx.beginPath(); ctx.arc(tp.x * S + ox, sy, rr, 0, TAU); ctx.stroke(); }
     }
   }
   ctx.strokeStyle = 'rgba(220,40,40,0.8)';
@@ -1131,7 +1175,7 @@ const PREVIEW_POSE = { theta: 0.25, carve: 0, plowK: 0 };
 export function drawModePreview(canvas, modeId, rider) {
   // Beim Start ist die Fresh-Seite versteckt (clientWidth 0): Fallback auf die Kartenmaße aus styles.css
   const W = canvas.clientWidth || 104, H = canvas.clientHeight || 58;
-  const superg = modeId === 'superg', duel = modeId === 'duel';
+  const superg = modeId === 'superg', slalom = modeId === 'slalom', duel = modeId === 'duel';
   const dpr = Math.min(window.devicePixelRatio || 1, C.MAX_DPR);
   canvas.width = Math.round(W * dpr);
   canvas.height = Math.round(H * dpr);
@@ -1140,9 +1184,11 @@ export function drawModePreview(canvas, modeId, rider) {
   const S = 5.5;
   ctx.fillStyle = C.BG;
   ctx.fillRect(0, 0, W, H);
-  // Spur: leichte Schlangenlinie von oben bis zum Fahrer; im Super-G schwingt sie weiter, durch die beiden Tore
+  // Spur: leichte Schlangenlinie von oben bis zum Fahrer; im Super-G schwingt sie weiter, durch die beiden Tore, im
+  // Slalom kurz und schnell um die Kippstangen
   const sx = W * 0.5, sy = H * 0.62;
-  const trackX = (y) => (superg ? sx + Math.sin((y / H) * 9 + 0.5) * W * 0.14 : sx + Math.sin((y / H) * 4.5) * W * 0.09);
+  const trackX = (y) => (superg ? sx + Math.sin((y / H) * 9 + 0.5) * W * 0.14
+    : slalom ? sx + Math.sin((y / H) * 15 + 0.6) * W * 0.085 : sx + Math.sin((y / H) * 4.5) * W * 0.09);
   ctx.strokeStyle = C.TRACK;
   ctx.lineWidth = 1.2;
   for (const off of [-1, 1]) {
@@ -1153,8 +1199,8 @@ export function drawModePreview(canvas, modeId, rider) {
     }
     ctx.stroke();
   }
-  // Bäume; im Super-G nur am Rand der Piste
-  const trees = superg
+  // Bäume; im Torlauf nur am Rand der Piste
+  const trees = superg || slalom
     ? [[0.04, 0.55, 0], [0.97, 0.38, 1], [0.03, 1.0, 2], [0.96, 0.92, 0]]
     : duel
       ? [[0.1, 0.5, 0], [0.9, 0.44, 1], [0.7, 0.92, 2], [0.25, 0.98, 1]]
@@ -1174,6 +1220,15 @@ export function drawModePreview(canvas, modeId, rider) {
         ctx.drawImage(sp.img, cx + dir * 0.19 * W - sp.ax, y - sp.ay, sp.w, sp.h);
       }
     }
+  }
+  if (slalom) {
+    // Drei Kippstangen, abwechselnd rot und blau, jede innen am Scheitel eines Schwungs
+    const kipp = [false, true].map((red) => makeKipp(S, dpr, red));
+    const sw = (y) => Math.sin((y / H) * 15 + 0.6);
+    [[0.0, true], [0.21, false], [0.42, true]].forEach(([fy, red]) => {
+      const y = fy * H + 1.5, sp = kipp[red ? 1 : 0], side = sw(y) > 0 ? 1 : -1;
+      ctx.drawImage(sp.img, trackX(y) - side * 0.045 * W - sp.ax, y - sp.ay + 6, sp.w, sp.h);
+    });
   }
   // Fahrer, wie gewählt (riders.js)
   ctx.save();

@@ -64,8 +64,9 @@ function splitStrokes(S, mir, gateW) {
   ];
 }
 
-// Sprite aus Strichen: Maße aus den Punkten, Fußpunkt der Stange bei (ax, ay)
-function makeMark(strokes, rgb, seed, dpr) {
+// Sprite aus Strichen: Maße aus den Punkten, Fußpunkt der Stange bei (ax, ay). Auch der Slalom sprüht damit
+// (guide-line.js).
+export function makeMark(strokes, rgb, seed, dpr) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const s of strokes) for (const [px, py] of s.pts) {
     const m = s.width / 2 + 3;
@@ -94,7 +95,7 @@ function spritesFor(R, gateW) {
 // rails: Linien des Fahrers für das Verwischen (render.js railsOf)
 export function drawGateMarks(R, g, ox, oy, rails) {
   const cs = g.course;
-  if (!cs) return;
+  if (!cs || cs.spec.single) return; // Slalom hat seine eigene Führung (guide-line.js)
   const { ctx, Sv: S, W, H } = R;
   const sps = spritesFor(R, C.SG_GATE_WIDTH_M);
   const k = S / R.S;

@@ -6,6 +6,7 @@
 import { C, VERSION } from './constants.js';
 import { createNet } from './net.js';
 import { BOARD_MODES, lowerIsBetter } from './modes.js';
+import { courseOf, cv } from './gates.js';
 import { isTuned } from './tune.js';
 import { t } from './i18n.js';
 import { loadName, saveName, loadBoardCache, saveBoardCache, loadBoardOwn, saveBoardOwn } from './storage.js';
@@ -57,10 +58,11 @@ export function sanitizeBoards(raw) {
 }
 
 // Schneller als BOARD_MAX_AVG_KMH im Schnitt fährt niemand (dieselbe Grenze steht in den Regeln): so ein Eintrag kommt
-// nicht aus dem Spiel, sondern von Hand in die Datenbank. Im Super-G ist die Strecke fest und m die Gesamtzeit in
-// Hundertstel, die nie unter der reinen Fahrzeit t liegt (Strafen kommen nur dazu).
+// nicht aus dem Spiel, sondern von Hand in die Datenbank. Im Torlauf (Super-G, Slalom) ist die Strecke fest und m die
+// Gesamtzeit in Hundertstel, die nie unter der reinen Fahrzeit t liegt (Strafen kommen nur dazu).
+const courseM = (mode) => cv(courseOf(mode), 'finishM');
 export function plausible(mode, m, t) {
-  if (lowerIsBetter(mode)) return t >= C.SG_FINISH_M / (C.BOARD_SG_MAX_AVG_KMH / 3.6) && m >= t * 100 - 1;
+  if (lowerIsBetter(mode)) return t >= courseM(mode) / (cv(courseOf(mode), 'boardKmh') / 3.6) && m >= t * 100 - 1;
   return m <= t * (C.BOARD_MAX_AVG_KMH / 3.6);
 }
 
@@ -128,7 +130,7 @@ export function viewFor(boards, mode, ownKey, rows = C.BOARD_ROWS) {
 // das Tempo also das tatsächlich gefahrene. Einträge ohne t (alte Stände) haben kein Tempo: kmh 0, die Anzeige
 // setzt einen Strich.
 export function statsFor(boards, mode, ownKey) {
-  const dist = (e) => (lowerIsBetter(mode) ? C.SG_FINISH_M : e.m);
+  const dist = (e) => (lowerIsBetter(mode) ? courseM(mode) : e.m);
   return sortEntries(boards && boards[mode], mode, ownKey).map((e, i) => ({
     rank: i + 1, key: e.key, name: e.name, m: e.m, t: e.t,
     kmh: e.t > 0 ? (dist(e) / e.t) * 3.6 : 0,

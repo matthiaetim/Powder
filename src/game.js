@@ -1,5 +1,5 @@
 // Spielzustand und Ablauf: ready → running → dead → (Fresh) → ready. Pause jederzeit.
-// Super-G (gates.js): ready → count (Countdown) → running → finished (Auslauf) → (Fresh) → ready.
+// Torlauf (Super-G, Slalom; gates.js): ready → count (Countdown) → running → finished (Auslauf) → (Fresh) → ready.
 // Duell (duel.js): ready mit hold (Lobby) → count aus einer gemeinsamen Uhr → running → dead → running (Weiterfahrt
 // nach der Sturzpause) → finished an der Zielweite oder wenn die Zeit vorbei ist.
 import { C } from './constants.js';
@@ -12,9 +12,11 @@ import { createParticles, clearParticles, spawnParticle, updateParticles } from 
 import { loadBest, saveBest, loadBestTime, saveBestTime, loadSplitRef, saveSplitRef, loadRider, saveRider, noteRecentMode, loadMarksOn, saveMarksOn } from './storage.js';
 import { MODES, DEFAULT_MODE, lowerIsBetter } from './modes.js';
 import { RIDERS, validRider } from './riders.js';
-import { createCourse, updateCourse, tickCourse, crossFrac } from './gates.js';
+import { createCourse, updateCourse, tickCourse, crossFrac, courseOf, cv } from './gates.js';
+import { fenceClamp, fenceRelax } from './fence.js';
 import { rollYeti, updateYeti } from './yeti.js';
-import { startStop, speedAt, distAt, headingAt } from './hockey.js';
+import { startStop, speedAt, distAt, headingAt, stopClock } from './hockey.js';
+import { createStadium, updateStadium, clearsWorld, glide, partying } from './stadium.js';
 
 const READY_FRAC = 0.78; // Fahrer steht im Intro weit unten im Bild
 
@@ -26,7 +28,8 @@ export function createGame(opts = {}) {
   const g = {
     state: 'ready',
     skier: P.createSkier(), world: null, av: null,
-    course: null, // Super-G: Tore und Wertung (gates.js), in den anderen Modi null
+    course: null, // Torlauf (Super-G, Slalom): Tore und Wertung (gates.js), in den anderen Modi null
+    stadium: null, // Slalom: Zielstadion (stadium.js)
     yeti: null,   // Classic: Yeti-Spuren (yeti.js), nur in manchen Läufen
     summitT: -1,  // Classic: Laufzeit beim Erreichen der Everest-Höhe (HUD zeigt kurz „Everest“), < 0 = noch nicht
     track: createTrack(), particles: createParticles(),
@@ -43,13 +46,13 @@ export function createGame(opts = {}) {
     readyT: 0, deadT: 0, deadCause: '',
     countT: 0, countBeeps: 0, finT: 0, pausedFrom: 'running', // Super-G: Countdown-Zeit und -Töne, Auslauf-Zeit, woher die Pause kam
     crashV: 0, crashX: 0, crashY: 0, crashPush: 0, // Tempo, Hindernis und Schub beim Aufprall (für die Splitter)
-    stop: null, // Hockeystop nach dem Ziel (hockey.js): beim Ziel festgehaltener Anfang
+    stop: null, // Hockeystop nach dem Ziel (hockey.js): festgehaltener Anfang; im Zielstadion erst nach dem Gleiten
     // fogT: -1, // < 0 = kein Nebel; sonst verstrichene Zeit seit dem Hockeystop (render.js) — deaktiviert
     camX: 0, skierFrac: READY_FRAC, zoom: 1,
     viewWm: C.VIEW_W_M, viewHm: C.VIEW_W_M * C.VIEW_ASPECT,
     debug: !!opts.debug, lastGesture: '–', runs: 0,
     trackAcc: 0, spawnAcc: 0, plowAcc: 0,
-    onEvent: null, // Haken für den Ton (main.js): press, release, plow, crash, beep, gate, pole, split, finish, summit
+    onEvent: null, // Haken für den Ton (main.js): press, release, plow, crash, beep, gate, pole, fence, split, finish, summit
     onCourse: null, // Rückruf des Torlaufs (einmal gebunden, keine Allokation pro Schritt)
     // Duell (duel.js): Start gesperrt (Lobby), Countdown aus der gemeinsamen Uhr, Zielweite, Sturzpause, Zeit vorbei,
     // Schonfrist nach der Weiterfahrt, Stürze im Lauf und Radius des letzten Hindernisses, Rückruf am Ziel, Pose des
@@ -67,17 +70,20 @@ export function hasAvalanche(g) {
   return g.mode === 'chase';
 }
 
-export function isSuperG(g) {
-  return g.mode === 'superg';
+// Torlauf-Modi (Super-G, Slalom): Kurs mit Toren, Countdown, Zeitwertung (gates.js COURSES)
+export function isCourse(g) {
+  return !!courseOf(g.mode);
 }
 
 export function isDuel(g) {
   return g.mode === 'duel';
 }
 
-// Super-G fährt immer denselben Kurs (SG_SEED), damit Bestzeiten vergleichbar sind; ?seed= gilt für alle Modi.
+// Ein Torlauf fährt immer denselben Kurs (SG_SEED, SL_SEED), damit Bestzeiten vergleichbar sind; ?seed= gilt für
+// alle Modi.
 function seedFor(g) {
-  return g.fixedSeed ?? (isSuperG(g) ? C.SG_SEED : randomSeed());
+  const spec = courseOf(g.mode);
+  return g.fixedSeed ?? (spec ? cv(spec, 'seed') : randomSeed());
 }
 
 // Bestwerte des gewählten Modus: Meter (Classic, Lawine) und Bestzeit mit Zwischenzeiten (Super-G)
@@ -97,12 +103,19 @@ function emit(g, type, data) {
 export function reset(g, seed, intro) {
   g.seed = seed;
   g.skier = P.createSkier();
-  const sg = isSuperG(g);
-  // Super-G: flache Pistenmitte, die bei 0 in der Mitte beginnt, und ein hindernisfreier Streifen um sie herum
-  g.world = sg
-    ? createWorld(seed, { lane: { amp: C.SG_LANE_AMP_M, wave: C.SG_LANE_WAVE_M, amp2: 0, wave2: 97 }, phase: 0, pisteHalf: C.SG_PISTE_HALF_M, startLine: false })
+  const spec = courseOf(g.mode);
+  // Torlauf: flache Pistenmitte, die bei 0 in der Mitte beginnt, und ein hindernisfreier Streifen um sie herum; im
+  // Slalom etwas breiter, der Wald bleibt hinter dem Fangzaun
+  g.world = spec
+    ? createWorld(seed, {
+      lane: { amp: cv(spec, 'laneAmp'), wave: cv(spec, 'laneWave'), amp2: 0, wave2: 97 }, phase: 0,
+      pisteHalf: cv(spec, 'pisteHalf') + (spec.fence ? C.SL_FENCE_CLEAR_M : 0), startLine: false,
+    })
     : createWorld(seed);
-  g.course = sg ? createCourse(seed, g.world) : null;
+  g.course = spec ? createCourse(seed, g.world, spec) : null;
+  // Zielstadion: räumt seine Fläche in der Welt frei, bevor ensureView die ersten Zellen baut
+  const sd = g.stadium = spec && spec.stadium ? createStadium(g.course, g.world) : null;
+  if (sd) g.world.clear = (x, y, r) => clearsWorld(sd, x, y, r);
   g.av = createAvalanche(0);
   g.yeti = null;
   g.summitT = -1;
@@ -154,9 +167,9 @@ export function update(g, dt, left = 0) {
     case 'ready':
       g.readyT += dt;
       if (hasAvalanche(g) && C.AV_INTRO_M > 0) holdAvalanche(g.av, g.skier, 0, dt, topDist(g)); // schon vor dem Start im Bild
-      // Super-G wartet im Intro auf den Tipp: der gibt zugleich den Ton frei, sonst wäre der erste Countdown stumm.
+      // Der Torlauf wartet im Intro auf den Tipp: der gibt zugleich den Ton frei, sonst wäre der erste Countdown stumm.
       // Im Duell (hold) startet nur der gemeinsame Countdown (beginCount).
-      if (!g.hold && g.readyT * 1000 >= g.readyDelayMs && !(isSuperG(g) && g.intro)) launch(g);
+      if (!g.hold && g.readyT * 1000 >= g.readyDelayMs && !(isCourse(g) && g.intro)) launch(g);
       break;
     case 'count':
       g.countT = g.countClock ? g.countClock() : g.countT + dt; // Duell: gemeinsame Uhr statt Simulationszeit
@@ -178,12 +191,13 @@ export function update(g, dt, left = 0) {
     default:
       break;
   }
+  if (g.stadium) updateStadium(g.stadium, g, dt);
 }
 
-// Aus ready heraus: Super-G und Duell in den Countdown, die anderen Modi sofort los.
+// Aus ready heraus: Torlauf und Duell in den Countdown, die anderen Modi sofort los.
 function launch(g) {
   if (g.state !== 'ready') return;
-  if (isSuperG(g) || isDuel(g)) { g.state = 'count'; g.countT = 0; g.countBeeps = 0; } else start(g);
+  if (isCourse(g) || isDuel(g)) { g.state = 'count'; g.countT = 0; g.countBeeps = 0; } else start(g);
 }
 
 // Duell: Countdown aus einer gemeinsamen Uhr (duel.js). clock() liefert die Countdown-Zeit in s, 0 = erster Piepton,
@@ -224,8 +238,8 @@ function start(g) {
   if (g.mode === 'classic') g.yeti = rollYeti(g.world);
 }
 
-// Endtempo je Modus: der Super-G hat seinen eigenen Regler
-const maxKmh = (g) => (isSuperG(g) ? C.SG_MAX_SPEED_KMH : C.MAX_SPEED_KMH);
+// Endtempo je Modus: Super-G und Slalom haben ihren eigenen Regler
+const maxKmh = (g) => (g.course ? cv(g.course.spec, 'maxKmh') : C.MAX_SPEED_KMH);
 
 function step(g, dt, left) {
   const s = g.skier;
@@ -234,6 +248,8 @@ function step(g, dt, left) {
   // Hockeystop deaktiviert (Tim und Jürgen wollen ihn nicht) — auskommentiert statt gelöscht.
   // const wasHockey = s.hockeyT >= 0;
   P.updateSkier(s, dt, maxKmh(g));
+  if (g.course && g.course.spec.ramp) startBoost(g, s, dt);
+  if (g.course && g.course.spec.fence && fenceClamp(g.course, g.world, s, dt)) emit(g, 'fence', { v: s.v });
   // if (!wasHockey && s.hockeyT >= 0) hockeyStop(g);
   // if (g.fogT >= 0) {
   //   g.fogT += dt;
@@ -264,14 +280,25 @@ function step(g, dt, left) {
   if (g.course && updateCourse(g.course, s, px, py, g.runT, dt, g.bestSplits, g.onCourse)) finish(g);
 }
 
+// Starthügel (Slalom): auf den ersten Metern zusätzlicher Hangabtrieb, zum Ende des steilen Stücks weich auf null.
+// Wer quer steht, bekommt nichts davon (cos), das Endtempo des Modus gilt weiter.
+function startBoost(g, s, dt) {
+  const spec = g.course.spec, ramp = cv(spec, 'ramp');
+  if (!(ramp > 0) || !(s.y < ramp)) return;
+  const u = Math.max(0, s.y) / ramp;
+  s.v = Math.min(maxKmh(g) / 3.6, s.v + cv(spec, 'boost') * (1 - u * u * (3 - 2 * u)) * Math.max(0, Math.cos(s.theta)) * dt);
+}
+
 // Kamera: x folgt weich; bei Tempo rückt der Fahrer nach oben und die Sicht zoomt heraus
 function updateCamera(g, dt) {
   const s = g.skier;
   const k = lookahead(s.v);
-  const fracTarget = C.SKIER_SCREEN_Y_FRAC + (C.CAM_Y_FRAC_FAST - C.SKIER_SCREEN_Y_FRAC) * k;
+  // Im Zielstadion (nach dem Ziel) rückt das Bild auf die Mitte des Runds: Zielbogen oben, Tribünen ringsum
+  const arena = g.state === 'finished' ? g.stadium : null;
+  const fracTarget = arena ? C.STAD_CAM_FRAC : C.SKIER_SCREEN_Y_FRAC + (C.CAM_Y_FRAC_FAST - C.SKIER_SCREEN_Y_FRAC) * k;
   const zoomTarget = 1 + (C.CAM_ZOOM_FAST - 1) * k;
   const ease = 1 - Math.exp(-dt / C.CAM_ZOOM_EASE_S);
-  g.camX += (s.x - g.camX) * (1 - Math.exp(-dt / C.CAM_X_EASE_S));
+  g.camX += ((arena ? arena.cx : s.x) - g.camX) * (1 - Math.exp(-dt / C.CAM_X_EASE_S));
   g.skierFrac += (fracTarget - g.skierFrac) * ease;
   g.zoom += (zoomTarget - g.zoom) * ease;
   ensureView(g);
@@ -293,10 +320,24 @@ function advanceTrail(g, dt) {
 // alten Fahrtrichtung weiter und steht nach knapp einer Sekunde; Lage, Tempo und Stellung folgen geschlossen aus
 // g.finT. Die Spur wird zur breiten Bremsspur (Pflug-Band quer zur Fahrt, siehe drawTrack); das normale Spray
 // entfällt, den Schnee übernimmt die Wolke (hockey-view.js). Hindernisse zählen nicht mehr, der Lauf ist gewertet.
+// Im Zielstadion (Slalom) gleitet er vorher ins Rund (stadium.js glide), der Hockeystop beginnt so, dass er in der
+// Mitte steht.
 function coast(g, dt) {
-  const s = g.skier, st = g.stop;
+  const s = g.skier, sd = g.stadium;
   g.finT += dt;
-  const t = g.finT, d = distAt(st, t);
+  if (sd && sd.gliding) {
+    if (glide(sd, s, dt)) g.stop = startStop(s, g.finT);
+    else {
+      tickCourse(g.course, dt);
+      fenceRelax(g.course, dt);
+      if (s.y - s.y0 > g.dist) g.dist = s.y - s.y0;
+      updateCamera(g, dt);
+      advanceTrail(g, dt);
+      return;
+    }
+  }
+  const st = g.stop;
+  const t = stopClock(st, g.finT), d = distAt(st, t);
   s.theta = headingAt(st, t);
   s.omega = 0;
   s.v = speedAt(st, t);
@@ -305,7 +346,10 @@ function coast(g, dt) {
   s.brake = s.v > 0 ? C.STOP_DECEL_MIN + C.STOP_DECEL_K * s.v : 0; // der Ton kratzt, solange er rutscht
   s.carve = s.v > 0.5 ? 1 : 0;
   s.plowK *= Math.exp(-dt / C.PLOW_EASE_S);
-  if (g.course) tickCourse(g.course, dt); // Stangen schwingen aus, Hinweis läuft ab (im Duell gibt es keinen Kurs)
+  if (g.course) {
+    tickCourse(g.course, dt); // Stangen schwingen aus, Hinweis läuft ab (im Duell gibt es keinen Kurs)
+    if (g.course.spec.fence) fenceRelax(g.course, dt); // die Beule im Fangzaun schwingt aus
+  }
   if (s.y - s.y0 > g.dist) g.dist = s.y - s.y0;
   updateCamera(g, dt);
   g.trackAcc += s.v * dt;
@@ -318,9 +362,20 @@ function coast(g, dt) {
 
 // Ein Tipp nach dem Ziel überspringt Hockeystop und Wolke: g.finT springt ans Ende, die Fresh-Seite kommt sofort.
 // Die Schonfrist gegen Doppeltipps (freshReady) läuft ab dann, derselbe Tipp startet also keinen neuen Lauf.
+// Im Zielstadion steht der Fahrer dann sofort quer in der Mitte des Runds.
 function skipFinish(g) {
-  if (g.state !== 'finished' || g.finT * 1000 >= C.SG_FINISH_OVERLAY_MS) return false;
-  g.finT = C.SG_FINISH_OVERLAY_MS / 1000;
+  if (g.state !== 'finished' || g.finT * 1000 >= overlayMs(g)) return false;
+  const sd = g.stadium;
+  if (sd) {
+    if (sd.gliding) {
+      const s = g.skier;
+      sd.gliding = false;
+      s.x = sd.cx; s.y = sd.yc; s.v = 0;
+      g.stop = startStop(s, g.finT - 1); // der Stopp ist schon vorbei: keine Wolke, die Ski stehen quer
+      g.track.pendingGap = true;
+    }
+    g.finT = g.stop.t0 + C.STAD_HOLD_S;
+  } else g.finT = C.SG_FINISH_OVERLAY_MS / 1000;
   return true;
 }
 
@@ -331,7 +386,7 @@ export function endRun(g, data) {
   const s = g.skier;
   g.state = 'finished';
   g.finT = 0;
-  g.stop = startStop(s);
+  g.stop = g.stadium ? null : startStop(s); // Zielstadion: erst gleiten (coast)
   s.side = 0;
   s.plow = false;
   emit(g, 'finish', data);
@@ -509,7 +564,9 @@ function endedMs(g) {
   return (g.state === 'finished' ? g.finT : g.deadT) * 1000;
 }
 function overlayMs(g) {
-  return g.state === 'finished' ? C.SG_FINISH_OVERLAY_MS : C.DEATH_OVERLAY_MS;
+  if (g.state !== 'finished') return C.DEATH_OVERLAY_MS;
+  if (!g.stadium) return C.SG_FINISH_OVERLAY_MS;
+  return g.stop ? (g.stop.t0 + C.STAD_HOLD_S) * 1000 : Infinity; // Zielstadion: erst gleiten, dann der Stopp
 }
 // Im Duell (hold) steht die Fresh-Seite mit der Lobby auch über dem wartenden Startbild
 export function overlayReady(g) {
@@ -520,7 +577,7 @@ export function overlayReady(g) {
 export function animating(g) {
   switch (g.state) {
     case 'running': case 'count': return true;
-    case 'finished': return g.finT < C.STOP_CLOUD_S || g.skier.v > 0; // Hockeystop und Wolke
+    case 'finished': return g.finT < C.STOP_CLOUD_S || g.skier.v > 0 || (!!g.stadium && partying(g.stadium)); // Hockeystop, Wolke, Konfetti
     case 'dead': return g.deadT < C.DEAD_SETTLE_S || (g.respawnS > 0 && !g.raceOver); // Duell: Geist fährt, Weiterfahrt kommt
     default: return false; // ready, paused: das Bild steht
   }
@@ -529,10 +586,10 @@ export function animating(g) {
 export function freshReady(g) {
   return ended(g) && endedMs(g) >= overlayMs(g) + C.FRESH_GUARD_MS;
 }
-// Neustart mitten im Super-G (Knopf oben rechts, hud.js): der Lauf zählt nicht, es geht mit dem Countdown von vorn
+// Neustart mitten im Torlauf (Knopf oben rechts, hud.js): der Lauf zählt nicht, es geht mit dem Countdown von vorn
 // los. Nur im Countdown, in der Fahrt oder in der Pause; im Duell würde es das Rennen zerreißen.
 export function restart(g) {
-  if (!isSuperG(g) || !(g.state === 'count' || g.state === 'running' || g.state === 'paused')) return false;
+  if (!isCourse(g) || !(g.state === 'count' || g.state === 'running' || g.state === 'paused')) return false;
   reset(g, seedFor(g), false);
   return true;
 }

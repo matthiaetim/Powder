@@ -123,18 +123,18 @@ export function createHud(g, doc, hooks = {}) {
   const avgText = (meters, sec) => (sec > 0 ? t('dead.avg', { v: nf.format((meters / sec) * 3.6) }) : '');
   function refreshDead() {
     const cs = g.course;
-    if (g.runMode === 'superg' && g.state === 'finished') {
+    if (lowerIsBetter(g.runMode) && g.state === 'finished') {
       deadDist.textContent = formatClock(cs.total, true);
       deadTime.textContent = (cs.misses === 0
         ? t('gates.all', { n: nf.format(cs.gates.length) })
         : `${cs.misses === 1 ? t('gates.miss1') : t('gates.missN', { n: nf.format(cs.misses) })} · +${nf1.format(cs.penalty)} s`)
-        + avgText(C.SG_FINISH_M, cs.time);
+        + avgText(cs.finishY, cs.time);
     } else {
       const m = Math.floor(g.dist);
       deadDist.textContent = nf.format(m) + ' m';
-      deadTime.textContent = g.runMode === 'superg' ? t('noFinish') : t('dead.in', { t: formatRunTime(g.runT) }) + avgText(m, g.runT);
+      deadTime.textContent = lowerIsBetter(g.runMode) ? t('noFinish') : t('dead.in', { t: formatRunTime(g.runT) }) + avgText(m, g.runT);
     }
-    if (g.mode === 'superg') {
+    if (lowerIsBetter(g.mode)) {
       deadBest.textContent = g.newBestTime && g.mode === g.runMode ? t('best.newTime')
         : g.bestTime > 0 ? t('best.time', { t: formatClock(g.bestTime / 100, true) }) : t('best.noTime');
     } else {
@@ -482,10 +482,10 @@ export function createHud(g, doc, hooks = {}) {
     if (g.mode !== lastMode) {
       lastMode = g.mode;
       doc.body.dataset.mode = g.mode;
-      hintEl.textContent = t(g.mode === 'superg' ? 'hint.superg' : 'hint');
+      hintEl.textContent = t(lowerIsBetter(g.mode) ? 'hint.superg' : 'hint'); // Torlauf: der Tipp startet den Countdown
     }
     // Neustart-Knopf: im Torlauf und gegen den Bot, der Bot kann im Duell jederzeit dazukommen oder gehen
-    const race = g.mode === 'superg' || !!(duel && duel.vsBot()) ? '1' : '';
+    const race = lowerIsBetter(g.mode) || !!(duel && duel.vsBot()) ? '1' : '';
     if (race !== lastRace) { lastRace = race; doc.body.dataset.race = race; }
     if (g.state !== lastState) {
       lastState = g.state;
@@ -536,7 +536,7 @@ export function createHud(g, doc, hooks = {}) {
         g.mode === 'chase'
           ? `lawine gap=${av.gap.toFixed(1)} m  v=${(av.speed * 3.6).toFixed(0)} km/h  pace=${(av.pace * 3.6).toFixed(0)} km/h  stall=${av.stallT.toFixed(1)} s  near=${av.near.toFixed(2)}  threat=${av.threat.toFixed(2)}  gnade=${av.mercy.toFixed(2)}`
           : cs
-            ? `super-g tor=${cs.next}/${cs.gates.length}  verpasst=${cs.misses}  strafe=${cs.penalty} s  stangen=${cs.hits}  splits=${cs.splits.map((c) => (c / 100).toFixed(2)).join('/')}  best=${(g.bestTime / 100).toFixed(2)} [${g.bestSplits.map((c) => (c / 100).toFixed(2)).join('/')}]  ziel=${cs.finished ? cs.total.toFixed(2) : '-'}`
+            ? `torlauf tor=${cs.next}/${cs.gates.length}  verpasst=${cs.misses}  strafe=${cs.penalty} s  stangen=${cs.hits}  splits=${cs.splits.map((c) => (c / 100).toFixed(2)).join('/')}  best=${(g.bestTime / 100).toFixed(2)} [${g.bestSplits.map((c) => (c / 100).toFixed(2)).join('/')}]  ziel=${cs.finished ? cs.total.toFixed(2) : '-'}`
             : 'lawine: aus (Classic)',
         `objs=${g.world.objCount}  cells=${g.world.cells.size}  track=${g.track.n}`,
         `gesture=${g.lastGesture}`,

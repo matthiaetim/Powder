@@ -1,6 +1,6 @@
 // Service Worker: alles vorab cachen, offline starten. Cache-Name trägt die Version,
 // damit ein Deploy beim nächsten Start ankommt. Version bumpen: tools/bump.sh <version>
-const VERSION = '0.27.5';
+const VERSION = '0.27.6';
 const CACHE = 'powder-' + VERSION;
 const FILES = [
   './',
@@ -34,6 +34,12 @@ const FILES = [
   './src/yeti.js',
   './src/gates.js',
   './src/gate-marks.js',
+  './src/guide-line.js',
+  './src/fence.js',
+  './src/fence-view.js',
+  './src/start-house.js',
+  './src/stadium.js',
+  './src/stadium-view.js',
   './src/snow-scrub.js',
   './src/tune.js',
   './src/input.js',

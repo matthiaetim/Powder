@@ -33,6 +33,7 @@ const DE = {
   'mode.classic': 'Classic', 'mode.classic.desc': 'So weit es geht.',
   'mode.chase': 'Lawine', 'mode.chase.desc': 'Fahr der Lawine davon.',
   'mode.superg': 'Super-G', 'mode.superg.desc': '21 Tore auf Zeit, 1000 m.',
+  'mode.slalom': 'Slalom', 'mode.slalom.desc': '30 Tore im Rhythmus, 500 m.',
   'mode.duel': 'Duell', 'mode.duel.desc': 'Zu zweit, live. Wer ist zuerst am Ziel?',
   'mode.offline': 'Braucht Internet und die Datenbank.',
   'rider.ski': 'Ski', 'rider.board': 'Snowboard', 'rider.sled': 'Schlitten',
@@ -146,7 +147,8 @@ const DE = {
   'snd.SND_SKI': 'Ski und Kurven',
   'snd.SND_AV': 'Lawine',
   'snd.SND_CRASH': 'Aufprall',
-  'snd.SND_RACE': 'Super-G',
+  'snd.SND_RACE': 'Rennen',
+  'snd.SND_CROWD': 'Publikum',
 };
 
 const EN = {
@@ -174,6 +176,7 @@ const EN = {
   'mode.classic': 'Classic', 'mode.classic.desc': 'As far as you can.',
   'mode.chase': 'Avalanche', 'mode.chase.desc': 'Outrun the avalanche.',
   'mode.superg': 'Super-G', 'mode.superg.desc': '21 gates against the clock, 1000 m.',
+  'mode.slalom': 'Slalom', 'mode.slalom.desc': '30 gates in rhythm, 500 m.',
   'mode.duel': 'Duel', 'mode.duel.desc': 'Two players, live. Who finishes first?',
   'mode.offline': 'Needs internet and the database.',
   'rider.ski': 'Ski', 'rider.board': 'Snowboard', 'rider.sled': 'Sled',
@@ -287,7 +290,8 @@ const EN = {
   'snd.SND_SKI': 'Skis and turns',
   'snd.SND_AV': 'Avalanche',
   'snd.SND_CRASH': 'Crashes',
-  'snd.SND_RACE': 'Super-G',
+  'snd.SND_RACE': 'Races',
+  'snd.SND_CROWD': 'Crowd',
 };
 
 const JA = {
@@ -315,6 +319,7 @@ const JA = {
   'mode.classic': 'クラシック', 'mode.classic.desc': 'どこまで行けるか。',
   'mode.chase': '雪崩', 'mode.chase.desc': '雪崩から逃げ切れ。',
   'mode.superg': 'スーパーG', 'mode.superg.desc': '21旗門のタイムレース、1000 m。',
+  'mode.slalom': 'スラローム', 'mode.slalom.desc': 'リズムよく30旗門、500 m。',
   'mode.duel': '対戦', 'mode.duel.desc': '2人でリアルタイム対戦。先にゴールするのは?',
   'mode.offline': 'インターネットとデータベースが必要です。',
   'rider.ski': 'スキー', 'rider.board': 'スノーボード', 'rider.sled': 'そり',
@@ -428,7 +433,8 @@ const JA = {
   'snd.SND_SKI': 'スキーとターン',
   'snd.SND_AV': '雪崩',
   'snd.SND_CRASH': '衝突',
-  'snd.SND_RACE': 'スーパーG',
+  'snd.SND_RACE': 'レース',
+  'snd.SND_CROWD': '観客',
 };
 
 const ES = {
@@ -456,6 +462,7 @@ const ES = {
   'mode.classic': 'Clásico', 'mode.classic.desc': 'Lo más lejos posible.',
   'mode.chase': 'Avalancha', 'mode.chase.desc': 'Escapa de la avalancha.',
   'mode.superg': 'Súper-G', 'mode.superg.desc': '21 puertas contra el reloj, 1000 m.',
+  'mode.slalom': 'Eslalon', 'mode.slalom.desc': '30 puertas con ritmo, 500 m.',
   'mode.duel': 'Duelo', 'mode.duel.desc': 'Dos jugadores, en directo. ¿Quién llega primero?',
   'mode.offline': 'Necesita internet y la base de datos.',
   'rider.ski': 'Esquí', 'rider.board': 'Snowboard', 'rider.sled': 'Trineo',
@@ -569,7 +576,8 @@ const ES = {
   'snd.SND_SKI': 'Esquís y giros',
   'snd.SND_AV': 'Avalancha',
   'snd.SND_CRASH': 'Choques',
-  'snd.SND_RACE': 'Súper-G',
+  'snd.SND_RACE': 'Carreras',
+  'snd.SND_CROWD': 'Público',
 };
 
 const DICT = { de: DE, en: EN, es: ES, ja: JA };
