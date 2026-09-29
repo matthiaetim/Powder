@@ -357,7 +357,8 @@ export function createHud(g, doc, hooks = {}) {
       ownM.textContent = v.own ? scoreText(v.own.m) : local > 0 ? scoreText(local) : '–';
     }
     const verdict = board.lastVerdict();
-    noteEl.textContent = verdict ? verdictText(verdict) : board.stale() ? 'Letzter bekannter Stand' : 'Tippen für Details';
+    noteEl.textContent = verdict ? verdictText(verdict) : board.taken() ? 'Name gehört einem anderen Gerät'
+      : board.stale() ? 'Letzter bekannter Stand' : 'Tippen für Details';
   }
 
   // Detail-Kachel: ein Tipp auf die Liste (nicht auf die eigene Zeile, die gehört dem Namensfeld) zeigt alle Einträge

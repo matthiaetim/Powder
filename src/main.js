@@ -7,6 +7,7 @@ import { createHud } from './hud.js';
 import { loadTune } from './tune.js';
 import { createSound } from './audio.js';
 import { createNet } from './net.js';
+import { createAuth } from './auth.js';
 import { createBoard } from './board.js';
 import { createDuel } from './duel.js';
 import { validCode } from './room.js';
@@ -24,9 +25,15 @@ const snd = createSound(game);
 // Bestenliste (board.js) und Duell-Räume (room.js, duel.js) teilen sich die Datenbank: ?board=local nutzt die Mocks des
 // Dev-Servers (node tools/serve.js 8082 --board), ?board=<URL> eine andere Datenbank, sonst BOARD_URL aus constants.js.
 // Leer = aus. ?room=CODE öffnet nach dem Start direkt die Lobby dieses Raums (Einladungslink).
+// Anmeldung (auth.js) passend dazu: beim Mock dessen Nachbau unter derselben Adresse, ?auth=<Präfix> für den Emulator
+// (?auth=http://127.0.0.1:9099/), sonst Google mit AUTH_KEY.
 const boardParam = params.get('board');
 const dbUrl = boardParam === 'local' ? location.origin : boardParam || C.BOARD_URL;
-const net = createNet(dbUrl, { EventSourceImpl: window.EventSource });
+const authParam = params.get('auth');
+const auth = boardParam === 'local' ? createAuth({ key: 'local', prefix: location.origin + '/' })
+  : authParam ? createAuth({ key: C.AUTH_KEY || 'emulator', prefix: authParam })
+  : createAuth();
+const net = createNet(dbUrl, { EventSourceImpl: window.EventSource, auth });
 const board = createBoard({ url: dbUrl, g: game, debug: game.debug, net });
 const duel = createDuel({ g: game, net, board, onTune: () => onResize(), debug: game.debug });
 game.onEvent = (type, data) => { snd.event(type, data); duel.event(type, data); };

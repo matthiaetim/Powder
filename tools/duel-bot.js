@@ -1,7 +1,8 @@
 // Automatischer Gegner fürs Duell, nur zum Testen: tritt einem Raum bei (oder eröffnet einen), meldet sich bereit und
 // fährt beim Start eine plausible Linie mit fünf Positionen pro Sekunde bis zur Zielweite. Läuft in Node gegen den
 // Mock (node tools/serve.js 8082 --board) oder gegen die echte Datenbank.
-// Aufruf: node tools/duel-bot.js <basis-url> <code> [--name Jo] [--rider board] [--kmh 110] [--crash 400] [--host]
+// Aufruf: node tools/duel-bot.js <basis-url> <code> [--name Jo] [--rider board] [--kmh 110] [--crash 400] [--host] [--auth <präfix>]
+//   --auth <präfix>: Anmeldung beim Emulator (http://127.0.0.1:9099/); ohne: beim Mock dessen Nachbau, sonst Google
 //   --crash <m>: stürzt einmal bei dieser Weite (Halt für die Sturzpause des Raums)
 //   --host: eröffnet selbst einen Raum, wartet auf einen Gast und startet, sobald er bereit ist
 const { NodeEventSource } = require('./sse.js');
@@ -19,8 +20,13 @@ const vmax = Number(opt('kmh', 110)) / 3.6, crashAt = Number(opt('crash', 0));
 (async () => {
   const { C } = await import('../src/constants.js');
   const { createNet } = await import('../src/net.js');
+  const { createAuth } = await import('../src/auth.js');
   const { createRoom, SV } = await import('../src/room.js');
-  const net = createNet(base, { EventSourceImpl: NodeEventSource });
+  const authPrefix = opt('auth', '');
+  const auth = authPrefix ? createAuth({ key: C.AUTH_KEY || 'emulator', prefix: authPrefix })
+    : base.startsWith('https://') ? createAuth()
+    : createAuth({ key: 'local', prefix: base.split('?')[0].replace(/\/+$/, '') + '/' });
+  const net = createNet(base, { EventSourceImpl: NodeEventSource, auth });
   let mirror = null;
   const room = createRoom(net, { onChange: (m) => { mirror = m; } });
   const role = args.includes('--host') ? 'host' : 'guest';

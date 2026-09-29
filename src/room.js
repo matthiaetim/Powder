@@ -1,7 +1,8 @@
 // Raum eines Duells in der Firebase Realtime Database (REST + Stream über net.js), reine Logik ohne DOM: anlegen,
 // beitreten, Felder schreiben, den Raum live spiegeln, Serverzeit schätzen. Was im Raum steht, legt duel.js fest;
-// die Regeln stehen in tools/firebase-rules.json und prüfen dieselbe Form. Ohne Anmeldung ist der Code das Geheimnis:
-// wer ihn kennt, darf alles im Raum schreiben, wie bei der Bestenliste.
+// die Regeln stehen in tools/firebase-rules.json und prüfen dieselbe Form. Jeder Platz trägt die uid des Geräts (auth.js):
+// Raumfelder schreibt nur der Host, den eigenen Platz und die eigene Position nur sein Besitzer. Der Code allein reicht
+// also nicht mehr, um ein fremdes Duell zu stören.
 import { C, VERSION } from './constants.js';
 
 export const SV = { '.sv': 'timestamp' }; // Server-Zeitstempel, löst Firebase beim Schreiben auf
@@ -105,10 +106,12 @@ export function createRoom(net, { onChange = null, onStatus = null, debug = fals
       const old = got.data;
       if (validRoom(old) && typeof old.ts === 'number' && old.ts > serverNow() - C.DUEL_ROOM_TTL_MS) continue;
       code = c; role = 'host';
+      const host = { name: player.name, rider: player.rider, ready: true, v: VERSION, seen: SV };
+      const uid = await net.whoami();
+      if (uid) host.uid = uid;
       const body = {
         v: VERSION, ts: SV, round: 1, seed, target: C.DUEL_TARGET_DEFAULT_M, pause: C.DUEL_CRASH_PAUSE_S,
-        state: 'lobby', startAt: 0,
-        players: { host: { name: player.name, rider: player.rider, ready: true, v: VERSION, seen: SV } },
+        state: 'lobby', startAt: 0, players: { host },
       };
       const r = await write('put', '', body, false);
       if (!r.ok) { code = ''; role = ''; return r.status === 401 ? 'rules' : 'error'; }
@@ -121,8 +124,8 @@ export function createRoom(net, { onChange = null, onStatus = null, debug = fals
   }
 
   // Beitreten: Raum muss da, gleich alt (Version) und in der Lobby oder nach dem Rennen (done) sein; ein Gast, der sich
-  // in der letzten Minute gemeldet hat, blockiert den Platz, außer er trägt denselben Namen (dann ist es derselbe Spieler
-  // nach einem Neuladen, etwa wenn iOS die App im Hintergrund beendet hat).
+  // in der letzten Minute gemeldet hat, blockiert den Platz, außer es ist dasselbe Gerät (dieselbe uid, etwa nach einem
+  // Neuladen, wenn iOS die App im Hintergrund beendet hat). Ohne Anmeldung zählt wie früher der Name.
   async function join(c, player) {
     const got = await net.get(`/rooms/${c}.json`);
     if (!got.ok) return got.status === 401 ? 'rules' : 'error';
@@ -131,12 +134,14 @@ export function createRoom(net, { onChange = null, onStatus = null, debug = fals
     if (typeof r0.ts === 'number' && r0.ts < serverNow() - C.DUEL_ROOM_TTL_MS) return 'missing';
     if (r0.v !== VERSION) return 'version';
     const guest = r0.players.guest;
+    const uid = await net.whoami();
     const fresh = guest && typeof guest.seen === 'number' && guest.seen > serverNow() - C.DUEL_LOBBY_GONE_S * 1000;
-    if (fresh && guest.name !== player.name) return 'full';
+    if (fresh && (uid && guest.uid ? guest.uid !== uid : guest.name !== player.name)) return 'full';
     if (r0.state !== 'lobby' && r0.state !== 'done') return 'busy';
     code = c; role = 'guest';
     const me = { name: player.name, rider: player.rider, ready: false, v: VERSION, seen: SV };
-    const r = await write('patch', 'players/guest', me, false);
+    if (uid) me.uid = uid;
+    const r = await write('put', 'players/guest', me, false); // ganzer Platz: kein Feld des Vorgängers bleibt stehen
     if (!r.ok) { code = ''; role = ''; return r.status === 401 ? 'rules' : 'error'; }
     probe(r.t0, r.t1, r.data && r.data.seen);
     mirror = r0;

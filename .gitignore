@@ -1,1 +1,4 @@
 .DS_Store
+# Firebase-Emulator (tools/rules-test.mjs)
+tools/*-debug.log
+tools/.firebaserc

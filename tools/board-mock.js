@@ -1,11 +1,13 @@
 // Mock der Firebase-REST-Schnittstelle für die Bestenliste, nur zum lokalen Testen: node tools/serve.js 8082 --board,
 // im Browser ?board=local. Hält die Einträge im Speicher (Neustart = Ausgangsstand) und prüft wie
-// tools/firebase-rules.json: nur classic/chase/superg, Schlüssel a-z0-9- mit 2 bis 24 Zeichen, genau die fünf Felder,
-// m ganz 1..99999 und nie schlechter als der Bestand (Meter nie kleiner, Super-G-Zeit in Hundertstel nie größer),
-// kein Löschen. Antwortet wie Firebase: 200 mit Echo, 401 Permission denied.
+// tools/firebase-rules.json: Schreiben nur angemeldet (auth-mock.js) und nur in eigene Einträge (uid) oder in einen
+// Altbestand ohne uid mit gleichem Namen; nur classic/chase/superg, Schlüssel a-z0-9- mit 2 bis 24 Zeichen, genau die
+// sechs Felder, m ganz 1..99999 und nie schlechter als der Bestand (Meter nie kleiner, Super-G-Zeit in Hundertstel nie
+// größer), plausibles Tempo, kein Löschen. Antwortet wie Firebase: 200 mit Echo, 401 Permission denied.
 const MODES = ['classic', 'chase', 'superg'];
 const TIME_MODES = ['superg'];
-const FIELDS = ['name', 'm', 't', 'ts', 'v'];
+const FIELDS = ['name', 'm', 't', 'ts', 'v', 'uid'];
+const { uidOf } = require('./auth-mock.js');
 
 function seed(rows) {
   const out = {};
@@ -14,8 +16,8 @@ function seed(rows) {
   return out;
 }
 const boards = {
-  classic: seed([['Luki', 4321, 83.27], ['Mia', 2890, 61.02], ['Jonas', 1750, 40.1], ['Ela', 980, 25.4], ['Tom', 640, 17.9], ['Ida', 150, 6.2]]),
-  chase: seed([['Luki', 2210, 52.3], ['Mia', 1430, 38.8], ['Tom', 510, 15.1]]),
+  classic: seed([['Luki', 4321, 263.27], ['Mia', 2890, 191.02], ['Jonas', 1750, 120.1], ['Ela', 980, 25.4], ['Tom', 640, 17.9], ['Ida', 150, 6.2]]),
+  chase: seed([['Luki', 2210, 85.3], ['Mia', 1430, 38.8], ['Tom', 510, 15.1]]),
   superg: seed([['Luki', 2712, 27.12], ['Mia', 2980, 26.8], ['Jonas', 3350, 30.5], ['Ela', 4120, 35.2], ['Tom', 5205, 43.05], ['Ida', 6890, 62.9]]),
 };
 
@@ -31,8 +33,10 @@ function send(res, status, body) {
 const denied = (res) => send(res, 401, { error: 'Permission denied' });
 
 // Prüft einen Eintrag wie die Regeln; liefert den zu speichernden Eintrag (Server-Zeit aufgelöst) oder null.
-function accept(mode, key, data, existing) {
-  if (!MODES.includes(mode)) return null;
+function accept(mode, key, data, existing, uid) {
+  if (!uid || !MODES.includes(mode)) return null;
+  if (existing && existing.uid !== uid && (existing.uid || !data || data.name !== existing.name)) return null;
+  if (!data || data.uid !== uid) return null;
   if (!/^[a-z0-9-]+$/.test(key) || key.length < 2 || key.length > 24) return null;
   if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
   const keys = Object.keys(data);
@@ -42,11 +46,12 @@ function accept(mode, key, data, existing) {
   if (typeof name !== 'string' || name.length < 2 || name.length > 12) return null;
   if (typeof m !== 'number' || !Number.isInteger(m) || m < 1 || m > 99999) return null;
   if (existing && (TIME_MODES.includes(mode) ? m > existing.m : m < existing.m)) return null;
-  if (typeof t !== 'number' || t < 0) return null;
-  if (ts && typeof ts === 'object' && ts['.sv'] === 'timestamp') ts = Date.now();
-  if (typeof ts !== 'number' || ts > Date.now()) return null;
+  if (typeof t !== 'number' || t <= 0 || t > 86400) return null;
+  if (TIME_MODES.includes(mode) ? t < 19.46 || m < t * 100 - 1 : m > t * 41.66) return null;
+  if (!(ts && typeof ts === 'object' && ts['.sv'] === 'timestamp')) return null; // Regeln: ts == now
+  ts = Date.now();
   if (typeof v !== 'string' || v.length > 16) return null;
-  return { name, m, t, ts, v };
+  return { name, m, t, ts, v, uid };
 }
 
 function readBody(req) {
@@ -72,7 +77,7 @@ function handle(req, res) {
     readBody(req).then((raw) => {
       let data;
       try { data = JSON.parse(raw); } catch { send(res, 400, { error: 'Invalid data; couldn\'t parse JSON object' }); return; }
-      const entry = accept(mode, key, data, boards[mode] && boards[mode][key]);
+      const entry = accept(mode, key, data, boards[mode] && boards[mode][key], uidOf(req));
       if (!entry) { denied(res); return; }
       boards[mode][key] = entry;
       console.log(`[board] ${mode}/${key} ← ${entry.name} ${entry.m}${TIME_MODES.includes(mode) ? ' Hundertstel' : ' m'}`);

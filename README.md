@@ -30,7 +30,7 @@ Plain HTML + JavaScript + Canvas, kein Framework, kein Build.
 
 ### Duell
 
-zwei iPhones fahren live dieselbe Strecke (gleicher Seed, Classic-Gelände) gegeneinander. Wer „Duell“ wählt, eröffnet einen Raum mit einem Code aus vier Buchstaben; der andere tippt den Code in seiner App ein (Zeile „Code · Beitreten“) oder öffnet den geteilten Link (`?room=CODE`, landet auf dem iPhone in Safari, deshalb ist der Code der Hauptweg). Die Lobby zeigt beide Startnummern, der Host stellt die Zielweite (1.000 bis 10.000 m in 500-m-Schritten), der Gast tippt „Bereit“, der Host „Los“: beide bekommen den Super-G-Countdown. Gewertet wird die eigene Zeit ab dem gemeinsamen Go bis zur Zielweite, gemessen mit der Wanduhr: Netzlaufzeit und Bildrate spielen keine Rolle, eine Pause kostet Zeit. Der Gegner fährt als halbtransparenter Geist mit Namensschild mit; ist er außer Sicht, steht ein Schild am unteren (er liegt vorn) oder oberen Bildrand mit dem Abstand, das HUD zeigt Abstand oder seine Vorgabe. Ein Sturz beendet den Lauf nicht: nach der Sturzpause (Regler, im Duell gilt der Wert des Hosts) geht es neben dem Hindernis mit Starttempo weiter, Stürze werden gezählt. Wer zuerst im Ziel ist, wartet; der andere fährt weiter, bis er die Zeit unterbietet oder seine Uhr darüber liegt. Das Ergebnis zeigt Sieger, beide Zeiten, Stürze und den lokalen Zähler gegen diesen Namen (`powder.duel`); „Revanche“ startet mit neuer Strecke im selben Raum: der Gast tippt „Revanche?“, der Host „Revanche“ und dann „Los“ (ein Gast, der schon Revanche wollte, ist in der neuen Lobby gleich bereit). Wer nach dem Rennen aus der App fliegt, kommt mit dem Code wieder in den Raum. Im Duell stehen die Regler des Abschnitts „Fahren“ auf Standard, beide Geräte müssen dieselbe Version haben, die Bestenliste bleibt außen vor. Technik: ein Raum unter `/rooms/CODE` in derselben Firebase-Datenbank wie die Bestenliste (`src/room.js`, `src/duel.js`, `src/duel-card.js`), Positionen fünfmal pro Sekunde per `PATCH`, Lesen live per Event-Stream; Räume werden nicht aufgeräumt, nach zwei Stunden ohne Statuswechsel dürfen sie überschrieben werden. Die Regeln in `tools/firebase-rules.json` müssen nach v0.22.0 einmal neu veröffentlicht werden, sonst meldet die Lobby „Die Regeln für Räume fehlen“.
+zwei iPhones fahren live dieselbe Strecke (gleicher Seed, Classic-Gelände) gegeneinander. Wer „Duell“ wählt, eröffnet einen Raum mit einem Code aus vier Buchstaben; der andere tippt den Code in seiner App ein (Zeile „Code · Beitreten“) oder öffnet den geteilten Link (`?room=CODE`, landet auf dem iPhone in Safari, deshalb ist der Code der Hauptweg). Die Lobby zeigt beide Startnummern, der Host stellt die Zielweite (1.000 bis 10.000 m in 500-m-Schritten), der Gast tippt „Bereit“, der Host „Los“: beide bekommen den Super-G-Countdown. Gewertet wird die eigene Zeit ab dem gemeinsamen Go bis zur Zielweite, gemessen mit der Wanduhr: Netzlaufzeit und Bildrate spielen keine Rolle, eine Pause kostet Zeit. Der Gegner fährt als halbtransparenter Geist mit Namensschild mit; ist er außer Sicht, steht ein Schild am unteren (er liegt vorn) oder oberen Bildrand mit dem Abstand, das HUD zeigt Abstand oder seine Vorgabe. Ein Sturz beendet den Lauf nicht: nach der Sturzpause (Regler, im Duell gilt der Wert des Hosts) geht es neben dem Hindernis mit Starttempo weiter, Stürze werden gezählt. Wer zuerst im Ziel ist, wartet; der andere fährt weiter, bis er die Zeit unterbietet oder seine Uhr darüber liegt. Das Ergebnis zeigt Sieger, beide Zeiten, Stürze und den lokalen Zähler gegen diesen Namen (`powder.duel`); „Revanche“ startet mit neuer Strecke im selben Raum: der Gast tippt „Revanche?“, der Host „Revanche“ und dann „Los“ (ein Gast, der schon Revanche wollte, ist in der neuen Lobby gleich bereit). Wer nach dem Rennen aus der App fliegt, kommt mit dem Code wieder in den Raum. Im Duell stehen die Regler des Abschnitts „Fahren“ auf Standard, beide Geräte müssen dieselbe Version haben, die Bestenliste bleibt außen vor. Technik: ein Raum unter `/rooms/CODE` in derselben Firebase-Datenbank wie die Bestenliste (`src/room.js`, `src/duel.js`, `src/duel-card.js`), Positionen fünfmal pro Sekunde per `PATCH`, Lesen live per Event-Stream; Räume werden nicht aufgeräumt, nach zwei Stunden ohne Statuswechsel dürfen sie überschrieben werden. Jeder Platz trägt die `uid` seines Geräts, nur der Host ändert den Raum (siehe „Schutz vor Vandalismus“).
 
 **Gegen den Bot** (ab v0.26.0): Der Knopf „Gegen Bot“ in der Duell-Kachel startet dasselbe Duell gegen einen Fahrer, der auf dem eigenen Gerät mitfährt, ohne Internet und ohne Namen. In der Lobby sitzt der Bot auf Startnummer 2, darunter stehen sechs Stufen zur Wahl: Anfänger, Hobby, Fortgeschritten, Profi, Weltcup, Legende; die gewählte Stufe bleibt gespeichert (`powder.bot.level`). Der Bot fährt mit derselben Physik durch dieselbe Strecke und lenkt wie ein Spieler über Halten und Loslassen, er stürzt an denselben Bäumen und liegt dieselbe Sturzpause. Jede Stufe fährt ihr eigenes Rennen, unabhängig vom Spieler. Zwei Unterschiede zum Duell gegen Menschen: eine Pause (auch der Wechsel in den Hintergrund) hält Uhr und Bot an, und Siege werden nicht gezählt. Richtwerte über 1.000 m (Mittel aus 60 Strecken, freie Schussfahrt ohne Hindernisse 24,4 s): Anfänger 57,5 s, Hobby 49,2 s, Fortgeschritten 41,5 s, Profi 35,1 s, Weltcup 29,5 s, Legende 26,6 s; die Legende stürzt nicht, die anderen im Schnitt 0,1 bis 0,6 Mal je Rennen. Technik: `src/bot.js` (Fahrer: probiert im Takt seiner Reaktionszeit Fahrwinkel aus, rechnet jeden mit der echten Physik voraus und nimmt den besten), `src/bot-room.js` (Raum im Speicher mit der Schnittstelle von `src/room.js`, so bleibt `src/duel.js` für beide Gegner dasselbe); die Stufen stehen als `BOT_LEVELS` in `src/constants.js`.
 
@@ -40,8 +40,12 @@ Die Fresh-Seite zeigt die fünf Besten des gewählten Modus (Rang, Name, Wert), 
 liegt er außerhalb, steht er nach „…“ mit seinem Rang darunter. In Classic und Lawine zählt die Weite in Metern, im
 Super-G die Gesamtzeit (Zeit plus Strafen, schnellste zuerst); dort zählt nur ein Lauf bis ins Ziel, ein Sturz
 davor meldet nichts. Beim ersten Sturz fragt die Seite einmal nach einem Namen (2 bis 12 Zeichen), ein Tipp auf den
-eigenen Eintrag ändert ihn. Die Identität ist der Name: gleiche Namen teilen sich einen Eintrag (auch von einem zweiten
-Gerät), ein Eintrag wird nur durch einen besseren überschrieben. Wer sich umbenennt, lädt seinen Bestwert unter dem neuen
+eigenen Eintrag ändert ihn. Ein Eintrag gehört dem Gerät, das ihn angelegt hat (anonymes Konto, siehe unten), und
+wird nur durch einen besseren desselben Geräts überschrieben. Ist ein Name schon von einem anderen Gerät belegt, steht
+unter der Liste „Name gehört einem anderen Gerät“ und es wird nichts gesendet, bis ein anderer Name gewählt ist.
+Einträge von vor v0.27.0 haben noch keinen Besitzer: das Gerät, das denselben Lauf (Wert und Fahrzeit) gespeichert
+hat, holt ihn sich beim nächsten Start automatisch. Wer Safari-Daten löscht, bekommt ein neues Konto und kann seine
+alten Einträge nicht mehr ändern. Wer sich umbenennt, lädt seinen Bestwert unter dem neuen
 Namen hoch, der alte Eintrag bleibt auf dem Server (Aufräumen in der Firebase-Konsole). Angezeigt wird derselbe Lauf
 (gleicher Wert und gleiche Fahrzeit auf die Hundertstel) nur einmal, auf seinem ursprünglichen Platz und unter dem
 neuesten Namen, auf dem eigenen Gerät unter dem eigenen. Die Bestweiten der anderen liegen als graue Namenslinien im Schnee, beim Start des
@@ -57,30 +61,57 @@ und Lawine ist das Tempo Weite durch Laufzeit, im Super-G 1000 m durch die reine
 „Gesamt“ und „Fahrzeit“). Beides kommt aus den Feldern `m` und `t`, die Datenbank bleibt unverändert.
 
 Technik: Firebase Realtime Database per REST (`src/board.js`, kein SDK). Die Datenbank-URL steht in `BOARD_URL`
-(`src/constants.js`), leer heißt aus. Ein Eintrag hat die Felder `name`, `m`, `t`, `ts`, `v`; `m` sind Meter, im Super-G
-die Gesamtzeit in Hundertstel (`2712` = 27,12 s), `t` ist die Laufzeit in Sekunden, im Super-G die reine Fahrzeit ohne
-Strafen. Die Regeln (`tools/firebase-rules.json`) lassen nur gültige Einträge zu, nur in Richtung besser (Meter nie
-kleiner, Super-G-Zeit nie größer) und ohne Löschen; sie prüfen Form und Richtung, nicht Ehrlichkeit. Wer die URL kennt,
-kann per Skript schreiben.
+(`src/constants.js`), leer heißt aus. Ein Eintrag hat die Felder `name`, `m`, `t`, `ts`, `v`, `uid`; `m` sind Meter, im
+Super-G die Gesamtzeit in Hundertstel (`2712` = 27,12 s), `t` ist die Laufzeit in Sekunden, im Super-G die reine
+Fahrzeit ohne Strafen, `uid` das Konto des Geräts.
+
+### Schutz vor Vandalismus (ab v0.27.0)
+
+Jedes Gerät meldet sich beim ersten Kontakt anonym bei Firebase an (`src/auth.js`, REST ohne SDK, Web-API-Schlüssel in
+`AUTH_KEY`), das Token hängt `src/net.js` an jeden Aufruf. Die Regeln (`tools/firebase-rules.json`) lassen dann zu:
+
+- Bestenliste lesen darf jeder; schreiben nur angemeldet, nur in eigene Einträge (`uid`) oder in einen Altbestand ohne
+  `uid` mit unverändertem Namen, nur in Richtung besser, ohne Löschen, `ts` muss die Serverzeit sein.
+- Plausibilität: in Classic und Lawine höchstens 150 km/h im Schnitt (`m ≤ t · 41,66`), im Super-G mindestens 19,46 s
+  Fahrzeit und Gesamtzeit nicht unter der Fahrzeit (`BOARD_MAX_AVG_KMH`, `BOARD_SG_MAX_AVG_KMH`). Die App blendet ältere
+  Einträge, die das verletzen, selbst aus.
+- Duell-Räume: lesen und schreiben nur angemeldet; Raumfelder, Löschen und „Los“ nur durch den Host, einen Platz nur
+  sein Gerät (der Host darf beim Gast „bereit“ setzen), einen fremden Gast-Platz erst nach 60 s ohne Lebenszeichen,
+  Positionen nur das Gerät des Platzes.
+- Gesperrte Geräte: steht unter `/banned/<uid>` ein Wert, darf dieses Konto nichts mehr schreiben.
+
+Ganz verhindern lässt sich Schummeln nicht, die App läuft auf dem Gerät des Spielers: wer will, kann einen plausiblen
+Fantasiewert unter eigenem Namen eintragen. Fremde Einträge und fremde Duelle sind aber geschützt, und ein Störer ist
+schnell entfernt:
+
+1. Firebase-Konsole → Realtime Database → Daten → `boards` → Modus → Eintrag → Papierkorb. Die `uid` des Eintrags vorher
+   kopieren.
+2. Sperren: auf der obersten Ebene der Daten ein Kind `banned` anlegen (falls nicht da) und darunter die `uid` mit dem
+   Wert `true`. Ein neues Konto kann er sich nur mit gelöschten Safari-Daten holen, das kostet ihn seine eigenen Einträge.
+
+Konten und Sicherheit: für das Google-Konto des Firebase-Projekts und die GitHub-Konten beider Entwickler
+Zwei-Faktor-Anmeldung einschalten; ein Push auf `main` ist ein Deploy. Das Projekt im kostenlosen Spark-Tarif lassen,
+dann kann eine Flut von Schreibzugriffen nichts kosten, sie stößt nur an die Grenzen.
+
+Regeln testen: `tools/rules-test.mjs` spielt 49 Fälle (erlaubte Wege der App und Angriffe) gegen den Firebase-Emulator,
+Anleitung im Kopf der Datei (braucht Java). Die App lässt sich ebenfalls gegen den Emulator starten:
+`?board=http%3A%2F%2F127.0.0.1%3A9000%3Fns%3Ddemo-powder&auth=http://127.0.0.1:9099/`, ein Duell-Bot dazu mit
+`node tools/duel-bot.js 'http://127.0.0.1:9000?ns=demo-powder' CODE --auth http://127.0.0.1:9099/`.
 
 ### Einrichtung
 
 1. <https://console.firebase.google.com> → „Projekt hinzufügen“ → Name z. B. `powder` → Google Analytics deaktivieren → Erstellen.
 2. „Build“ → „Realtime Database“ → „Datenbank erstellen“ → Standort Belgien (europe-west1) → „Im gesperrten Modus starten“.
-3. Reiter „Regeln“ → Inhalt von `tools/firebase-rules.json` einfügen (alles ersetzen) → „Veröffentlichen“.
-4. Reiter „Daten“ → URL oben kopieren (`https://….europe-west1.firebasedatabase.app`) → ohne Schluss-Slash in `BOARD_URL` eintragen → Version bumpen.
-5. Firebase mailt regelmäßig „unsichere Regeln“, weil Schreiben ohne Anmeldung erlaubt ist. Das ist hier gewollt.
+3. „Build“ → „Authentication“ → „Jetzt starten“ → Reiter „Anmeldemethode“ → „Anonym“ → aktivieren → Speichern.
+4. Zahnrad oben links → „Projekteinstellungen“ → Reiter „Allgemein“ → „Web-API-Schlüssel“ kopieren → in `AUTH_KEY`
+   eintragen. Der Schlüssel ist öffentlich (er steht in jeder Web-App), kein Geheimnis.
+5. Reiter „Daten“ der Realtime Database → URL oben kopieren (`https://….europe-west1.firebasedatabase.app`) → ohne
+   Schluss-Slash in `BOARD_URL` eintragen → Version bumpen, pushen, warten bis die Version live ist.
+6. Erst dann Reiter „Regeln“ → Inhalt von `tools/firebase-rules.json` einfügen (alles ersetzen) → „Veröffentlichen“.
+   Ältere App-Versionen ohne Anmeldung können ab da nichts mehr schreiben; sie holen sich das Update beim nächsten Öffnen.
 
-Regeln prüfen (`DB=https://…app`): ein gültiger `PUT` an `$DB/boards/classic/test.json` mit
-`{"name":"Test","m":1234,"t":45.67,"ts":{".sv":"timestamp"},"v":"0.13.0"}` antwortet 200; derselbe mit `"m":1000`,
-`"m":"1234"`, einem Feld mehr oder als `DELETE` antwortet 401 `Permission denied`. Für den Super-G entsprechend
-`$DB/boards/superg/test.json` mit `"m":2712`: ein zweiter `PUT` mit `"m":2600` antwortet 200, mit `"m":2800` 401.
-Für die Duell-Räume (ab v0.22.0): ein gültiger `PUT` an `$DB/rooms/TEST.json` (Felder wie in `src/room.js` `create`)
-antwortet 200, derselbe noch einmal 401 (Raum belegt), `PATCH` mit `{"target":1234}` 401 und mit `{"target":1500}` 200,
-`PATCH` an `…/live/host.json?print=silent` 204, `GET $DB/rooms.json` 401 (Räume sind nicht aufzählbar), `DELETE` 200.
-Die Testeinträge danach in der Konsole löschen. Nach einer Regeländerung (etwa ein neuer Modus) den Inhalt von
-`tools/firebase-rules.json` erneut im Reiter „Regeln“ einfügen und veröffentlichen; bis dahin lehnt der Server Einträge
-des neuen Modus ab.
+Nach einer Regeländerung (etwa ein neuer Modus) den Inhalt von `tools/firebase-rules.json` erneut im Reiter „Regeln“
+einfügen und veröffentlichen; bis dahin lehnt der Server Einträge des neuen Modus ab.
 
 Ein Duell lokal testen: derselbe Mock-Server bedient auch `/rooms` (`tools/room-mock.js`, mit Event-Stream), im Browser
 `?board=local`; als Gegner tritt `node tools/duel-bot.js http://localhost:8082 CODE --name Jo --crash 300` dem Raum bei,
@@ -89,7 +120,8 @@ meldet sich bereit und fährt beim Start mit; `--host` eröffnet stattdessen ein
 fährt aber nicht mit, weil das unfokussierte Fenster pausiert.
 
 Lokal ohne Firebase: `node tools/serve.js 8082 --board` startet einen Mock der Schnittstelle (`tools/board-mock.js`, mit
-Beispielnamen), im Browser dann `?board=local`.
+Beispielnamen, und `tools/auth-mock.js` für die Anmeldung), im Browser dann `?board=local`. Die Mocks prüfen Besitz und
+Plausibilität wie die Regeln.
 
 ## Ton
 

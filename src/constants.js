@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.26.5';
+export const VERSION = '0.27.0';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -186,6 +186,19 @@ export const C = {
   BOARD_NAME_MAX: 12,        // länger sprengt die Zeile Rang | Name | Meter bei 16 px
   BOARD_MAX_M: 99999,        // Obergrenze der Regeln: darüber ist es kein Lauf mehr, sondern ein Skript
   BOARD_TIMEOUT_MS: 6000,    // hängender Abruf blockiert sonst das Nachholen; die Liste kommt dann aus dem Cache
+  // Plausibilität (Regeln und sanitizeBoards): ein Lauf ist nie schneller als dieser Schnitt. Classic und Lawine
+  // starten mit START_SPEED_KMH und kurven um Bäume, echte Bestwerte liegen bei 70 bis 105 km/h. Im Super-G geht es
+  // steil bergab (echt bis 144 km/h), dort gilt fast das Endtempo. Die Regeln tragen die Werte in m/s und s.
+  BOARD_MAX_AVG_KMH: 150,
+  BOARD_SG_MAX_AVG_KMH: 185,
+
+  // Anmeldung (auth.js): anonymes Firebase-Konto je Gerät per REST ohne SDK. Die uid steht in jedem Eintrag und jedem
+  // Duell-Platz, die Regeln lassen nur ihren Besitzer schreiben. AUTH_KEY ist der Web-API-Schlüssel des Projekts
+  // (Firebase-Konsole, Projekteinstellungen); er ist öffentlich und kein Geheimnis. Leer = ohne Anmeldung, dann lehnen
+  // die neuen Regeln jedes Schreiben ab.
+  AUTH_KEY: '',
+  AUTH_PREFIX: 'https://',   // vor identitytoolkit.googleapis.com/…; Emulator und Mock setzen ihren Host davor
+  AUTH_EARLY_S: 300,         // Token (1 h gültig) so lange vor Ablauf erneuern, damit kein Aufruf mit altem Token läuft
   MARK_FRIEND_RGBA: 'rgba(20,20,15,0.35)', // Namenslinien fremder Bestweiten: blasse Tinte, die eigene bleibt rot
   BOARD_MARKS_N: 5,          // Namenslinien im Schnee: je so viele Weiten hinter und vor dem eigenen Rekord (game.js runMarksFor)
   BOARD_MARKS_GAP_M: 150,    // Mindestabstand zwischen zwei Namenslinien, sonst kleben die Ziele aufeinander

@@ -45,10 +45,22 @@ export function sanitizeBoards(raw) {
       if (!e || typeof e !== 'object' || typeof e.name !== 'string') continue;
       const name = e.name.trim().slice(0, C.BOARD_NAME_MAX);
       if (!name || !Number.isInteger(e.m) || e.m < 1 || e.m > C.BOARD_MAX_M) continue;
-      out[mode][key] = { name, m: e.m, t: typeof e.t === 'number' && e.t >= 0 ? e.t : 0, ts: typeof e.ts === 'number' ? e.ts : 0 };
+      const t = typeof e.t === 'number' && e.t >= 0 ? e.t : 0;
+      if (!plausible(mode, e.m, t)) continue;
+      const entry = { name, m: e.m, t, ts: typeof e.ts === 'number' ? e.ts : 0 };
+      if (typeof e.uid === 'string' && e.uid) entry.uid = e.uid;
+      out[mode][key] = entry;
     }
   }
   return out;
+}
+
+// Schneller als BOARD_MAX_AVG_KMH im Schnitt fährt niemand (dieselbe Grenze steht in den Regeln): so ein Eintrag kommt
+// nicht aus dem Spiel, sondern von Hand in die Datenbank. Im Super-G ist die Strecke fest und m die Gesamtzeit in
+// Hundertstel, die nie unter der reinen Fahrzeit t liegt (Strafen kommen nur dazu).
+export function plausible(mode, m, t) {
+  if (lowerIsBetter(mode)) return t >= C.SG_FINISH_M / (C.BOARD_SG_MAX_AVG_KMH / 3.6) && m >= t * 100 - 1;
+  return m <= t * (C.BOARD_MAX_AVG_KMH / 3.6);
 }
 
 // Derselbe Lauf unter mehreren Schlüsseln: wer sich umbenennt, lädt seinen Bestwert unter dem neuen Namen hoch, und
@@ -191,16 +203,25 @@ export function createBoard({ url = '', g = null, fetchFn = null, debug = false,
   const warn = (...args) => { if (debug) console.warn('[board]', ...args); };
   const emit = () => { for (const fn of listeners) fn(); };
   const key = () => nameKey(name);
+  // Gehört der Eintrag unter dem eigenen Namen einem anderen Gerät (uid)? Dann ist er nicht der eigene: kein Übernehmen,
+  // keine Markierung als eigene Zeile, und die Regeln lehnen jedes Schreiben dorthin ab. Ohne uid im Eintrag (vor
+  // v0.27.0) gehört er noch niemandem, das erste Gerät mit demselben Lauf holt ihn sich (flushMode).
+  const foreign = (e) => !!(e && e.uid && e.uid !== net.uid());
+  function taken() {
+    const k = key();
+    return !!k && BOARD_MODES.some((mode) => foreign(boards[mode][k]));
+  }
+  const ownKey = () => (taken() ? '' : key());
 
   function pushMarks() {
-    if (g) setMarks(g, Object.fromEntries(BOARD_MODES.map((mode) => [mode, friendMarks(boards, mode, key())])));
+    if (g) setMarks(g, Object.fromEntries(BOARD_MODES.map((mode) => [mode, friendMarks(boards, mode, ownKey())])));
   }
 
   // Server kennt für den eigenen Namen mehr als dieses Gerät (Zweitgerät, gelöschte Safari-Daten): übernehmen,
   // adoptBest vergleicht selbst mit dem lokalen Bestwert des Modus
   function adoptFromServer() {
     const k = key();
-    if (!k || !g) return;
+    if (!k || !g || taken()) return;
     for (const mode of BOARD_MODES) {
       const e = boards[mode][k];
       if (e) adoptBest(g, mode, e.m);
@@ -234,19 +255,25 @@ export function createBoard({ url = '', g = null, fetchFn = null, debug = false,
   async function flushMode(mode) {
     const k = key();
     const o = own[mode];
-    if (!k || !o || o.sentAs === k || busy[mode]) return;
-    // Server hat schon so gut oder besser. Ausnahme: genau dieser Lauf, aber unter einem anderen Namen neuer
-    // eingetragen (zurückbenannt). Dann gleich noch einmal senden, damit andere Geräte wieder diesen Namen zeigen.
+    if (!k || !o || busy[mode]) return;
+    // Server hat schon so gut oder besser. Ausnahmen: genau dieser Lauf, aber unter einem anderen Namen neuer
+    // eingetragen (zurückbenannt), dann gleich noch einmal senden, damit andere Geräte wieder diesen Namen zeigen.
+    // Oder genau dieser Lauf ohne Besitzer (vor v0.27.0 gesendet): noch einmal mit uid senden, dann gehört er uns.
     const e = boards[mode][k];
-    const back = e && e.m === o.m && e.t === o.t && newerDuplicate(boards[mode], k, e);
-    if (e && !better(mode, o.m, e.m) && !back) { o.sentAs = k; saveBoardOwn(own); return; }
+    const same = e && e.m === o.m && e.t === o.t;
+    const back = same && newerDuplicate(boards[mode], k, e);
+    const claim = same && !e.uid && !!net.uid();
+    if (o.sentAs === k && !claim) return;
+    if (e && !better(mode, o.m, e.m) && !back && !claim) { o.sentAs = k; saveBoardOwn(own); return; }
     busy[mode] = true;
     try {
+      const uid = await net.whoami();
       const body = { name, m: o.m, t: o.t, ts: { '.sv': 'timestamp' }, v: VERSION };
+      if (uid) body.uid = uid;
       const res = await net.request(`/boards/${mode}/${encodeURIComponent(k)}.json`, { method: 'PUT', body: JSON.stringify(body) });
       if (res.ok) {
         const echo = await res.json().catch(() => null);
-        const e = sanitizeBoards({ [mode]: { [k]: echo } })[mode][k] || { name, m: o.m, t: o.t, ts: Date.now() };
+        const e = sanitizeBoards({ [mode]: { [k]: echo } })[mode][k] || { name, m: o.m, t: o.t, ts: Date.now(), ...(uid ? { uid } : {}) };
         sentNow[mode][k] = e;
         boards = mergeBoards(boards, { [mode]: { [k]: e } });
         o.sentAs = k;
@@ -255,7 +282,8 @@ export function createBoard({ url = '', g = null, fetchFn = null, debug = false,
         pushMarks();
         emit();
       } else if (res.status >= 400 && res.status < 500) {
-        // Regeln lehnen ab: der Server hat schon mehr oder die Form stimmt nicht. Wiederholen bringt nichts.
+        // Regeln lehnen ab: der Server hat schon mehr, der Name gehört einem anderen Gerät (taken, die Liste sagt es)
+        // oder die Form stimmt nicht. Wiederholen bringt nichts.
         o.sentAs = k;
         saveBoardOwn(own);
         warn('senden abgelehnt', res.status, await res.text().catch(() => ''));
@@ -303,16 +331,16 @@ export function createBoard({ url = '', g = null, fetchFn = null, debug = false,
 
   if (enabled) {
     pushMarks(); // Linien im ersten Lauf aus dem Cache, auch offline
-    load();
-    flush();
+    load().then(() => flush()); // erst laden: dann ist die uid da und der Stand frisch (Besitz, siehe flushMode)
   }
 
   return {
     enabled,
     name: () => name,
     setName,
-    view: (mode) => viewFor(boards, mode, key()),
-    stats: (mode) => statsFor(boards, mode, key()),
+    view: (mode) => viewFor(boards, mode, ownKey()),
+    stats: (mode) => statsFor(boards, mode, ownKey()),
+    taken,
     lastVerdict: () => verdict,
     stale: () => failed && !fetched,
     onChange: (fn) => { listeners.push(fn); },

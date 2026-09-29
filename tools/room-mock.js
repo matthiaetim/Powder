@@ -3,8 +3,11 @@
 // versteht GET/PUT/PATCH/DELETE in jeder Tiefe (null löscht, PATCH-Schlüssel mit / sind Mehrfach-Pfade), löst
 // {'.sv':'timestamp'} auf, antwortet auf ?print=silent mit 204 und streamt bei Accept: text/event-stream wie Firebase
 // (erst put mit dem ganzen Knoten, dann put je Änderung mit relativem Pfad, keep-alive alle 30 s). Regeln wie in
-// tools/firebase-rules.json: Code aus vier Buchstaben, ein ganzer Raum nur frei, verlassen oder beim Löschen, Feldformen;
-// Verstöße antworten 401 Permission denied, /rooms.json ist nicht lesbar.
+// tools/firebase-rules.json: nur angemeldet (auth-mock.js), Code aus vier Buchstaben, ein ganzer Raum nur frei oder
+// verlassen und mit eigener uid als Host, Löschen und Raumfelder nur durch den Host, ein Platz nur durch seinen
+// Besitzer, den Host oder als freier/verwaister Gast-Platz, Positionen nur durch den Besitzer des Platzes (der Host
+// darf sie löschen), Feldformen; Verstöße antworten 401 Permission denied, /rooms.json ist nicht lesbar.
+const { uidOf } = require('./auth-mock.js');
 const rooms = {};
 const subs = []; // offene Streams: { res, segs }
 const CODE_RE = /^[A-HJ-NP-Z]{4}$/;
@@ -13,7 +16,8 @@ const ROOM_KEYS = ['v', 'ts', 'round', 'seed', 'target', 'pause', 'state', 'star
 const ROOM_REQUIRED = ['v', 'ts', 'round', 'seed', 'target', 'pause', 'state', 'startAt', 'players'];
 const STATES = ['lobby', 'count', 'race', 'done'];
 const RIDERS = ['ski', 'board', 'sled'];
-const PLAYER_KEYS = ['name', 'rider', 'ready', 'v', 'seen'];
+const PLAYER_KEYS = ['name', 'rider', 'ready', 'v', 'seen', 'uid'];
+const LOBBY_GONE_MS = 60000;
 const LIVE_KEYS = ['t', 'x', 'y', 'th', 'v', 'c', 'done', 'fin', 'p', 'at'];
 
 const CORS = {
@@ -93,6 +97,7 @@ function validRoom(r) {
     if (!RIDERS.includes(p.rider)) return false;
     if (typeof p.ready !== 'boolean') return false;
     if (typeof p.v !== 'string' || p.v.length > 16) return false;
+    if (typeof p.uid !== 'string' || !p.uid) return false;
     if (p.seen !== undefined && (!isNum(p.seen) || p.seen > Date.now())) return false;
   }
   if (r.live !== undefined) {
@@ -138,15 +143,38 @@ function subscribe(req, res, segs) {
   });
 }
 
+// Darf uid an wsegs (code, …) schreiben? Wie die .write-Regeln, geprüft gegen den Stand vor dem Write.
+function mayWrite(uid, wsegs, oldRoom, newRoom) {
+  if (!uid) return false;
+  const host = oldRoom && oldRoom.players && oldRoom.players.host && oldRoom.players.host.uid;
+  const [, top, role] = wsegs;
+  if (!top) {
+    if (newRoom === undefined) return host === uid;
+    return !!(newRoom.players && newRoom.players.host && newRoom.players.host.uid === uid) && (!oldRoom || oldRoom.ts < Date.now() - TTL_MS);
+  }
+  if (top === 'players' && (role === 'host' || role === 'guest')) {
+    const p = oldRoom && oldRoom.players && oldRoom.players[role];
+    const np = newRoom && newRoom.players && newRoom.players[role];
+    if (np && np.uid !== uid && np.uid !== (p && p.uid)) return false; // uid nur die eigene oder unverändert
+    return (p && p.uid === uid) || host === uid
+      || (role === 'guest' && (!p || p.seen < Date.now() - LOBBY_GONE_MS) && !!np && np.uid === uid);
+  }
+  if (top === 'live' && (role === 'host' || role === 'guest')) {
+    const p = oldRoom && oldRoom.players && oldRoom.players[role];
+    const gone = !getAt(newRoom, ['live', role]);
+    return (p && p.uid === uid) || (gone && host === uid);
+  }
+  return host === uid;
+}
+
 // Ein Write (schon aufgelöst) gegen die Regeln prüfen, übernehmen, verteilen, antworten
-function commit(res, segs, writes, silent, method) {
+function commit(res, segs, writes, silent, method, uid) {
   const code = segs[0];
   let next = rooms;
   for (const [wsegs, value] of writes) next = withWrite(next, wsegs, value);
   const oldRoom = rooms[code];
   const newRoom = prune(next[code]);
-  const whole = method === 'PUT' && segs.length === 1;
-  if (whole && newRoom !== undefined && oldRoom && !(oldRoom.ts < Date.now() - TTL_MS)) { denied(res); return; }
+  if (!writes.every(([wsegs]) => mayWrite(uid, wsegs, oldRoom, newRoom))) { denied(res); return; }
   if (newRoom !== undefined && !validRoom(newRoom)) { denied(res); return; }
   if (newRoom === undefined) delete rooms[code]; else rooms[code] = newRoom;
   for (const [wsegs] of writes) broadcast(wsegs);
@@ -165,21 +193,23 @@ function handle(req, res) {
   const segs = (hit[1] || '').split('/').filter(Boolean).map(decodeURIComponent);
   if (req.method === 'OPTIONS') { res.writeHead(204, CORS); res.end(); return true; }
   if (!segs[0] || !CODE_RE.test(segs[0])) { denied(res); return true; } // /rooms.json: nicht lesbar, wie die Regeln
+  const uid = uidOf(req);
+  if (!uid) { denied(res); return true; } // ohne Anmeldung weder lesen noch schreiben
   const silent = url.searchParams.get('print') === 'silent';
   if (req.method === 'GET') {
     if ((req.headers.accept || '').includes('text/event-stream')) subscribe(req, res, segs);
     else send(res, 200, getAt(rooms, segs) ?? null);
     return true;
   }
-  if (req.method === 'DELETE') { commit(res, segs, [[segs, null]], silent, 'DELETE'); return true; }
+  if (req.method === 'DELETE') { commit(res, segs, [[segs, null]], silent, 'DELETE', uid); return true; }
   if (req.method === 'PUT' || req.method === 'PATCH') {
     readBody(req).then((raw) => {
       let data;
       try { data = JSON.parse(raw); } catch { send(res, 400, { error: 'Invalid data; couldn\'t parse JSON object' }); return; }
       data = resolveSv(data);
-      if (req.method === 'PUT') { commit(res, segs, [[segs, data]], silent, 'PUT'); return; }
+      if (req.method === 'PUT') { commit(res, segs, [[segs, data]], silent, 'PUT', uid); return; }
       if (!data || typeof data !== 'object' || Array.isArray(data)) { send(res, 400, { error: 'Invalid data; PATCH braucht ein Objekt' }); return; }
-      commit(res, segs, Object.entries(data).map(([k, v]) => [[...segs, ...k.split('/').filter(Boolean)], v]), silent, 'PATCH');
+      commit(res, segs, Object.entries(data).map(([k, v]) => [[...segs, ...k.split('/').filter(Boolean)], v]), silent, 'PATCH', uid);
     });
     return true;
   }
