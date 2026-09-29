@@ -64,7 +64,7 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
   const d = {
     phase: 'off', // off | join | lobby | count | race | result
     role: '', error: '', notice: '', busy: false, pendingCode: '', stream: '',
-    round: 0, goWall: 0, raceStartedAt: 0, fin: 0, done: false, out: false, outAt: 0,
+    round: 0, goWall: 0, raceStartedAt: 0, fin: 0, done: false, out: false, outAt: 0, outY: 0,
     samples: [], lastSampleAt: 0, myHist: [], oppStale: false, oppGone: false,
     verdict: null, tallied: 0, doneWritten: false,
     lastSend: -1e9, sending: false, sentFinal: false, failed: 0, lastBeat: 0, targetTimer: 0,
@@ -130,7 +130,7 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
   }
 
   function newRound() {
-    d.fin = 0; d.done = false; d.out = false; d.outAt = 0; d.samples = []; d.myHist = []; d.lastSampleAt = 0;
+    d.fin = 0; d.done = false; d.out = false; d.outAt = 0; d.outY = 0; d.samples = []; d.myHist = []; d.lastSampleAt = 0;
     d.oppStale = false; d.oppGone = false; d.verdict = null; d.doneWritten = false; d.sentFinal = false;
     d.bot = null;
     g.ghost.on = false;
@@ -192,6 +192,7 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
     // Gegner im Ziel und meine Uhr schon darüber: verloren, der Lauf endet sofort
     if (oppFin && !d.done && raceT() > oppFin) {
       d.done = true; d.out = true; d.outAt = round2(raceT());
+      d.outY = Math.max(0, g.skier.y); // Weite beim Aus, für die Ergebniskarte statt „kein Ziel“
       d.lastSend = -1e9;
       stopRun();
     }
@@ -496,7 +497,7 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
       canGo: d.role === 'host' && !!guest && !!guest.ready && guest.v === VERSION && seenOk(guest),
       ready: d.role === 'guest' ? !!(guest && guest.ready) : true,
       streaming: room.streaming(), healthy: room.healthy(),
-      verdict: d.verdict, myFin: d.fin, myCrashes: g.crashes, done: d.done, out: d.out, outAt: d.outAt,
+      verdict: d.verdict, myFin: d.fin, myCrashes: g.crashes, done: d.done, out: d.out, outAt: d.outAt, outY: d.outY,
       oppLive: oppLive(r), oppWantsRematch: !d.vsBot && d.role === 'host' && d.phase === 'result' && !!(guest && guest.ready),
       tally: opp && !d.vsBot ? tallyFor(opp.name) : null,
     };

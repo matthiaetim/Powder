@@ -74,7 +74,7 @@ export function createDuelCard(doc, g, duel, { onTap, board, fmtClock, nf, onLea
     verdictEl.append(doc.createTextNode(title));
     if (sub) verdictEl.append(el('span', 'sub', sub));
     const mine = el('div', 'duel-line me');
-    mine.append(el('span', '', 'Du'), el('span', 'num', v.myFin > 0 ? fmtClock(v.myFin, false) : 'kein Ziel'), el('span', 'sub', crashText(v.myCrashes)));
+    mine.append(el('span', '', 'Du'), el('span', 'num', v.myFin > 0 ? fmtClock(v.myFin, false) : v.outY > 0 ? meters(Math.floor(v.outY)) : 'kein Ziel'), el('span', 'sub', crashText(v.myCrashes)));
     const theirs = el('div', 'duel-line');
     const ol = v.oppLive;
     const oppFin = r ? r.oppFin : ol && ol.fin > 0 ? ol.fin : 0;
