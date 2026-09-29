@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.26.0';
+export const VERSION = '0.26.1';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -425,13 +425,13 @@ export const C = {
   // HOCKEY_FOG_OUT_S: 0.5,     // Ausblendzeit
 };
 
-// Regler im Tuning-Panel (langer Druck auf das Versions-Label). Einträge mit heading sind Zwischentitel,
-// names zeigt statt der Zahl einen Namen (1 = erster Name). visual: der Regler ändert nur das Bild, nicht das Spiel,
+// Regler im Tuning-Panel (langer Druck auf das Versions-Label). Einträge mit heading beginnen eine aufklappbare
+// Gruppe, tone wählt deren Farbe (styles.css, .tune-group[data-tone]). names zeigt statt der Zahl einen Namen (1 = erster Name). visual: der Regler ändert nur das Bild, nicht das Spiel,
 // und macht Läufe deshalb nicht ungültig für die Bestenliste (tune.js isTuned, hud.js). fair: im Duell steht der Regler
 // auf Standard (tune.js), weil er Welt, Sicht oder Fahrphysik ändert und beide Geräte dieselbe Strecke gleich schnell
 // fahren müssen.
 export const TUNABLES = [
-  { heading: 'Fahren' },
+  { heading: 'Fahren', tone: 'blue' },
   { key: 'TURN_TAP_DEG', label: 'Tipp-Winkel', unit: '°', min: 10, max: 80, step: 5, fair: true },
   { key: 'TURN_DEEPEN_DEG_S', label: 'Vertiefen beim Halten', unit: '°/s', min: 0, max: 150, step: 5, fair: true },
   { key: 'TURN_T', label: 'Ansprechzeit', unit: 's', min: 0.05, max: 0.4, step: 0.01, fair: true },
@@ -455,7 +455,7 @@ export const TUNABLES = [
   // { key: 'HOCKEY_MIN_KMH', label: 'Mindesttempo', unit: 'km/h', min: 20, max: 180, step: 5 },
   // { key: 'HOCKEY_HOLD_S', label: 'Haltezeit', unit: 's', min: 0.1, max: 1.5, step: 0.05 },
   // { key: 'HOCKEY_FOG_OFFSET_PX', label: 'Nebelgröße', unit: 'px', min: 0, max: 150, step: 5 },
-  { heading: 'Lawine' },
+  { heading: 'Lawine', tone: 'red' },
   { key: 'AV_PACE0_KMH', label: 'Tempo am Start', unit: 'km/h', min: 5, max: 120, step: 5 },
   { key: 'AV_PACE1_KMH', label: 'Tempo am Ende', unit: 'km/h', min: 20, max: 250, step: 5 },
   { key: 'AV_RAMP_S', label: 'Schneller bis Laufzeit', unit: 's', min: 30, max: 600, step: 10 },
@@ -472,7 +472,7 @@ export const TUNABLES = [
   { key: 'AV_MERCY_DEG', label: 'Gnade bis Winkel', unit: '°', min: 0, max: 60, step: 5 },
   { key: 'AV_CURVE_DEG', label: 'Volle Härte ab Winkel', unit: '°', min: 20, max: 95, step: 5 },
   { key: 'AV_MERCY_KMH', label: 'Schuss schüttelt ab', unit: 'km/h', min: 0, max: 30, step: 1 },
-  { heading: 'Super-G' },
+  { heading: 'Super-G', tone: 'green' },
   { key: 'SG_GATE_SPACING_M', label: 'Torabstand', unit: 'm', min: 25, max: 80, step: 5 },
   { key: 'SG_GATE_WIDTH_M', label: 'Torbreite', unit: 'm', min: 4, max: 14, step: 0.5, decimals: 1 },
   { key: 'SG_GATE_OFFSET_M', label: 'Torversatz', unit: 'm', min: 0, max: 16, step: 1 },
@@ -480,17 +480,17 @@ export const TUNABLES = [
   { key: 'SG_PENALTY_S', label: 'Zeitstrafe pro Tor', unit: 's', min: 0, max: 10, step: 0.5, decimals: 1 },
   { key: 'SG_POLE_KMH', label: 'Stange kostet', unit: 'km/h', min: 0, max: 30, step: 1 },
   { key: 'SG_MAX_SPEED_KMH', label: 'Endtempo', unit: 'km/h', min: 100, max: 300, step: 10 },
-  { heading: 'Duell' },
+  { heading: 'Duell', tone: 'orange' },
   { key: 'DUEL_CRASH_PAUSE_S', label: 'Sturzpause', unit: 's', min: 0.5, max: 5, step: 0.1, decimals: 1 },
   { key: 'DUEL_GHOST_DELAY_S', label: 'Geist-Verzögerung', unit: 's', min: 0, max: 1, step: 0.05 },
-  { heading: 'Bild' },
+  { heading: 'Bild', tone: 'teal' },
   { key: 'MAX_DPR', label: 'Auflösung', unit: '×', min: 1, max: 3, step: 0.5, decimals: 1, visual: true },
   { key: 'MARK_SPRAY_PX', label: 'Sprühlinie', unit: 'px', min: 2, max: 12, step: 1, visual: true },
-  { heading: 'Schriftzug' },
+  { heading: 'Schriftzug', tone: 'yellow' },
   { key: 'SIGN_ALPHA', label: 'Deckkraft', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
   { key: 'SIGN_WIDTH_FRAC', label: 'Breite', unit: '%', min: 0.4, max: 1, step: 0.02, scale: 100, decimals: 0 },
   { key: 'SIGN_ERASE_ALPHA', label: 'Verwischen beim Überfahren', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
-  { heading: 'Ton' },
+  { heading: 'Ton', tone: 'violet' },
   { key: 'SND_MASTER', label: 'Lautstärke', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
   { key: 'SND_WIND', label: 'Wind', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
   { key: 'SND_SKI', label: 'Ski und Kurven', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },

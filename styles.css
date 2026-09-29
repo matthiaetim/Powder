@@ -496,7 +496,7 @@ body[data-panel="duel"] #dead-card { display: none; }
 #btn-duel-bot, #btn-duel-human { margin-top: 14px; }
 
 /* kleine flache Knöpfe: Modus auswählen, Zurück, Tuning-Aktionen */
-.btn-flat, .tune-actions button {
+.btn-flat, .tune-reset {
   padding: 6px 12px;
   font-family: var(--display);
   font-size: 11px;
@@ -507,7 +507,7 @@ body[data-panel="duel"] #dead-card { display: none; }
   border-radius: 8px;
   transition: background 0.14s, color 0.14s;
 }
-.btn-flat:active, .tune-actions button:active { background: var(--ink); color: var(--paper); }
+.btn-flat:active, .tune-reset:active { background: var(--ink); color: var(--paper); }
 
 #version {
   position: fixed;
@@ -528,28 +528,123 @@ body[data-panel="duel"] #dead-card { display: none; }
   right: 12px;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
   z-index: 10;
-  padding: 12px 14px 12px;
+  display: flex;
+  flex-direction: column;
   box-sizing: border-box;
   max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 40px);
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  background: rgba(255, 255, 255, 0.97);
+  overflow: hidden;
+  background: var(--paper);
   border: 3px solid var(--ink);
-  border-radius: 16px;
-  box-shadow: 7px 8px 0 rgba(20, 20, 15, 0.1);
+  border-radius: var(--r-card);
+  box-shadow: 7px 8px 0 rgba(20, 20, 15, 0.14);
   color: var(--ink);
-  touch-action: pan-y;
 }
 #tune[hidden] { display: none; }
-.tune-title { font-size: 16px; margin-bottom: 8px; }
-.tune-rows { display: flex; flex-direction: column; gap: 6px; }
-.tune-heading { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.55; margin: 8px 0 0; }
-.tune-heading:first-child { margin-top: 0; }
-.tune-row { display: grid; grid-template-columns: 1fr auto; row-gap: 2px; font-size: 13px; }
+
+/* Kopf bleibt stehen, damit X und Standard ohne Scrollen erreichbar sind */
+.tune-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 16px;
+  border-bottom: 3px solid var(--ink);
+  background: var(--mark);
+}
+.tune-title { font-size: 18px; line-height: 1; flex: 1; padding-top: 3px; }
+.tune-reset:disabled { opacity: 0.35; }
+.tune-close {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  padding: 0;
+  font-family: var(--body);
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--paper);
+  background: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: 12px 14px 11px 13px / 14px 11px 13px 12px;
+  box-shadow: 2px 3px 0 rgba(20, 20, 15, 0.18);
+  transition: transform var(--press);
+}
+.tune-close:active { transform: translate(2px, 2px); box-shadow: none; }
+
+.tune-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  min-height: 0;
+}
+
+/* Gruppenfarben: dieselbe Palette wie das Spiel, Rot und Grün aus dem Super-G, Gelb aus --mark */
+.tune-group { --tone: var(--ink); --tone-soft: rgba(20, 20, 15, 0.06); --tone-ink: #fff; }
+.tune-group[data-tone="blue"] { --tone: #2F6DB5; --tone-soft: #E3EDF9; }
+.tune-group[data-tone="red"] { --tone: var(--slow); --tone-soft: #F8E3E0; }
+.tune-group[data-tone="green"] { --tone: var(--fast); --tone-soft: #E0F0E4; }
+.tune-group[data-tone="orange"] { --tone: #D9661F; --tone-soft: #FBE7D8; }
+.tune-group[data-tone="teal"] { --tone: #1F8A8A; --tone-soft: #DDF0F0; }
+.tune-group[data-tone="yellow"] { --tone: #D9A514; --tone-soft: #FBF1CC; --tone-ink: var(--ink); }
+.tune-group[data-tone="violet"] { --tone: #6B4BB8; --tone-soft: #ECE6F7; }
+
+.tune-group {
+  flex: none;
+  border: 2px solid var(--ink);
+  border-radius: var(--r-tile);
+  background: #fff;
+  overflow: hidden;
+}
+.tune-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font-family: var(--display);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-align: left;
+  color: var(--ink);
+  background: #fff;
+  border: 0;
+  border-left: 10px solid var(--tone);
+  padding: 9px 12px 8px 10px;
+}
+.tune-group.open .tune-bar { background: var(--tone); color: var(--tone-ink); }
+.tune-bar-name { flex: 1; padding-top: 2px; }
+.tune-badge {
+  min-width: 20px;
+  padding: 3px 6px 1px;
+  box-sizing: border-box;
+  font-size: 11px;
+  text-align: center;
+  color: var(--ink);
+  background: var(--mark);
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+}
+.tune-badge[hidden] { display: none; }
+.tune-chev { font-family: var(--body); font-size: 22px; line-height: 1; transition: transform 0.18s ease-out; }
+.tune-group.open .tune-chev { transform: rotate(90deg); }
+
+.tune-list { display: none; flex-direction: column; gap: 4px; padding: 8px 12px 12px; background: var(--tone-soft); border-top: 2px solid var(--ink); }
+.tune-group.open .tune-list { display: flex; }
+.tune-row { display: grid; grid-template-columns: 1fr auto; align-items: center; row-gap: 2px; column-gap: 8px; padding: 4px 0; font-size: 13px; }
 .tune-label { opacity: 0.85; }
-.tune-value { font-variant-numeric: tabular-nums; text-align: right; }
-.tune-row input[type="range"] { grid-column: 1 / -1; width: 100%; margin: 0; accent-color: var(--ink); touch-action: pan-x; }
-.tune-actions { display: flex; justify-content: space-between; margin-top: 12px; }
+.tune-value {
+  padding: 2px 7px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  border: 2px solid transparent;
+  border-radius: 8px;
+}
+/* abweichend vom Standard: Wert eingerahmt in Gruppenfarbe, damit man getunte Regler sofort findet */
+.tune-row.changed .tune-label { opacity: 1; }
+.tune-row.changed .tune-value { color: var(--tone-ink); background: var(--tone); border-color: var(--ink); }
+.tune-row input[type="range"] { grid-column: 1 / -1; width: 100%; margin: 0; accent-color: var(--tone); touch-action: pan-x; }
 
 #debug {
   position: fixed;
