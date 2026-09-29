@@ -1,25 +1,29 @@
 // DOM-HUD: Tempo, Distanz, Pause, Fresh-Seite mit Laufzeit, Bestenliste samt Namensfeld und Detail-Kachel,
-// Moduswahl (drei Vorschauen unter Fresh und Kachel mit allen Modi), Ton-Icon, Debug-Text.
+// Moduswahl (drei Vorschauen unter Fresh und Kachel mit allen Modi), Ton-Icon, Einstellungen (Zahnrad), Debug-Text.
+// Alle Texte kommen aus i18n.js; ein Sprachwechsel beschriftet alles neu (relabel).
 // Super-G: dazu die laufende Zeit, Hinweise zu Torfehler und Zwischenzeit, der Countdown in der Bildmitte.
 import { C, VERSION } from './constants.js';
 import { overlayReady, togglePause, pauseIfRunning, fresh, restart, selectMode, selectRider } from './game.js';
 import { createTunePanel, isTuned } from './tune.js';
 import { verdictText } from './board.js';
 import { MODES, MODE_ORDER, lowerIsBetter } from './modes.js';
-import { RIDERS, RIDER_ORDER } from './riders.js';
+import { RIDER_ORDER } from './riders.js';
 import { drawModePreview, drawRiderPreview } from './render.js';
 import { loadBest, loadBestTime, loadDuelTally, loadRecentModes } from './storage.js';
 import { createDuelCard } from './duel-card.js';
+import { t, num, sep, applyStatic, onLang } from './i18n.js';
+import { createSettings } from './settings.js';
 
 const pad2 = (n) => String(n).padStart(2, '0');
 
-// Laufzeit: unter einer Minute „43,27 Sekunden“, sonst „1:34:07 Minuten“ (Minuten:Sekunden:Hundertstel).
+// Laufzeit: unter einer Minute „43,27 Sekunden“, sonst „1:34:07 Minuten“ (Minuten:Sekunden:Hundertstel). Trenner
+// und Wort je Sprache (i18n.js).
 export function formatRunTime(sec) {
   const cs = Math.max(0, Math.round(sec * 100));
   const hh = pad2(cs % 100);
   const total = Math.floor(cs / 100);
   const m = Math.floor(total / 60), s = total % 60;
-  return m === 0 ? `${s},${hh} Sekunden` : `${m}:${pad2(s)}:${hh} Minuten`;
+  return m === 0 ? t('time.sec', { v: `${s}${sep()}${hh}` }) : t('time.min', { v: `${m}:${pad2(s)}:${hh}` });
 }
 
 // Uhr im Super-G: „41,27“ (Hundertstel), ab einer Minute „1:02,47“; mit unit hängt unter einer Minute „ s“ an.
@@ -28,23 +32,24 @@ export function formatClock(sec, unit) {
   const hh = pad2(cs % 100);
   const total = Math.floor(cs / 100);
   const m = Math.floor(total / 60), s = total % 60;
-  if (m > 0) return `${m}:${pad2(s)},${hh}`;
-  return `${s},${hh}${unit ? ' s' : ''}`;
+  if (m > 0) return `${m}:${pad2(s)}${sep()}${hh}`;
+  return `${s}${sep()}${hh}${unit ? ' s' : ''}`;
 }
 
 export function createHud(g, doc, hooks = {}) {
   const $ = (id) => doc.getElementById(id);
   const doFresh = hooks.fresh || (() => fresh(g));
   const speedEl = $('hud-speed'), distEl = $('hud-dist'), timeEl = $('hud-time'), raceNoteEl = $('hud-note'), oppEl = $('hud-opp');
-  const pauseSub = doc.querySelector('#ov-pause .ov-sub'), pauseDefault = pauseSub ? pauseSub.textContent : '';
+  const pauseSub = doc.querySelector('#ov-pause .ov-sub');
   const countEl = $('ov-count'), hintEl = $('hint');
   const deadDist = $('dead-dist'), deadTime = $('dead-time'), deadBest = $('dead-best'), debugEl = $('debug');
   const themeEl = doc.querySelector('meta[name="theme-color"]'); // färbt die iOS-Statusleiste (Safari-Tab) mit
   $('version').textContent = 'v' + VERSION;
-  const nf = new Intl.NumberFormat(C.HUD_LOCALE, { maximumFractionDigits: 0 });
-  const nf1 = new Intl.NumberFormat(C.HUD_LOCALE, { maximumFractionDigits: 1 });
-  const nf2 = new Intl.NumberFormat(C.HUD_LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const hintDefault = hintEl.textContent;
+  applyStatic(doc);
+  // Zahlen im Format der gewählten Sprache (6.978 m, 6,978 m), bei jedem Aufruf neu, damit ein Sprachwechsel greift
+  const nf = { format: (v) => num(v) };
+  const nf1 = { format: (v) => num(v, 1) };
+  const nf2 = { format: (v) => num(v, 2, 2) };
   let lastSpeed = -1, lastDist = '', lastTime = '', lastState = '', lastOverlay = '', lastDebug = 0, lastText = -1e9;
   let lastMode = '', lastRace = '', lastNote = '', lastCount = '', lastOpp = '';
   const duel = hooks.duel || null;
@@ -72,7 +77,7 @@ export function createHud(g, doc, hooks = {}) {
   const soundEl = $('btn-sound');
   const syncSound = () => {
     const on = !snd || snd.isOn();
-    soundEl.setAttribute('aria-label', on ? 'Ton an' : 'Ton aus');
+    soundEl.setAttribute('aria-label', t(on ? 'aria.soundOn' : 'aria.soundOff'));
     soundEl.setAttribute('aria-pressed', on ? 'true' : 'false');
     soundEl.classList.toggle('off', !on);
   };
@@ -115,37 +120,37 @@ export function createHud(g, doc, hooks = {}) {
   // Bestwert des gewählten Modus (ein Kartenwechsel ruft erneut auf): Bestzeit im Super-G, sonst Meter
   // Durchschnittstempo des Laufs wie in der Detail-Kachel (board.js statsFor): Weite durch Laufzeit, im Super-G die
   // Kurslänge durch die reine Fahrzeit ohne Strafen
-  const avgText = (meters, sec) => (sec > 0 ? ` · Ø ${nf.format((meters / sec) * 3.6)} km/h` : '');
+  const avgText = (meters, sec) => (sec > 0 ? t('dead.avg', { v: nf.format((meters / sec) * 3.6) }) : '');
   function refreshDead() {
     const cs = g.course;
     if (g.runMode === 'superg' && g.state === 'finished') {
       deadDist.textContent = formatClock(cs.total, true);
       deadTime.textContent = (cs.misses === 0
-        ? `alle ${nf.format(cs.gates.length)} Tore`
-        : `${cs.misses === 1 ? '1 Tor' : nf.format(cs.misses) + ' Tore'} verpasst · +${nf1.format(cs.penalty)} s`)
+        ? t('gates.all', { n: nf.format(cs.gates.length) })
+        : `${cs.misses === 1 ? t('gates.miss1') : t('gates.missN', { n: nf.format(cs.misses) })} · +${nf1.format(cs.penalty)} s`)
         + avgText(C.SG_FINISH_M, cs.time);
     } else {
       const m = Math.floor(g.dist);
       deadDist.textContent = nf.format(m) + ' m';
-      deadTime.textContent = g.runMode === 'superg' ? 'kein Ziel' : 'in ' + formatRunTime(g.runT) + avgText(m, g.runT);
+      deadTime.textContent = g.runMode === 'superg' ? t('noFinish') : t('dead.in', { t: formatRunTime(g.runT) }) + avgText(m, g.runT);
     }
     if (g.mode === 'superg') {
-      deadBest.textContent = g.newBestTime && g.mode === g.runMode ? 'Neue Bestzeit'
-        : g.bestTime > 0 ? 'Bestzeit ' + formatClock(g.bestTime / 100, true) : 'Noch keine Bestzeit';
+      deadBest.textContent = g.newBestTime && g.mode === g.runMode ? t('best.newTime')
+        : g.bestTime > 0 ? t('best.time', { t: formatClock(g.bestTime / 100, true) }) : t('best.noTime');
     } else {
-      deadBest.textContent = g.newBest && g.mode === g.runMode ? 'Neuer Rekord' : 'Bester Lauf ' + nf.format(g.best) + ' m';
+      deadBest.textContent = g.newBest && g.mode === g.runMode ? t('best.newRecord') : t('best.run', { m: nf.format(g.best) + ' m' });
     }
   }
 
   // Hinweis im HUD (Super-G): Torfehler mit Strafe, Zwischenzeit als Differenz zur Bestzeit oder als Zeit
   function noteText(n) {
-    if (n.kind === 'miss') return `Torfehler +${nf1.format(n.value)} s`;
+    if (n.kind === 'miss') return t('note.miss', { v: nf1.format(n.value) });
     if (n.kind === 'split') return formatClock(n.value, true);
     return (n.value < 0 ? '−' : n.value > 0 ? '+' : '±') + nf2.format(Math.abs(n.value)) + ' s';
   }
 
-  // Karten statt der Ergebniskarte: Moduswahl ('modes'), Fahrerwahl ('riders') oder Detail-Kachel der Bestenliste
-  // ('stats'), immer nur eine
+  // Karten statt der Ergebniskarte: Moduswahl ('modes'), Fahrerwahl ('riders'), Einstellungen ('settings') oder
+  // Detail-Kachel der Bestenliste ('stats'), immer nur eine
   const showPanel = (name) => { doc.body.dataset.panel = name; };
 
   // Moduswahl: unter Fresh stehen drei Vorschauen, links immer Classic, daneben die zwei zuletzt gewählten oder
@@ -160,7 +165,7 @@ export function createHud(g, doc, hooks = {}) {
     if (id === 'duel') {
       if (!duelOn) return 'Bot';
       const w = Object.values(loadDuelTally()).reduce((n, e) => n + (e && e.w ? e.w : 0), 0);
-      return w > 0 ? (w === 1 ? '1 Sieg' : nf.format(w) + ' Siege') : '–';
+      return w > 0 ? (w === 1 ? t('wins1') : t('winsN', { n: nf.format(w) })) : '–';
     }
     if (MODES[id].board === 'time') { const v = loadBestTime(id); return v > 0 ? formatClock(v / 100, true) : '–'; }
     const v = loadBest(id);
@@ -179,10 +184,8 @@ export function createHud(g, doc, hooks = {}) {
     text.className = 'mode-text';
     const name = doc.createElement('span');
     name.className = 'mode-name';
-    name.textContent = m.name;
     const desc = doc.createElement('span');
     desc.className = 'mode-desc';
-    desc.textContent = off ? 'Braucht Internet und die Datenbank.' : m.desc;
     text.append(name, desc);
     const best = doc.createElement('span');
     best.className = 'mode-best';
@@ -207,7 +210,7 @@ export function createHud(g, doc, hooks = {}) {
     name.className = 'mode-name';
     const cta = doc.createElement('span');
     cta.className = 'mode-cta';
-    cta.textContent = 'Tap to play'; // nur beim gewählten sichtbar, steht überall, damit die Kärtchen gleich hoch sind
+    // nur beim gewählten sichtbar, steht überall, damit die Kärtchen gleich hoch sind (Text: labelModes)
     card.append(cv, name, cta);
     onTap(card, () => {
       const id = card.dataset.mode;
@@ -231,10 +234,23 @@ export function createHud(g, doc, hooks = {}) {
       card.hidden = !id;
       if (!id || card.dataset.mode === id) return;
       card.dataset.mode = id;
-      card.querySelector('.mode-name').textContent = MODES[id].name;
+      card.querySelector('.mode-name').textContent = t('mode.' + id);
       drawModePreview(card.querySelector('.mode-preview'), id, g.rider);
     });
   }
+  // Namen und Kurztexte der Modi in der gewählten Sprache (beim Start und nach einem Sprachwechsel)
+  function labelModes() {
+    for (const row of modeRows) {
+      const id = row.dataset.mode;
+      row.querySelector('.mode-name').textContent = t('mode.' + id);
+      row.querySelector('.mode-desc').textContent = modeOff(id) ? t('mode.offline') : t('mode.' + id + '.desc');
+    }
+    for (const card of cards) {
+      card.querySelector('.mode-cta').textContent = t('tapToPlay');
+      if (card.dataset.mode) card.querySelector('.mode-name').textContent = t('mode.' + card.dataset.mode);
+    }
+  }
+  labelModes();
   const drawModes = () => {
     for (const row of modeRows) drawModePreview(row.querySelector('.mode-preview'), row.dataset.mode, g.rider);
     for (const card of cards) if (card.dataset.mode) drawModePreview(card.querySelector('.mode-preview'), card.dataset.mode, g.rider);
@@ -274,7 +290,7 @@ export function createHud(g, doc, hooks = {}) {
     markActive(); refreshDead(); renderBoard();
     if (back.panel === 'modes') openModes(); else showPanel(back.panel === 'duel' ? '' : back.panel);
   }
-  if (duel) createDuelCard(doc, g, duel, { onTap, board: hooks.board, fmtClock: formatClock, nf, onLeave: leaveDuel });
+  const duelCard = duel ? createDuelCard(doc, g, duel, { onTap, board: hooks.board, fmtClock: formatClock, nf, nf1, onLeave: leaveDuel }) : null;
 
   const showRiders = (on) => showPanel(on ? 'riders' : '');
 
@@ -290,7 +306,7 @@ export function createHud(g, doc, hooks = {}) {
     cv.className = 'rider-preview';
     const name = doc.createElement('span');
     name.className = 'mode-name';
-    name.textContent = RIDERS[id].name;
+    name.textContent = t('rider.' + id);
     tile.append(cv, name);
     drawRiderPreview(cv, id, 82);
     onTap(tile, () => {
@@ -307,6 +323,13 @@ export function createHud(g, doc, hooks = {}) {
   markRider();
   onTap(riderBtn, () => showRiders(doc.body.dataset.panel !== 'riders'));
   onTap($('btn-rider-back'), () => showRiders(false));
+
+  // Einstellungen (settings.js): das Zahnrad links neben dem Ton-Icon tauscht die Ergebniskarte gegen die Kachel,
+  // noch ein Tipp oder „Zurück“ schließen sie
+  const settings = createSettings(doc, { onTap, g, board: hooks.board });
+  const showSettings = (on) => { if (on) settings.refresh(); showPanel(on ? 'settings' : ''); };
+  onTap($('btn-settings'), () => showSettings(doc.body.dataset.panel !== 'settings'));
+  onTap($('btn-settings-back'), () => showSettings(false));
 
   // Bestenliste (board.js): Top-Zeilen des gewählten Modus, die eigene Zeile trägt das Namensfeld. Ohne Namen steht
   // nur das Feld da, zentriert und unterstrichen; mit Namen wird es zur Namenszelle, ein Tipp darauf öffnet die
@@ -340,7 +363,7 @@ export function createHud(g, doc, hooks = {}) {
     moreEl.after(ownRow);
     moreEl.hidden = true;
     nameInput.value = name;
-    if (!name) { noteEl.textContent = 'für die Bestenliste'; return; }
+    if (!name) { noteEl.textContent = t('board.forList'); return; }
     const v = board.view(g.mode);
     for (const e of v.top) {
       if (!e.own) { rowsEl.append(rowEl(e.rank, e.name, e.m)); continue; }
@@ -357,8 +380,8 @@ export function createHud(g, doc, hooks = {}) {
       ownM.textContent = v.own ? scoreText(v.own.m) : local > 0 ? scoreText(local) : '–';
     }
     const verdict = board.lastVerdict();
-    noteEl.textContent = verdict ? verdictText(verdict) : board.taken() ? 'Name gehört einem anderen Gerät'
-      : board.stale() ? 'Letzter bekannter Stand' : 'Tippen für Details';
+    noteEl.textContent = verdict ? verdictText(verdict) : board.taken() ? t('board.taken')
+      : board.stale() ? t('board.stale') : t('board.details');
   }
 
   // Detail-Kachel: ein Tipp auf die Liste (nicht auf die eigene Zeile, die gehört dem Namensfeld) zeigt alle Einträge
@@ -373,9 +396,10 @@ export function createHud(g, doc, hooks = {}) {
   };
   function renderStats() {
     const time = lowerIsBetter(g.mode);
-    statsMode.textContent = MODES[g.mode].name;
-    statsHead.replaceChildren(cell('stats-rank', '#'), cell('stats-name', 'Name'), cell('stats-num', time ? 'Gesamt' : 'Meter'),
-      cell('stats-num', time ? 'Fahrzeit' : 'Zeit'), cell('stats-num', 'Ø km/h'));
+    statsMode.textContent = t('mode.' + g.mode);
+    statsHead.replaceChildren(cell('stats-rank', '#'), cell('stats-name', t('stats.name')),
+      cell('stats-num', t(time ? 'stats.total' : 'stats.meters')), cell('stats-num', t(time ? 'stats.ride' : 'stats.time')),
+      cell('stats-num', t('stats.avg')));
     const list = board.stats(g.mode);
     statsList.replaceChildren(...list.map((e) => {
       const row = doc.createElement('div');
@@ -389,7 +413,7 @@ export function createHud(g, doc, hooks = {}) {
       );
       return row;
     }));
-    statsNote.textContent = list.length ? '' : 'Noch keine Einträge';
+    statsNote.textContent = list.length ? '' : t('stats.empty');
   }
   function openStats() {
     if (!boardOn || !board.name()) return;
@@ -444,9 +468,9 @@ export function createHud(g, doc, hooks = {}) {
         const txt = formatClock(dh.clock, false);
         if (txt !== lastTime) { lastTime = txt; timeEl.textContent = txt; }
         let opp = '', cls = '';
-        if (dh.oppGone) opp = `${dh.oppName} weg`;
-        else if (dh.oppFin) opp = `Vorgabe ${formatClock(dh.oppFin, false)} · ${dh.oppName} im Ziel`;
-        else if (dh.oppPaused) opp = `${dh.oppName} pausiert`;
+        if (dh.oppGone) opp = t('opp.gone', { n: dh.oppName });
+        else if (dh.oppFin) opp = t('opp.fin', { t: formatClock(dh.oppFin, false), n: dh.oppName });
+        else if (dh.oppPaused) opp = t('opp.paused', { n: dh.oppName });
         else if (dh.gap != null) {
           const gp = Math.round(dh.gap);
           opp = `${dh.oppName} ${gp >= 0 ? '+' : '−'}${nf.format(Math.abs(gp))} m`;
@@ -458,7 +482,7 @@ export function createHud(g, doc, hooks = {}) {
     if (g.mode !== lastMode) {
       lastMode = g.mode;
       doc.body.dataset.mode = g.mode;
-      hintEl.textContent = g.mode === 'superg' ? 'Tippen zum Start' : hintDefault;
+      hintEl.textContent = t(g.mode === 'superg' ? 'hint.superg' : 'hint');
     }
     // Neustart-Knopf: im Torlauf und gegen den Bot, der Bot kann im Duell jederzeit dazukommen oder gehen
     const race = g.mode === 'superg' || !!(duel && duel.vsBot()) ? '1' : '';
@@ -469,7 +493,7 @@ export function createHud(g, doc, hooks = {}) {
       doc.body.dataset.intro = g.state === 'ready' && g.intro && !g.hold ? '1' : '';
       // Bestwert steht fest: die() bzw. finish() lief im Physikschritt davor; das Duell hat keine Liste
       if ((g.state === 'dead' || g.state === 'finished') && boardOn && MODES[g.runMode].board) board.onRunEnd(g);
-      if (pauseSub && g.state === 'paused') pauseSub.textContent = duel && duel.racing() && !duel.vsBot() ? 'Die Zeit läuft weiter · Tippen zum Weiterfahren' : pauseDefault;
+      if (pauseSub && g.state === 'paused') pauseSub.textContent = t(duel && duel.racing() && !duel.vsBot() ? 'pause.duel' : 'pause.sub');
     }
     // Hinweis unter dem Fahrer, verschwindet nach SG_NOTE_S (gates.js zählt note.t hoch)
     const note = cs && cs.note && cs.note.t < C.SG_NOTE_S && g.state !== 'finished' ? cs.note : null;
@@ -482,11 +506,11 @@ export function createHud(g, doc, hooks = {}) {
     // Countdown 3 · 2 · 1 in der Mitte, nach dem Start kurz „Go“
     let count = '';
     if (g.state === 'count') count = String(Math.min(C.SG_COUNT_BEEPS, Math.max(1, C.SG_COUNT_BEEPS - Math.floor(g.countT / C.SG_COUNT_STEP_S))));
-    else if (g.state === 'running' && (cs || g.mode === 'duel') && g.runT < C.SG_GO_SHOW_S) count = 'Go';
+    else if (g.state === 'running' && (cs || g.mode === 'duel') && g.runT < C.SG_GO_SHOW_S) count = t('go');
     if (count !== lastCount) {
       lastCount = count;
       countEl.textContent = count;
-      countEl.classList.toggle('go', count === 'Go');
+      countEl.classList.toggle('go', g.state === 'running' && count !== '');
     }
     const ov = overlayReady(g) ? '1' : '';
     if (ov !== lastOverlay) {
@@ -520,5 +544,23 @@ export function createHud(g, doc, hooks = {}) {
       ].join('\n');
     }
   }
+  // Sprachwechsel (Einstellungen): statische Texte, Kacheln, Liste und Ergebnis neu beschriften; was sync() nur bei
+  // Änderungen schreibt, wird über die last*-Merker neu angestoßen
+  onLang(() => {
+    applyStatic(doc);
+    labelModes();
+    riderTiles.forEach((tile) => { tile.querySelector('.mode-name').textContent = t('rider.' + tile.dataset.rider); });
+    syncSound();
+    settings.refresh();
+    if (doc.body.dataset.panel === 'modes') openModes();
+    if (doc.body.dataset.panel === 'stats') renderStats();
+    if (duelCard) duelCard.render();
+    refreshDead();
+    renderBoard();
+    lastMode = ''; lastSpeed = -1; lastDist = ''; lastTime = ''; lastOpp = ''; lastNote = ''; lastText = -1e9;
+    lastCount = ''; // Countdown und Laufwerte im nächsten Bild neu, sync läuft in jedem Bild
+    if (pauseSub) pauseSub.textContent = t('pause.sub'); // nicht über lastState: der Zustandswechsel meldet den Lauf
+  });
+
   return { sync, openDuel };
 }

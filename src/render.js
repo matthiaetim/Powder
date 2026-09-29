@@ -6,6 +6,7 @@ import { drawAvalanche, drawCloud, makeAvSprites } from './avalanche-view.js';
 import { drawHockey } from './hockey-view.js';
 import { laneX, mulberry32 } from './world.js';
 import { scrubRect } from './snow-scrub.js';
+import { t, num } from './i18n.js';
 import { drawGateMarks } from './gate-marks.js';
 
 const TAU = Math.PI * 2;
@@ -22,11 +23,11 @@ const TAG_PAD_X = 7, TAG_H = 18, TAG_BORDER = 1.5, TAG_SHADOW = 2, TAG_TILT = -1
 const TAG_RADII = [6, 8, 5, 7]; // ungleiche Ecken, wie von Hand gezeichnet
 const SIGN_FONT_STACK = DISPLAY_FONT_STACK;
 // Schilder im Schnee (siehe drawSignature): der Credit in jedem Modus, das Gipfelschild bei Everest-Höhe nur im
-// Classic. Getter, weil Breite und Text am Regler bzw. in constants.js hängen. lazy: erst bauen, wenn der Fahrer
+// Classic. Getter, weil Breite und Text am Regler, in constants.js oder an der Sprache (i18n.js) hängen. lazy: erst bauen, wenn der Fahrer
 // sich nähert, die meisten Läufe kommen nie hin.
 const SIGNS = [
   { y: () => C.SIGN_Y_M, text: () => C.SIGN_TEXT, frac: () => C.SIGN_WIDTH_FRAC, cross: false, lazy: false, on: () => true },
-  { y: () => C.EVEREST_Y_M, text: () => C.EVEREST_TEXT, frac: () => C.EVEREST_WIDTH_FRAC, cross: true, lazy: true, on: (g) => g.mode === 'classic' },
+  { y: () => C.EVEREST_Y_M, text: () => t('everest', { m: num(C.EVEREST_Y_M) + ' m' }), frac: () => C.EVEREST_WIDTH_FRAC, cross: true, lazy: true, on: (g) => g.mode === 'classic' },
 ];
 // Spur je Fahrer (riders.js): Seiten der Linien, halber Abstand zur Mitte in m, Breite als Faktor der Ski-Linie.
 // Das Snowboard zieht eine breite Linie in der Mitte, der Schlitten zwei Kufen, etwas weiter auseinander als Ski.
@@ -60,7 +61,7 @@ const railsOf = (rider) => RAILS[rider] || RAILS.ski;
 //   }
 //   ctx.closePath();
 // }
-const nf = new Intl.NumberFormat(C.HUD_LOCALE);
+const nf = { format: (v) => num(v) }; // Format der gewählten Sprache (i18n.js)
 
 export function createRenderer(canvas) {
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -273,14 +274,14 @@ function drawMarks(R, g, ox, oy) {
     sprayMark(R, g, ox, oy, sy, f.name + ' · ' + nf.format(f.m) + ' m', C.MARK_FRIEND_RGBA, TAG_WHITE, labelY);
   }
   const b = g.runBest;
-  if (b > 0 && b >= y0 && b <= y1) sprayMark(R, g, ox, oy, b * S + oy, 'Rekord · ' + nf.format(b) + ' m', C.MARK_BEST_RGBA, TAG_RED);
+  if (b > 0 && b >= y0 && b <= y1) sprayMark(R, g, ox, oy, b * S + oy, t('sign.record', { m: nf.format(b) + ' m' }), C.MARK_BEST_RGBA, TAG_RED);
   if (g.finishM > 0) drawFinishLine(R, g.finishM, ox, oy, y0, y1); // Duell: Zielweite aus dem Raum
 }
 
 // Super-G: Startlinie bei 0 und karierte Ziellinie bei SG_FINISH_M statt Meter- und Rekordlinien (die blaue
 // 1000-m-Linie läge genau auf dem Ziel).
 function drawCourseLines(R, g, ox, oy, y0, y1) {
-  if (y0 <= 0 && 0 <= y1) sprayMark(R, g, ox, oy, oy, 'Start', C.MARK_RGBA, TAG_WHITE);
+  if (y0 <= 0 && 0 <= y1) sprayMark(R, g, ox, oy, oy, t('sign.start'), C.MARK_RGBA, TAG_WHITE);
   drawFinishLine(R, g.course.finishY, ox, oy, y0, y1);
 }
 
@@ -301,7 +302,7 @@ function drawFinishLine(R, fy, ox, oy, y0, y1) {
     if (i % 2 === 0) ctx.fillRect(x0, top, x1 - x0, mid - top); // obere Reihe: gerade Karos, untere: ungerade
     else ctx.fillRect(x0, mid, x1 - x0, bot - mid);
   }
-  drawTag(ctx, W - 8, sy - cell - 3, 'Ziel', TAG_WHITE);
+  drawTag(ctx, W - 8, sy - cell - 3, t('sign.finish'), TAG_WHITE);
 }
 
 // Schild-Farben: Meterlinien auf Papier, Namen und Start/Ziel auf Weiß, der Rekord rot mit heller Schrift

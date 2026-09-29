@@ -15,18 +15,14 @@ import { nameKey } from './board.js';
 import { loadDuelTally, bumpDuelTally, loadBotLevel, saveBotLevel } from './storage.js';
 import { createBotRoom } from './bot-room.js';
 import { createBot, advanceBot, stopBot, botPose, botLive } from './bot.js';
+import { t } from './i18n.js';
 
 const other = (role) => (role === 'host' ? 'guest' : 'host');
 const round2 = (v) => Math.round(v * 100) / 100;
 const round3 = (v) => Math.round(v * 1000) / 1000;
-const JOIN_ERROR = {
-  missing: 'Raum nicht gefunden',
-  version: 'Der andere hat eine andere Version: App neu laden',
-  full: 'Der Raum ist voll',
-  busy: 'Dort läuft schon ein Rennen',
-  rules: 'Die Regeln für Räume fehlen in der Datenbank',
-  error: 'Kein Netz',
-};
+// Fehler beim Anlegen und Beitreten, Texte in i18n.js (duel.err.*)
+const JOIN_ERRORS = ['missing', 'version', 'full', 'busy', 'rules', 'error'];
+const joinError = (res) => t('duel.err.' + (JOIN_ERRORS.includes(res) ? res : 'error'));
 
 // Wertung aus beiden Ständen: fin = Zielzeit in s (0 = keine), done = Lauf gewertet, gone = Gegner weg.
 // result '' = noch offen, sonst w/l/d aus meiner Sicht; reason: time (beide im Ziel), out (einer über der Zeit), gone.
@@ -76,7 +72,7 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
   const netRoom = createRoom(net, { onChange: onRoom, onStatus: (s) => { d.stream = s; emit(); }, debug });
   const botRoom = createBotRoom({ onChange: onRoom });
   let room = netRoom; // der Raum des laufenden Duells: im Netz oder, gegen den Bot, im Speicher
-  const me = () => ({ name: board.name() || (d.vsBot ? 'Du' : ''), rider: g.rider });
+  const me = () => ({ name: board.name() || (d.vsBot ? t('duel.me') : ''), rider: g.rider });
   const raceT = () => (Date.now() - d.goWall) / 1000;
   const countClock = () => raceT() + C.SG_COUNT_BEEPS * C.SG_COUNT_STEP_S;
   const oppRole = () => other(d.role);
@@ -211,7 +207,7 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
     if (!v.result) return;
     const opp = oppPlayer(r);
     d.verdict = {
-      ...v, oppName: opp ? opp.name : 'Gegner', oppFin: ol && ol.fin > 0 ? ol.fin : 0, oppY: ol ? ol.y || 0 : 0,
+      ...v, oppName: opp ? opp.name : t('duel.opponent'), oppFin: ol && ol.fin > 0 ? ol.fin : 0, oppY: ol ? ol.y || 0 : 0,
       oppCrashes: ol ? ol.c || 0 : 0, myFin: d.fin, myOutAt: d.outAt, myCrashes: g.crashes, round: d.round,
     };
     d.phase = 'result';
@@ -283,7 +279,7 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
     room.reset();
     d.role = '';
     d.phase = 'join';
-    d.notice = 'Der andere hat den Raum geschlossen';
+    d.notice = t('duel.err.closed');
     d.verdict = null;
     g.finishM = 0; g.respawnS = 0; g.onFinish = null; g.ghost.on = false;
     emit();
@@ -391,17 +387,17 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
 
   async function create() {
     if (room.code()) await dropRoom();
-    if (!net.enabled) { d.error = JOIN_ERROR.error; d.phase = 'join'; emit(); return; }
+    if (!net.enabled) { d.error = joinError('error'); d.phase = 'join'; emit(); return; }
     d.busy = true; d.error = ''; d.phase = 'join'; emit();
     const res = await room.create(me(), randomSeed());
     d.busy = false;
     if (res === 'ok') { d.role = 'host'; d.round = 0; d.pendingCode = ''; enterLobby(); }
-    else { d.error = JOIN_ERROR[res] || JOIN_ERROR.error; emit(); }
+    else { d.error = joinError(res); emit(); }
   }
 
   async function join(raw) {
     const code = validCode(raw);
-    if (!code) { d.error = 'Der Code hat vier Buchstaben, ohne I und O'; emit(); return; }
+    if (!code) { d.error = t('duel.err.code'); emit(); return; }
     if (d.vsBot) await dropRoom();
     if (!board.name()) { d.pendingCode = code; d.phase = 'join'; emit(); return; }
     if (room.code() === code) return;
@@ -410,7 +406,7 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
     const res = await room.join(code, me());
     d.busy = false;
     if (res === 'ok') { d.role = 'guest'; d.round = 0; d.pendingCode = ''; enterLobby(); }
-    else { d.error = JOIN_ERROR[res] || JOIN_ERROR.error; emit(); }
+    else { d.error = joinError(res); emit(); }
   }
 
   // Eigenen Raum aufgeben (Host löscht, Gast trägt sich aus), ohne das Duell zu beenden
@@ -483,7 +479,7 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
   function shareData() {
     const code = room.code();
     const url = typeof location !== 'undefined' ? `${location.origin}${location.pathname}?room=${code}` : '';
-    return { title: 'Powder – Duell', text: `Fahr gegen mich in Powder! Raum-Code ${code}`, url };
+    return { title: t('duel.shareTitle'), text: t('duel.shareText', { c: code }), url };
   }
 
   const tallyFor = (name) => {
@@ -524,7 +520,7 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
     const ol = oppLive(r), opp = oppPlayer(r);
     return {
       clock: d.done ? (d.fin || d.outAt) : Math.max(0, raceT()),
-      oppName: opp ? opp.name : 'Gegner',
+      oppName: opp ? opp.name : t('duel.opponent'),
       oppFin: ol && ol.fin > 0 ? ol.fin : 0,
       oppPaused: !!(ol && ol.p && !ol.done),
       oppGone: d.oppGone,

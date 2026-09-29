@@ -215,3 +215,59 @@ export function noteRecentMode(id) {
   if (arr[0] === id) return;
   saveJson(RECENT_KEY, [id, ...arr.filter((m) => m !== id)].slice(0, 6));
 }
+
+// Einstellungen (hud.js): Sprache (i18n.js, '' = noch nicht gewählt) und die Einwilligung in die anonyme
+// Spielstatistik. Die Einwilligung ist aus, bis der Spieler sie selbst einschaltet (Opt-in, § 25 TDDDG).
+const LANG_KEY = 'powder.lang';
+const STATS_OK_KEY = 'powder.stats.ok';
+
+export function loadLang() {
+  try {
+    return localStorage.getItem(LANG_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function saveLang(id) {
+  try {
+    localStorage.setItem(LANG_KEY, id);
+  } catch {
+    /* egal */
+  }
+}
+
+export function loadStatsOk() {
+  try {
+    return localStorage.getItem(STATS_OK_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function saveStatsOk(on) {
+  try {
+    localStorage.setItem(STATS_OK_KEY, on ? '1' : '0');
+  } catch {
+    /* egal */
+  }
+}
+
+// Namenslinien der anderen im Schnee (Einstellungen, game.js): an, bis der Spieler sie ausschaltet
+const MARKS_KEY = 'powder.marks';
+
+export function loadMarksOn() {
+  try {
+    return localStorage.getItem(MARKS_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+
+export function saveMarksOn(on) {
+  try {
+    localStorage.setItem(MARKS_KEY, on ? '1' : '0');
+  } catch {
+    /* egal */
+  }
+}

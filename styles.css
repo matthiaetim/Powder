@@ -350,6 +350,24 @@ body[data-state="ready"][data-overlay="1"] #ov-dead { display: flex; } /* ready:
 .sound-icon .mute, #btn-sound.off .wave { display: none; }
 #btn-sound.off .mute { display: inline; }
 body[data-panel="riders"] #btn-rider { background: var(--mark); }
+/* Einstellungen: Zahnrad links neben dem Ton-Icon, gleiche Kachel, leicht andersherum gekippt als der Nachbar, damit
+   die beiden nicht wie ein Block wirken. Offen: gelb wie das Fahrer-Icon bei offener Fahrerwahl. */
+#btn-settings {
+  position: fixed;
+  right: calc(16px + 51px + 12px); /* Ton-Icon: 40 px Symbol + 2 × 3 px Rand innen + 2 × 2,5 px Linie */
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  padding: 3px;
+  background: #fff;
+  border: 2.5px solid var(--ink);
+  border-radius: var(--r-tile);
+  box-shadow: 3px 4px 0 var(--ink);
+  transform: rotate(-1.5deg);
+  transition: transform var(--press), box-shadow var(--press);
+}
+#btn-settings:active { transform: rotate(-1.5deg) translate(3px, 4px); box-shadow: 0 0 0 var(--ink); }
+body[data-panel="settings"] #btn-settings { background: var(--mark); }
+.gear-icon { display: block; width: 40px; height: 40px; }
+.gear-icon .gear { fill: var(--ink); stroke: var(--ink); stroke-width: 1.6; stroke-linejoin: round; }
 /* Neustart (Super-G, Duell gegen den Bot): oben rechts, solange gefahren wird (Countdown, Fahrt, Pause); dieselbe Kachel wie das Ton-Icon,
    das erst auf der Fresh-Seite an dieser Stelle steht. Ein Tipp bricht den Lauf ab, es geht mit dem Countdown von
    vorn los. */
@@ -372,16 +390,102 @@ body[data-race="1"][data-state="paused"] #btn-restart { display: block; }
 .restart-icon { display: block; width: 40px; height: 40px; }
 .restart-icon path { fill: none; stroke: var(--ink); stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
 .rider-preview { display: block; width: 40px; height: 40px; border-radius: 9px; }
-#rider-card, #stats-card, #modes-card, #duel-card { display: none; }
+#rider-card, #stats-card, #modes-card, #duel-card, #settings-card { display: none; }
 body[data-panel="riders"] #rider-card, body[data-panel="stats"] #stats-card, body[data-panel="modes"] #modes-card,
-body[data-panel="duel"] #duel-card { display: flex; }
+body[data-panel="duel"] #duel-card, body[data-panel="settings"] #settings-card { display: flex; }
 body[data-panel="riders"] #dead-card, body[data-panel="stats"] #dead-card, body[data-panel="modes"] #dead-card,
-body[data-panel="duel"] #dead-card { display: none; }
+body[data-panel="duel"] #dead-card, body[data-panel="settings"] #dead-card { display: none; }
 .card-title { font-family: var(--display); font-size: 30px; line-height: 1; letter-spacing: 0.02em; }
 #riders { display: flex; gap: 8px; margin-top: 18px; align-items: flex-start; }
 #riders .mode-card { width: 94px; }
 #riders .rider-preview { width: 82px; height: 82px; border: 2px solid var(--ink); border-radius: 8px; box-sizing: border-box; }
 #btn-rider-back { margin-top: 18px; }
+
+/* Einstellungen (settings.js): Einwilligung als großes Kästchen mit Text, Sprache als drei Kärtchen mit Flagge,
+   Lautstärken als Zeilen Name | Regler | Prozent. Der Inhalt scrollt, wenn er nicht auf den Bildschirm passt
+   (iPhone SE im Safari-Tab); Titel und Zurück bleiben stehen. */
+/* Die Karte steht nicht mittig wie die anderen, sondern direkt unter den Icons: so bleibt für die Regler die volle
+   Höhe bis unten (margin-bottom auto schluckt den Rest des Overlays) */
+#settings-card { margin: calc(env(safe-area-inset-top, 0px) + 84px) 0 auto; }
+#settings-body {
+  width: 100%;
+  /* Rest der Bildschirmhöhe: 84 px Icons oben, ~130 px Titel, Zurück und Rand der Karte, 24 px Luft unten */
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 240px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  margin-top: 14px;
+  padding: 2px 4px 6px;
+  box-sizing: border-box;
+}
+.set-check {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: start;
+  width: calc(100% - 4px); /* Platz für den Schatten, #settings-body schneidet sonst ab */
+  padding: 10px 10px 10px 8px;
+  text-align: left;
+  color: var(--ink);
+  background: #fff;
+  border: 2.5px solid var(--ink);
+  border-radius: var(--r-tile);
+  box-shadow: 3px 4px 0 var(--ink);
+  transition: transform var(--press), box-shadow var(--press), background 0.15s;
+}
+.set-check:active { transform: translate(3px, 4px); box-shadow: 0 0 0 var(--ink); }
+.set-check[aria-checked="true"] { background: var(--mark); }
+.set-box {
+  display: block;
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
+  box-sizing: border-box;
+  background: #fff;
+  border: 2.5px solid var(--ink);
+  border-radius: 7px 8px 6px 8px;
+}
+.set-box svg { display: block; width: 100%; height: 100%; visibility: hidden; }
+.set-box path { fill: none; stroke: var(--ink); stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+.set-check[aria-checked="true"] .set-box svg { visibility: visible; }
+.set-check-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.set-check-title { font-family: var(--display); font-size: 14px; line-height: 1.1; letter-spacing: 0.02em; }
+.set-check-sub { font-family: var(--body); font-size: 12px; line-height: 1.3; opacity: 0.7; }
+.set-head { display: block; margin: 18px 0 8px; font-family: var(--display); font-size: 16px; letter-spacing: 0.04em; text-align: left; }
+.set-head-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 18px 0 8px; }
+.set-head-row .set-head { margin: 0; }
+#set-snd-reset[disabled] { opacity: 0.35; }
+#set-langs { display: flex; gap: 8px; justify-content: center; padding: 0 4px 4px 0; } /* rechts und unten Platz für den Schatten */
+.lang-card { flex: 1 1 0; min-width: 0; max-width: 96px; box-sizing: border-box; padding: 5px 4px 6px; }
+.flag {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  box-sizing: border-box;
+  background: #fff;
+}
+.flag svg { display: block; width: 100%; height: 100%; }
+.lang-card .mode-name { font-size: 11px; }
+.lang-card:lang(ja) .mode-name { font-family: var(--body); font-size: 12px; letter-spacing: 0; }
+.set-slider {
+  display: grid;
+  grid-template-columns: 7.4em minmax(0, 1fr) 3em;
+  column-gap: 8px;
+  align-items: center;
+  min-height: 34px;
+  font-size: 13px;
+}
+.set-slider-name { text-align: left; line-height: 1.15; overflow-wrap: anywhere; } /* lange Namen brechen um statt abzuschneiden */
+.set-slider-val { text-align: right; font-variant-numeric: tabular-nums; opacity: 0.75; }
+.set-slider input { width: 100%; margin: 0; accent-color: var(--ink); }
+#set-board[hidden] { display: none; }
+#set-board .set-head { margin-top: 18px; }
+#set-name { text-align: center; }
+.set-note { min-height: 1.3em; margin: 5px 0 12px; font-size: 12px; opacity: 0.65; }
+#btn-settings-back { margin-top: 14px; }
 
 /* Detail-Kachel der Bestenliste (hud.js): Rang | Name | Wert | Fahrzeit | Ø km/h, Kopfzeile klein und blass. Die
    Liste scrollt, wenn sie nicht auf den Bildschirm passt; Platz für Titel, Kopf, Hinweis und Zurück bleibt frei. */

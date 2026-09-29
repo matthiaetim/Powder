@@ -7,6 +7,7 @@ import { C, VERSION } from './constants.js';
 import { createNet } from './net.js';
 import { BOARD_MODES, lowerIsBetter } from './modes.js';
 import { isTuned } from './tune.js';
+import { t } from './i18n.js';
 import { loadName, saveName, loadBoardCache, saveBoardCache, loadBoardOwn, saveBoardOwn } from './storage.js';
 import { setMarks, adoptBest } from './game.js';
 
@@ -163,13 +164,9 @@ export function runVerdict(g) {
   return '';
 }
 
-const VERDICT_TEXT = {
-  debug: 'Im Debug-Modus, zählt nicht für die Bestenliste',
-  seed: 'Mit festem Seed, zählt nicht für die Bestenliste',
-  tuned: 'Mit Tuning, zählt nicht für die Bestenliste',
-};
+// Hinweis unter der Liste, Texte in i18n.js (verdict.*)
 export function verdictText(verdict) {
-  return VERDICT_TEXT[verdict] || '';
+  return verdict ? t('verdict.' + verdict) : '';
 }
 
 // Eigener Upload-Stand je Modus: bester zulässiger Lauf und unter welchem Schlüssel er auf dem Server liegt

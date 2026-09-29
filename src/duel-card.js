@@ -7,8 +7,9 @@
 import { C } from './constants.js';
 import { isTuned } from './tune.js';
 import { drawRiderPreview } from './render.js';
+import { t } from './i18n.js';
 
-export function createDuelCard(doc, g, duel, { onTap, board, fmtClock, nf, onLeave }) {
+export function createDuelCard(doc, g, duel, { onTap, board, fmtClock, nf, nf1, onLeave }) {
   const $ = (id) => doc.getElementById(id);
   const card = $('duel-card'), noteEl = $('duel-note'), errEl = $('duel-error');
   const nameRow = $('duel-name-row'), nameIn = $('duel-name'), createBtn = $('btn-duel-create');
@@ -30,67 +31,65 @@ export function createDuelCard(doc, g, duel, { onTap, board, fmtClock, nf, onLea
     return e;
   };
   const meters = (m) => nf.format(m) + ' m';
-  const nf1 = new Intl.NumberFormat(C.HUD_LOCALE, { maximumFractionDigits: 1 }); // Sturzpause: 1,5 s
   const levelBtns = C.BOT_LEVELS.map((lv, i) => {
     const b = el('button', 'duel-level', String(i + 1));
     b.type = 'button';
-    b.setAttribute('aria-label', `Stufe ${i + 1}: ${lv.name}`);
     onTap(b, () => duel.setBotLevel(i + 1));
     levelsEl.append(b);
     return b;
   });
-  const crashText = (n) => (n === 0 ? 'kein Sturz' : n === 1 ? '1 Sturz' : nf.format(n) + ' Stürze');
+  const crashText = (n) => (n === 0 ? t('duel.crash0') : n === 1 ? t('duel.crash1') : t('duel.crashN', { n: nf.format(n) }));
 
   // Startnummer eines Spielers (Host 1, Gast 2); ohne Spieler eine gestrichelte Leerstelle
   function bib(num, p, mine, v) {
-    if (!p) return el('div', 'bib empty', 'wartet auf Gegner');
+    if (!p) return el('div', 'bib empty', t('duel.waitingOpp'));
     const b = el('div', 'bib' + (mine ? ' me' : ''));
     const cv = el('canvas', 'rider-preview');
     drawRiderPreview(cv, p.rider, 40);
-    let state = mine ? 'du' : '';
-    if (num === 1) state = mine ? (v.vsBot ? 'du' : 'du · Host') : 'Host';
-    if (num === 2 && p.ready) { state = mine ? 'du · bereit' : 'bereit'; b.classList.add('ready'); }
-    if (num === 2 && !p.ready) state = mine ? 'du' : 'noch nicht bereit';
-    if (p.bot) state = `Bot · Stufe ${p.bot}`;
-    if (!mine && v.oppVersion && !v.versionOk) { state = 'Version ' + v.oppVersion; b.classList.add('warn'); }
-    if (!mine && v.oppGone) { state = 'weg?'; b.classList.add('warn'); }
+    let state = mine ? t('duel.you') : '';
+    if (num === 1) state = mine ? t(v.vsBot ? 'duel.you' : 'duel.youHost') : t('duel.host');
+    if (num === 2 && p.ready) { state = t(mine ? 'duel.youReady' : 'duel.ready'); b.classList.add('ready'); }
+    if (num === 2 && !p.ready) state = t(mine ? 'duel.you' : 'duel.notReady');
+    if (p.bot) state = t('duel.botLevel', { n: p.bot });
+    if (!mine && v.oppVersion && !v.versionOk) { state = t('duel.version', { v: v.oppVersion }); b.classList.add('warn'); }
+    if (!mine && v.oppGone) { state = t('duel.gone'); b.classList.add('warn'); }
     b.append(el('div', 'bib-num', String(num)), cv, el('div', 'bib-name', p.name), el('div', 'bib-state', state));
     return b;
   }
 
   function renderResult(v) {
     const r = v.verdict;
-    const oppName = (v.opp && v.opp.name) || (r && r.oppName) || 'Gegner';
+    const oppName = (v.opp && v.opp.name) || (r && r.oppName) || t('duel.opponent');
     verdictEl.replaceChildren();
     let title, sub = '';
     if (!r) {
-      title = v.myFin > 0 ? 'Ziel!' : 'Vorbei';
-      sub = v.out ? 'Zeit überschritten' : `Warten auf ${oppName}` + (v.oppLive && v.oppLive.y > 0 ? ` · bei ${meters(Math.floor(v.oppLive.y))}` : '');
+      title = t(v.myFin > 0 ? 'duel.finish' : 'duel.over');
+      sub = v.out ? t('duel.timeOut') : t('duel.waitFor', { n: oppName }) + (v.oppLive && v.oppLive.y > 0 ? t('duel.at', { m: meters(Math.floor(v.oppLive.y)) }) : '');
     } else {
-      title = r.result === 'w' ? 'Gewonnen!' : r.result === 'l' ? 'Verloren' : 'Unentschieden';
-      if (r.reason === 'gone') sub = `${oppName} ist weg`;
-      else if (r.reason === 'out') sub = r.result === 'w' ? (v.vsBot ? `${oppName} war langsamer` : `${oppName} hat die Zeit überschritten`) : 'Zeit überschritten';
+      title = t(r.result === 'w' ? 'duel.won' : r.result === 'l' ? 'duel.lost' : 'duel.draw');
+      if (r.reason === 'gone') sub = t('duel.isGone', { n: oppName });
+      else if (r.reason === 'out') sub = r.result === 'w' ? t(v.vsBot ? 'duel.slower' : 'duel.oppTimeOut', { n: oppName }) : t('duel.timeOut');
     }
     verdictEl.append(doc.createTextNode(title));
     if (sub) verdictEl.append(el('span', 'sub', sub));
     const mine = el('div', 'duel-line me');
-    mine.append(el('span', '', 'Du'), el('span', 'num', v.myFin > 0 ? fmtClock(v.myFin, false) : v.outY > 0 ? meters(Math.floor(v.outY)) : 'kein Ziel'), el('span', 'sub', crashText(v.myCrashes)));
+    mine.append(el('span', '', t('duel.me')), el('span', 'num', v.myFin > 0 ? fmtClock(v.myFin, false) : v.outY > 0 ? meters(Math.floor(v.outY)) : t('noFinish')), el('span', 'sub', crashText(v.myCrashes)));
     const theirs = el('div', 'duel-line');
     const ol = v.oppLive;
     const oppFin = r ? r.oppFin : ol && ol.fin > 0 ? ol.fin : 0;
     const oppDone = r ? true : !!(ol && ol.done);
     theirs.append(el('span', '', oppName),
       // der Bot hört auf, sobald er verloren hat: statt „kein Ziel“ steht, wie weit er war
-      el('span', 'num', oppFin > 0 ? fmtClock(oppFin, false) : oppDone && !(v.vsBot && ol && ol.y > 0) ? 'kein Ziel' : ol && ol.y > 0 ? meters(Math.floor(ol.y)) : '…'),
+      el('span', 'num', oppFin > 0 ? fmtClock(oppFin, false) : oppDone && !(v.vsBot && ol && ol.y > 0) ? t('noFinish') : ol && ol.y > 0 ? meters(Math.floor(ol.y)) : '…'),
       el('span', 'sub', ol ? crashText(ol.c || 0) : ''));
     linesEl.replaceChildren(mine, theirs);
     if (v.tally) {
-      const t = v.tally;
-      linesEl.append(el('div', 'duel-tally', `Gegen ${oppName}: ${t.w} : ${t.l}` + (t.d ? ` · ${t.d} unentschieden` : '')));
+      const tl = v.tally;
+      linesEl.append(el('div', 'duel-tally', t('duel.tally', { n: oppName, w: tl.w, l: tl.l }) + (tl.d ? t('duel.tallyDraw', { d: tl.d }) : '')));
     }
     againBtn.hidden = !r; // erst wenn das Ergebnis feststeht, sonst risse der Host dem anderen den Lauf weg
-    if (v.role === 'host') againBtn.textContent = v.oppWantsRematch ? `Revanche · ${oppName} will auch` : 'Revanche';
-    else againBtn.textContent = v.ready ? 'Revanche? ✓' : 'Revanche?';
+    if (v.role === 'host') againBtn.textContent = v.oppWantsRematch ? t('duel.againWants', { n: oppName }) : t('duel.again');
+    else againBtn.textContent = t(v.ready ? 'duel.againAsked' : 'duel.againAsk');
   }
 
   function render() {
@@ -117,8 +116,8 @@ export function createDuelCard(doc, g, duel, { onTap, board, fmtClock, nf, onLea
     errEl.textContent = v.error || '';
 
     if (view === 'join') {
-      noteEl.textContent = v.notice || (!v.hasName ? 'Gegen einen Mitspieler brauchst du einen Namen.' : v.busy ? 'Verbinde …'
-        : !v.netOk ? 'Gegen einen Mitspieler brauchst du Internet.' : 'Neuen Raum eröffnen oder mit einem Code beitreten.');
+      noteEl.textContent = v.notice || t(!v.hasName ? 'duel.needName' : v.busy ? 'duel.connecting'
+        : !v.netOk ? 'duel.needNet' : 'duel.joinHint');
       if (v.pendingCode && !codeIn.value) codeIn.value = v.pendingCode;
       if (nameIn.value === '' && v.myName) nameIn.value = v.myName;
       return;
@@ -130,22 +129,26 @@ export function createDuelCard(doc, g, duel, { onTap, board, fmtClock, nf, onLea
       bibsEl.replaceChildren(hostBib, guestBib);
       if (!sliding) { range.value = String(v.target); targetVal.textContent = meters(v.target); }
       range.disabled = v.role !== 'host';
-      levelBtns.forEach((b, i) => { b.classList.toggle('active', i + 1 === v.botLevel); b.disabled = v.phase !== 'lobby'; });
+      levelBtns.forEach((b, i) => {
+        b.classList.toggle('active', i + 1 === v.botLevel);
+        b.disabled = v.phase !== 'lobby';
+        b.setAttribute('aria-label', t('duel.level', { i: i + 1, name: t('bot.' + (i + 1)) }));
+      });
       const hints = [];
-      if (v.phase === 'count') hints.push('Start …');
-      else if (v.vsBot) hints.push('Stufe wählen, dann „Los“', 'Pause hält das Rennen an');
-      else if (v.role === 'host') hints.push(v.guest ? (v.canGo ? 'Alles bereit' : v.versionOk ? `Warte, bis ${v.guest.name} bereit ist` : 'Der andere muss die App neu laden') : 'Teile den Code, dann kann der andere beitreten');
-      else hints.push(v.ready ? `Warte auf ${v.host ? v.host.name : 'den Host'}` : 'Tipp auf „Bereit“');
-      hints.push(`Sturzpause ${nf1.format(v.pause)} s`);
-      if (isTuned()) hints.push('Regler im Duell auf Standard');
+      if (v.phase === 'count') hints.push(t('duel.starting'));
+      else if (v.vsBot) hints.push(t('duel.botHint'), t('duel.botPause'));
+      else if (v.role === 'host') hints.push(v.guest ? (v.canGo ? t('duel.allReady') : v.versionOk ? t('duel.waitReady', { n: v.guest.name }) : t('duel.reload')) : t('duel.shareHint'));
+      else hints.push(v.ready ? t('duel.waitHost', { n: v.host ? v.host.name : t('duel.theHost') }) : t('duel.tapReady'));
+      hints.push(t('duel.pause', { v: nf1.format(v.pause) }));
+      if (isTuned()) hints.push(t('duel.tuned'));
       if (shareNote) hints.push(shareNote);
-      if (v.role && !v.streaming) hints.push('kein Stream');
+      if (v.role && !v.streaming) hints.push(t('duel.noStream'));
       noteEl.textContent = hints.join(' · ');
-      if (v.role === 'host') { goBtn.textContent = v.phase === 'count' ? 'Start …' : 'Los'; goBtn.disabled = !v.canGo || v.phase === 'count'; }
-      else { goBtn.textContent = v.phase === 'count' ? 'Start …' : v.ready ? 'Bereit ✓' : 'Bereit'; goBtn.disabled = v.phase === 'count'; }
+      if (v.role === 'host') { goBtn.textContent = t(v.phase === 'count' ? 'duel.starting' : 'duel.go'); goBtn.disabled = !v.canGo || v.phase === 'count'; }
+      else { goBtn.textContent = t(v.phase === 'count' ? 'duel.starting' : v.ready ? 'duel.readyBtnOn' : 'duel.readyBtn'); goBtn.disabled = v.phase === 'count'; }
       return;
     }
-    noteEl.textContent = v.notice || (v.round > 1 ? `Runde ${v.round}` : '');
+    noteEl.textContent = v.notice || (v.round > 1 ? t('duel.round', { n: v.round }) : '');
     renderResult(v);
   }
 
@@ -175,8 +178,8 @@ export function createDuelCard(doc, g, duel, { onTap, board, fmtClock, nf, onLea
     if (navigator.share) {
       navigator.share(data).catch(() => { /* abgebrochen */ });
     } else if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(`${data.text} ${data.url}`).then(() => { shareNote = 'Link kopiert'; render(); }, () => {});
-    } else shareNote = 'Code weitersagen: ' + duel.view().code;
+      navigator.clipboard.writeText(`${data.text} ${data.url}`).then(() => { shareNote = t('duel.copied'); render(); }, () => {});
+    } else shareNote = t('duel.tellCode', { c: duel.view().code });
     render();
   });
   range.addEventListener('pointerdown', () => { sliding = true; });

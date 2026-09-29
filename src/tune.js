@@ -4,28 +4,52 @@ import { C, TUNABLES, VERSION } from './constants.js';
 const KEY = 'powder.tune.v16'; // Versionssprung verwirft alte Regler-Werte, wenn sich die Defaults ändern
 const ROWS = TUNABLES.filter((t) => t.key); // ohne Gruppentitel
 const DEFAULTS = Object.fromEntries(ROWS.map((t) => [t.key, C[t.key]]));
+// Regler, die auch in den Einstellungen stehen (user, der Ton): eigener Speicher, der KEY-Sprünge überlebt. Dort steht
+// nur, was vom Standard abweicht, sonst verdeckte ein gespeicherter alter Standard einen neuen.
+const USER_KEY = 'powder.settings.tune';
+const USER_ROWS = ROWS.filter((t) => t.user);
+const DEV_ROWS = ROWS.filter((t) => !t.user);
 
 export function loadTune() {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) || '{}');
-    for (const t of ROWS) if (typeof saved[t.key] === 'number') C[t.key] = saved[t.key];
+    for (const t of DEV_ROWS) if (typeof saved[t.key] === 'number') C[t.key] = saved[t.key];
+    const mine = JSON.parse(localStorage.getItem(USER_KEY) || '{}');
+    for (const t of USER_ROWS) if (typeof mine[t.key] === 'number') C[t.key] = mine[t.key];
   } catch { /* egal */ }
 }
 
 function saveTune() {
   try {
-    localStorage.setItem(KEY, JSON.stringify(Object.fromEntries(ROWS.map((t) => [t.key, C[t.key]]))));
+    localStorage.setItem(KEY, JSON.stringify(Object.fromEntries(DEV_ROWS.map((t) => [t.key, C[t.key]]))));
+    localStorage.setItem(USER_KEY, JSON.stringify(Object.fromEntries(USER_ROWS
+      .filter((t) => C[t.key] !== DEFAULTS[t.key]).map((t) => [t.key, C[t.key]]))));
   } catch { /* egal */ }
 }
 
+// „Standard“ im Tuning-Panel: nur die Entwickler-Regler, die Wahl des Spielers in den Einstellungen bleibt
 export function resetTune() {
-  for (const t of ROWS) C[t.key] = DEFAULTS[t.key];
+  for (const t of DEV_ROWS) C[t.key] = DEFAULTS[t.key];
   try { localStorage.removeItem(KEY); } catch { /* egal */ }
 }
 
-// Weicht ein Regler vom Standard ab, der das Spiel verändert? Regler mit visual (nur Bild) zählen nicht.
+// Einstellungen (hud.js): einen Spieler-Regler setzen oder alle auf Standard
+export function setUserTune(key, v) {
+  if (!USER_ROWS.some((t) => t.key === key)) return;
+  C[key] = v;
+  saveTune();
+}
+export function resetUserTune() {
+  for (const t of USER_ROWS) C[t.key] = DEFAULTS[t.key];
+  saveTune();
+}
+export const userTunables = () => USER_ROWS;
+export const userTuned = () => USER_ROWS.some((t) => C[t.key] !== DEFAULTS[t.key]);
+
+// Weicht ein Regler vom Standard ab, der das Spiel verändert? Regler mit visual (nur Bild) oder user (Ton, Wahl des
+// Spielers) zählen nicht.
 export function isTuned() {
-  return ROWS.some((t) => !t.visual && C[t.key] !== DEFAULTS[t.key]);
+  return ROWS.some((t) => !t.visual && !t.user && C[t.key] !== DEFAULTS[t.key]);
 }
 
 // Anzeige eines Werts: Name aus names (1 = erster), sonst Zahl mit Einheit.
@@ -168,7 +192,7 @@ export function createTunePanel(doc, panel, onChange) {
     const n = e.sec.own.filter((x) => C[x.t.key] !== DEFAULTS[x.t.key]).length;
     e.sec.badge.textContent = n ? String(n) : '';
     e.sec.badge.hidden = !n;
-    reset.disabled = !ROWS.some((x) => C[x.key] !== DEFAULTS[x.key]); // auch Bild-Regler zählen hier
+    reset.disabled = !DEV_ROWS.some((x) => C[x.key] !== DEFAULTS[x.key]); // auch Bild-Regler zählen hier, der Ton nicht
   }
 
   function refresh() {

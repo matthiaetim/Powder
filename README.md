@@ -102,9 +102,12 @@ Anleitung im Kopf der Datei (braucht Java). Die App lässt sich ebenfalls gegen 
 
 1. <https://console.firebase.google.com> → „Projekt hinzufügen“ → Name z. B. `powder` → Google Analytics deaktivieren → Erstellen.
 2. „Build“ → „Realtime Database“ → „Datenbank erstellen“ → Standort Belgien (europe-west1) → „Im gesperrten Modus starten“.
-3. „Build“ → „Authentication“ → „Jetzt starten“ → Reiter „Anmeldemethode“ → „Anonym“ → aktivieren → Speichern.
-4. Zahnrad oben links → „Projekteinstellungen“ → Reiter „Allgemein“ → „Web-API-Schlüssel“ kopieren → in `AUTH_KEY`
-   eintragen. Der Schlüssel ist öffentlich (er steht in jeder Web-App), kein Geheimnis.
+3. Links „Sicherheit“ → „Authentication“ (oder „Nach Produkten suchen“) → „Jetzt starten“ → Reiter „Anmeldemethode“
+   → „Anonym“ → aktivieren. „Automatische Bereinigung“ **aus** lassen: sie löscht Konten nach 30 Tagen, dann verlöre
+   jedes Gerät den Besitz seiner Einträge. Speichern.
+4. Links „Einstellungen“ → „Projekteinstellungen“ → „Allgemein“. Steht dort kein Web-API-Schlüssel, unter „Meine Apps“
+   mit `</>` eine Web-App registrieren (ohne Firebase Hosting); der Code-Block zeigt dann `apiKey: "AIza…"`. Den Wert in
+   `AUTH_KEY` eintragen. Der Schlüssel ist öffentlich (er steht in jeder Web-App), kein Geheimnis.
 5. Reiter „Daten“ der Realtime Database → URL oben kopieren (`https://….europe-west1.firebasedatabase.app`) → ohne
    Schluss-Slash in `BOARD_URL` eintragen → Version bumpen, pushen, warten bis die Version live ist.
 6. Erst dann Reiter „Regeln“ → Inhalt von `tools/firebase-rules.json` einfügen (alles ersetzen) → „Veröffentlichen“.
@@ -132,8 +135,26 @@ Alles synthetisch über die Web Audio API (`src/audio.js`), keine Audiodateien. 
 - **Lawine**: Grollen, das mit der Nähe lauter und heller wird, Knacken und Zischen, sobald sie im Bild ist, Krachen, wenn sie nach dem Stillstand losbricht. Nach dem Erwischen klingt sie aus.
 - **Aufprall**: kurzer dumpfer Schlag, am Baum mit knappem Knacken, am Fels mit Klonk, an der Lawine schwerer.
 - **Super-G**: Pieptöne des Countdowns (der lange ist das Go), ein kurzes Schlagen des Fähnchens beim Durchfahren, ein doppelter Buzzer beim Torfehler, Klacken an der Stange, Doppelton im Ziel (Countdown und Zielton auch im Duell). Beim App-Start ist der Ton erst nach dem ersten Tipp frei, deshalb wartet der Modus dort auf den Tipp.
-- Lautstärke gesamt und je Gruppe im Tuning-Panel, Abschnitt „Ton“.
+- Lautstärke gesamt und je Gruppe in den Einstellungen (Zahnrad) und im Tuning-Panel, Abschnitt „Ton“. Beide
+  verstellen dieselben Werte; sie zählen nicht als Tuning, ein Lauf mit leiserem Ton kommt also in die Bestenliste.
 - **App verlassen**: Beim Schließen, beim App-Wechsel, beim Sperren und beim Tab-Wechsel geht der Ton in 20 ms auf null und wird erst danach angehalten, beim Zurückkommen blendet er weich wieder ein. Ein harter Stopp klang auf dem iPhone beim Schließen verzerrt, weil iOS den Rest im Ausgabepuffer kurz in Schleife spielt.
+
+## Einstellungen
+
+Das Zahnrad links neben dem Ton-Icon öffnet auf der Fresh-Seite die Kachel „Einstellungen“ (`src/settings.js`):
+
+- **Anonyme Spielstatistik senden**: ein Häkchen, am Anfang aus (Opt-in). Gespeichert als `powder.stats.ok`; gesendet
+  wird noch nichts, die Erhebung selbst kommt in einer späteren Version und fragt dann dieses Häkchen ab.
+- **Sprache**: Deutsch, Englisch (Union Jack), Japanisch. Ohne Wahl gilt die Sprache des Geräts, sofern es eine der
+  drei ist, sonst Deutsch. Alle Texte stehen in `src/i18n.js` (`t('schlüssel')`), statische Texte in `index.html`
+  tragen `data-t`, `data-t-ph` oder `data-t-aria`. Zahlen folgen der Sprache (6.978 m, 6,978 m; 41,27 s, 41.27 s).
+  Das Tuning-Panel bleibt deutsch. Neue Texte immer in allen drei Sprachen anlegen.
+- **Name**: derselbe Name wie im Feld der Bestenliste (Bestenliste und Duell), mit dem Hinweis, wenn er einem anderen
+  Gerät gehört. **Namenslinien im Schnee**: die Bestweiten der anderen an oder aus (`powder.marks`, `g.marksOn` in
+  `src/game.js`), die eigene rote Rekordlinie bleibt. Beides nur mit Datenbank.
+- **Ton**: die Lautstärken aus dem Tuning-Abschnitt „Ton“ als Regler, dazu „Standard“. Diese Regler tragen in
+  `TUNABLES` das Flag `user`: eigener Speicher (`powder.settings.tune`, nur was vom Standard abweicht), der einen neuen
+  `KEY` in `src/tune.js` übersteht, und „Standard“ im Tuning-Panel lässt sie in Ruhe.
 
 ## Lokal starten
 
@@ -151,6 +172,7 @@ Leerlauf-Anteil, Hitboxen, Safe Lane), `?seed=42` (reproduzierbare Welt),
 Alle Stellschrauben stehen in `src/constants.js`; die Liste `TUNABLES` dort bestimmt die Regler im Panel (Abschnitte „Fahren“, „Lawine“: Tempo am Start und Ende, Anstiegsdauer, Lauerabstand, Stillstand-Schwelle und -Wartezeit, Fangabstand, Beben, Schräg zählt Tempo, Gnade beim Schuss, Gnade bis Winkel, volle Härte ab Winkel, Schuss schüttelt ab, „Super-G“: Torabstand, Torbreite, Torversatz, Piste frei je Seite, Zeitstrafe pro Tor, Stange kostet, Endtempo, „Duell“: Sturzpause, Geist-Verzögerung, „Bild“: Auflösung (Deckel für die Pixeldichte, Standard 2; kleiner ist weicher, aber schneller, und zählt nicht als Tuning für die Bestenliste), „Schriftzug“: Deckkraft, Breite, Verwischen, und „Ton“: Lautstärke gesamt, Wind, Ski und Kurven, Lawine, Aufprall, Super-G).
 Vom iPhone übernehmen: im Panel „Kopieren“, den Text in den Chat mit Claude einfügen. Jede Zeile hat die Form `KEY: Rohwert, // Gruppe: Regler = Anzeige, Standard alt` und passt so direkt in `C` in `src/constants.js`.
 Ändern sich die Standardwerte, den Schlüssel `KEY` in `src/tune.js` hochzählen, sonst bleiben alte Regler-Werte auf dem iPhone aktiv.
+Regler mit `user: true` (Abschnitt „Ton“) stehen auch in den Einstellungen und werden getrennt gespeichert (siehe „Einstellungen“).
 Regler mit `fair: true` (der ganze Abschnitt „Fahren“) stehen während eines Duells auf Standard (`suspendTune` in `src/tune.js`), damit beide Geräte dieselbe Welt gleich schnell fahren; danach gelten wieder die gespeicherten Werte.
 
 ## Deploy (GitHub Pages)

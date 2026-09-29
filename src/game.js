@@ -9,7 +9,7 @@ import { createAvalanche, updateAvalanche, holdAvalanche } from './avalanche.js'
 import { checkCollision } from './collision.js';
 import { createTrack, clearTrack, pushTrack } from './track.js';
 import { createParticles, clearParticles, spawnParticle, updateParticles } from './particles.js';
-import { loadBest, saveBest, loadBestTime, saveBestTime, loadSplitRef, saveSplitRef, loadRider, saveRider, noteRecentMode } from './storage.js';
+import { loadBest, saveBest, loadBestTime, saveBestTime, loadSplitRef, saveSplitRef, loadRider, saveRider, noteRecentMode, loadMarksOn, saveMarksOn } from './storage.js';
 import { MODES, DEFAULT_MODE, lowerIsBetter } from './modes.js';
 import { RIDERS, validRider } from './riders.js';
 import { createCourse, updateCourse, tickCourse, crossFrac } from './gates.js';
@@ -33,6 +33,7 @@ export function createGame(opts = {}) {
     dist: 0, runT: 0, best: 0, newBest: false,
     runBest: 0, // Bestwert beim Start des Laufs: dort steht die Rekordlinie, auch wenn best beim Aufprall schon steigt
     marks: {}, runMarks: [], // Bestweiten der anderen je Modus (board.js) und der beim Start eingefrorene Satz für die Linien
+    marksOn: loadMarksOn(),  // Namenslinien anzeigen (Einstellungen); die eigene rote Rekordlinie bleibt immer
     runTainted: false,       // Regler mitten im Lauf verstellt: zählt nicht für die Bestenliste (board.js)
     bestTime: 0, newBestTime: false, // Super-G: Bestzeit in Hundertstel, neue Bestzeit im Lauf
     bestSplits: [], splitRefT: 0,    // Zwischenzeiten des schnellsten eigenen Laufs und dessen Gesamtzeit (storage.js)
@@ -562,6 +563,7 @@ export function selectRider(g, id) {
 // Alle Weiten würden mit wachsender Spielerzahl den Hang zupflastern. Ergebnis Meter absteigend, wie drawMarks
 // (render.js) es erwartet.
 function runMarksFor(g) {
+  if (!g.marksOn) return [];
   const all = [...(g.marks[g.mode] || [])].sort((a, b) => a.m - b.m);
   const out = [];
   const free = (m) => out.every((f) => Math.abs(f.m - m) >= C.BOARD_MARKS_GAP_M);
@@ -582,6 +584,13 @@ function runMarksFor(g) {
 export function setMarks(g, byMode) {
   g.marks = byMode || {};
   if (g.state === 'ready') g.runMarks = runMarksFor(g);
+}
+// Einstellungen: Namenslinien an oder aus. Außerhalb eines Laufs sofort (hinter der Kachel sieht man den Hang), sonst
+// ab dem nächsten Lauf wie bei setMarks.
+export function setMarksOn(g, on) {
+  g.marksOn = !!on;
+  saveMarksOn(g.marksOn);
+  if (g.state !== 'running' && g.state !== 'paused' && g.state !== 'count') g.runMarks = runMarksFor(g);
 }
 // Der Server kennt für den eigenen Namen mehr als dieses Gerät (Zweitgerät, gelöschte Daten): lokal übernehmen, damit
 // „Bester Lauf“ und die rote Linie zur Bestenliste passen. Die Linie rückt erst beim nächsten Lauf.

@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.27.1';
+export const VERSION = '0.27.2';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -174,7 +174,6 @@ export const C = {
   FRESH_GUARD_MS: 300,
 
   // HUD
-  HUD_LOCALE: 'de-DE',
   HUD_TEXT_MS: 50,           // Tempo und Distanz höchstens 20× pro Sekunde in den DOM schreiben (Layout kostet pro Bild)
 
   // Bestenliste (board.js): Firebase Realtime Database per REST ohne SDK. Leer = aus, die App läuft wie bisher.
@@ -274,7 +273,6 @@ export const C = {
   // Easter Egg (Classic): Gipfelschild bei der Höhe des Mount Everest, gleiche Machart wie der Credit (render.js),
   // mit Gipfelkreuz; beim Überfahren zeigt das HUD kurz „Everest“ statt der Meter, dazu ein kleiner Dreiklang.
   EVEREST_Y_M: 8848,
-  EVEREST_TEXT: 'Everest 8.848 m',
   EVEREST_WIDTH_FRAC: 0.7,   // kleiner als der Credit, der Text ist kürzer und wäre sonst riesig
   EVEREST_HUD_S: 2.5,
 
@@ -445,7 +443,8 @@ export const C = {
 // Gruppe, tone wählt deren Farbe (styles.css, .tune-group[data-tone]). names zeigt statt der Zahl einen Namen (1 = erster Name). visual: der Regler ändert nur das Bild, nicht das Spiel,
 // und macht Läufe deshalb nicht ungültig für die Bestenliste (tune.js isTuned, hud.js). fair: im Duell steht der Regler
 // auf Standard (tune.js), weil er Welt, Sicht oder Fahrphysik ändert und beide Geräte dieselbe Strecke gleich schnell
-// fahren müssen.
+// fahren müssen. user: der Regler steht auch in den Einstellungen für jeden Spieler (hud.js, Ton), zählt nie als
+// Tuning und wird eigens gespeichert, damit ein neuer KEY in tune.js die Wahl des Spielers nicht verwirft.
 export const TUNABLES = [
   { heading: 'Fahren', tone: 'blue' },
   { key: 'TURN_TAP_DEG', label: 'Tipp-Winkel', unit: '°', min: 10, max: 80, step: 5, fair: true },
@@ -507,10 +506,10 @@ export const TUNABLES = [
   { key: 'SIGN_WIDTH_FRAC', label: 'Breite', unit: '%', min: 0.4, max: 1, step: 0.02, scale: 100, decimals: 0 },
   { key: 'SIGN_ERASE_ALPHA', label: 'Verwischen beim Überfahren', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
   { heading: 'Ton', tone: 'violet' },
-  { key: 'SND_MASTER', label: 'Lautstärke', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
-  { key: 'SND_WIND', label: 'Wind', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
-  { key: 'SND_SKI', label: 'Ski und Kurven', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
-  { key: 'SND_AV', label: 'Lawine', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
-  { key: 'SND_CRASH', label: 'Aufprall', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
-  { key: 'SND_RACE', label: 'Super-G: Start und Tore', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0 },
+  { key: 'SND_MASTER', label: 'Lautstärke', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0, user: true },
+  { key: 'SND_WIND', label: 'Wind', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0, user: true },
+  { key: 'SND_SKI', label: 'Ski und Kurven', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0, user: true },
+  { key: 'SND_AV', label: 'Lawine', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0, user: true },
+  { key: 'SND_CRASH', label: 'Aufprall', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0, user: true },
+  { key: 'SND_RACE', label: 'Super-G: Start und Tore', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0, user: true },
 ];

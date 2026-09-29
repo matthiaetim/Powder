@@ -26,6 +26,8 @@
   <link rel="modulepreload" href="./src/hud.js">
   <link rel="modulepreload" href="./src/tune.js">
   <link rel="modulepreload" href="./src/audio.js">
+  <link rel="modulepreload" href="./src/i18n.js">
+  <link rel="modulepreload" href="./src/settings.js">
   <link rel="modulepreload" href="./src/net.js">
   <link rel="modulepreload" href="./src/auth.js">
   <link rel="modulepreload" href="./src/board.js">
@@ -58,14 +60,14 @@
     <div id="hud-opp"></div>
   </div>
   <div id="hud-note"></div>
-  <div id="hint">Tippen lenkt · Halten carvt</div>
+  <div id="hint" data-t="hint">Tippen lenkt · Halten carvt</div>
   <div id="ov-count" class="overlay"></div>
   <div id="ov-pause" class="overlay">
-    <div class="ov-title">Pause</div>
+    <div class="ov-title" data-t="pause">Pause</div>
     <div class="ov-sub">Tippen zum Weiterfahren</div>
   </div>
   <div id="ov-dead" class="overlay">
-   <button id="btn-rider" type="button" aria-label="Fahrer wählen"><canvas class="rider-preview" width="40" height="40"></canvas></button>
+   <button id="btn-rider" type="button" aria-label="Fahrer wählen" data-t-aria="aria.rider"><canvas class="rider-preview" width="40" height="40"></canvas></button>
    <button id="btn-sound" type="button" aria-label="Ton an" aria-pressed="true">
     <svg class="sound-icon" viewBox="0 0 40 40" aria-hidden="true">
      <path class="spk" d="M8 16h6l8-7v22l-8-7H8z"/>
@@ -74,38 +76,77 @@
      <path class="mute" d="M27 16l8 8M35 16l-8 8"/>
     </svg>
    </button>
+   <!-- Einstellungen: Zahnrad links neben dem Ton-Icon, öffnet die Kachel „Einstellungen“ (settings.js) -->
+   <button id="btn-settings" type="button" aria-label="Einstellungen" data-t-aria="aria.settings">
+    <svg class="gear-icon" viewBox="0 0 40 40" aria-hidden="true">
+     <path class="gear" fill-rule="evenodd" d="M17.17 9.79L17.66 5.99L22.34 5.99L22.83 9.79A10.6 10.6 0 0 1 25.22 10.77L28.25 8.44L31.56 11.75L29.23 14.78A10.6 10.6 0 0 1 30.21 17.17L34.01 17.66L34.01 22.34L30.21 22.83A10.6 10.6 0 0 1 29.23 25.22L31.56 28.25L28.25 31.56L25.22 29.23A10.6 10.6 0 0 1 22.83 30.21L22.34 34.01L17.66 34.01L17.17 30.21A10.6 10.6 0 0 1 14.78 29.23L11.75 31.56L8.44 28.25L10.77 25.22A10.6 10.6 0 0 1 9.79 22.83L5.99 22.34L5.99 17.66L9.79 17.17A10.6 10.6 0 0 1 10.77 14.78L8.44 11.75L11.75 8.44L14.78 10.77A10.6 10.6 0 0 1 17.17 9.79ZM24.6 20A4.6 4.6 0 1 0 15.4 20A4.6 4.6 0 1 0 24.6 20Z"/>
+    </svg>
+   </button>
+   <div id="settings-card" class="card">
+    <div class="card-title" data-t="settings.title">Einstellungen</div>
+    <div id="settings-body">
+     <button id="set-stats" class="set-check" type="button" role="checkbox" aria-checked="false">
+      <span class="set-box" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M4.5 10.5l3.8 3.8 7.2-8.6"/></svg></span>
+      <span class="set-check-text">
+       <span class="set-check-title" data-t="settings.stats">Anonyme Spielstatistik senden</span>
+       <span class="set-check-sub" data-t="settings.statsSub"></span>
+      </span>
+     </button>
+     <div class="set-head" data-t="settings.lang">Sprache</div>
+     <div id="set-langs"></div>
+     <div id="set-board">
+      <div class="set-head" data-t="settings.name">Name</div>
+      <input id="set-name" class="field native" type="text" maxlength="12" placeholder="Dein Name" autocomplete="off" autocorrect="off"
+             autocapitalize="words" spellcheck="false" enterkeyhint="done" aria-label="Dein Name" data-t-ph="name.ph" data-t-aria="name.ph">
+      <div id="set-name-note" class="set-note"></div>
+      <button id="set-marks" class="set-check" type="button" role="checkbox" aria-checked="true">
+       <span class="set-box" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M4.5 10.5l3.8 3.8 7.2-8.6"/></svg></span>
+       <span class="set-check-text">
+        <span class="set-check-title" data-t="settings.marks">Namenslinien im Schnee</span>
+        <span class="set-check-sub" data-t="settings.marksSub"></span>
+       </span>
+      </button>
+     </div>
+     <div class="set-head-row">
+      <span class="set-head" data-t="settings.sound">Ton</span>
+      <button id="set-snd-reset" class="btn-flat" type="button" data-t="settings.soundReset">Standard</button>
+     </div>
+     <div id="set-sounds"></div>
+    </div>
+    <button id="btn-settings-back" class="btn-flat" type="button" data-t="back">Zurück</button>
+   </div>
    <div id="rider-card" class="card">
-    <div class="card-title">Fahrer</div>
+    <div class="card-title" data-t="rider.title">Fahrer</div>
     <div id="riders"></div>
-    <button id="btn-rider-back" class="btn-flat" type="button">Zurück</button>
+    <button id="btn-rider-back" class="btn-flat" type="button" data-t="back">Zurück</button>
    </div>
    <div id="stats-card" class="card">
-    <div class="card-title">Bestenliste</div>
+    <div class="card-title" data-t="stats.title">Bestenliste</div>
     <div id="stats-mode"></div>
     <div id="stats-head" class="stats-row"></div>
     <div id="stats-list"></div>
     <div id="stats-note"></div>
-    <button id="btn-stats-back" class="btn-flat" type="button">Zurück</button>
+    <button id="btn-stats-back" class="btn-flat" type="button" data-t="back">Zurück</button>
    </div>
    <div id="modes-card" class="card">
-    <div class="card-title">Modus</div>
+    <div class="card-title" data-t="modes.title">Modus</div>
     <div id="modes-list"></div>
-    <button id="btn-modes-back" class="btn-flat" type="button">Zurück</button>
+    <button id="btn-modes-back" class="btn-flat" type="button" data-t="back">Zurück</button>
    </div>
    <div id="duel-card" class="card" data-view="join">
-    <div class="card-title">Duell</div>
+    <div class="card-title" data-t="duel.title">Duell</div>
     <div id="duel-note"></div>
     <div id="duel-name-row" class="duel-field-row">
       <input id="duel-name" class="field native" type="text" maxlength="12" placeholder="Dein Name" autocomplete="off" autocorrect="off"
-             autocapitalize="words" spellcheck="false" enterkeyhint="done" aria-label="Dein Name">
+             autocapitalize="words" spellcheck="false" enterkeyhint="done" aria-label="Dein Name" data-t-ph="name.ph" data-t-aria="name.ph">
     </div>
-    <button id="btn-duel-create" class="btn-main" type="button">Neuer Raum</button>
-    <div id="duel-code-row" class="duel-code-row"><span id="duel-code" class="duel-code"></span><button id="btn-duel-share" class="btn-flat native" type="button">Teilen</button></div>
+    <button id="btn-duel-create" class="btn-main" type="button" data-t="duel.create">Neuer Raum</button>
+    <div id="duel-code-row" class="duel-code-row"><span id="duel-code" class="duel-code"></span><button id="btn-duel-share" class="btn-flat native" type="button" data-t="duel.share">Teilen</button></div>
     <div id="duel-bibs" class="duel-bibs"></div>
-    <div id="duel-levels" class="duel-levels" role="group" aria-label="Stufe des Bots"></div>
+    <div id="duel-levels" class="duel-levels" role="group" aria-label="Stufe des Bots" data-t-aria="duel.levels"></div>
     <div id="duel-target" class="duel-sign">
-      <div class="duel-sign-row"><span class="duel-sign-label">Ziel</span><span id="duel-target-val" class="duel-sign-val">1.000 m</span></div>
-      <input id="duel-target-range" class="native" type="range" min="1000" max="10000" step="500" value="1000" aria-label="Zielweite">
+      <div class="duel-sign-row"><span class="duel-sign-label" data-t="duel.target">Ziel</span><span id="duel-target-val" class="duel-sign-val">1.000 m</span></div>
+      <input id="duel-target-range" class="native" type="range" min="1000" max="10000" step="500" value="1000" aria-label="Zielweite" data-t-aria="duel.targetAria">
     </div>
     <button id="btn-duel-go" class="btn-main" type="button">Los</button>
     <div id="duel-verdict"></div>
@@ -113,13 +154,13 @@
     <button id="btn-duel-again" class="btn-main" type="button">Revanche</button>
     <div id="duel-join-row" class="duel-join-row">
       <input id="duel-code-in" class="field native" type="text" maxlength="4" placeholder="Code" autocomplete="off" autocorrect="off"
-             autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-label="Raum-Code">
-      <button id="btn-duel-join" class="btn-flat" type="button">Beitreten</button>
+             autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-label="Raum-Code" data-t-ph="duel.code" data-t-aria="duel.codeAria">
+      <button id="btn-duel-join" class="btn-flat" type="button" data-t="duel.join">Beitreten</button>
     </div>
-    <button id="btn-duel-bot" class="btn-flat" type="button">Gegen Bot</button>
-    <button id="btn-duel-human" class="btn-flat" type="button">Gegen Mitspieler</button>
+    <button id="btn-duel-bot" class="btn-flat" type="button" data-t="duel.bot">Gegen Bot</button>
+    <button id="btn-duel-human" class="btn-flat" type="button" data-t="duel.human">Gegen Mitspieler</button>
     <div id="duel-error"></div>
-    <button id="btn-duel-leave" class="btn-flat" type="button">Zurück</button>
+    <button id="btn-duel-leave" class="btn-flat" type="button" data-t="back">Zurück</button>
    </div>
    <div id="dead-card" class="card">
     <div id="dead-dist">0 m</div>
@@ -131,24 +172,24 @@
       <label class="board-row board-own" for="board-name">
         <span class="board-rank"></span>
         <input id="board-name" type="text" maxlength="12" placeholder="Dein Name" autocomplete="off" autocorrect="off"
-               autocapitalize="words" spellcheck="false" enterkeyhint="done" aria-label="Dein Name für die Bestenliste">
+               autocapitalize="words" spellcheck="false" enterkeyhint="done" aria-label="Dein Name für die Bestenliste" data-t-ph="name.ph" data-t-aria="name.aria">
         <span class="board-m"></span>
       </label>
       <div id="board-note"></div>
     </div>
     <button id="btn-fresh" type="button">Fresh</button>
     <div id="modes"></div>
-    <button id="btn-modes" class="btn-flat" type="button">Modus auswählen</button>
+    <button id="btn-modes" class="btn-flat" type="button" data-t="modes.choose">Modus auswählen</button>
    </div>
   </div>
   <!-- Neustart (Super-G, Duell gegen den Bot): nach den Overlays, damit er auch über der Pause liegt -->
-  <button id="btn-restart" type="button" aria-label="Neustart">
+  <button id="btn-restart" type="button" aria-label="Neustart" data-t-aria="aria.restart">
    <svg class="restart-icon" viewBox="0 0 40 40" aria-hidden="true">
     <path d="M29.2 14.2A11 11 0 1 0 31 22.5"/>
     <path d="M30.5 7.5l-1 7.3-7.3-1"/>
    </svg>
   </button>
-  <div id="version" role="button" aria-label="Version, lange drücken für Tuning"></div>
+  <div id="version" role="button" aria-label="Version, lange drücken für Tuning" data-t-aria="aria.version"></div>
   <div id="tune" hidden></div>
   <pre id="debug" hidden></pre>
   <script type="module" src="./src/main.js"></script>

@@ -66,9 +66,10 @@ export function createInput(canvas, h) {
   });
 
   // iOS-Safari: kein Scrollen, kein Zoom, kein Kontextmenü. Ausnahmen behalten den nativen Tipp: Tuning-Panel (Regler,
-  // Scrollen), Liste der Bestenliste-Details (Scrollen), Namensfeld der Bestenliste sowie Felder, Regler und
-  // Teilen-Knopf der Duell-Kachel (.native: Tastatur, Wischen, click für navigator.share).
-  const NATIVE = '#tune, #stats-list, .board-own, #duel-card .native';
+  // Scrollen), Liste der Bestenliste-Details (Scrollen), Inhalt der Einstellungen (Regler, Scrollen), Namensfeld der
+  // Bestenliste sowie Felder, Regler und Teilen-Knopf der Duell-Kachel (.native: Tastatur, Wischen, click für
+  // navigator.share).
+  const NATIVE = '#tune, #stats-list, #settings-body, .board-own, #duel-card .native';
   document.addEventListener('touchmove', (e) => {
     if (e.target.closest && e.target.closest(NATIVE)) return;
     e.preventDefault();
@@ -83,7 +84,7 @@ export function createInput(canvas, h) {
   document.addEventListener('touchend', noNative, { passive: false });
   document.addEventListener('gesturestart', (e) => e.preventDefault());
   document.addEventListener('contextmenu', (e) => e.preventDefault());
-  document.addEventListener('dblclick', (e) => { if (!e.target.closest?.('.board-own, #duel-card .native')) e.preventDefault(); });
+  document.addEventListener('dblclick', (e) => { if (!e.target.closest?.('.board-own, #duel-card .native, #settings-body .native')) e.preventDefault(); });
   window.addEventListener('blur', cancelAll);
 
   return { cancelAll };

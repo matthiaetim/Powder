@@ -4,11 +4,13 @@
 import { C, VERSION } from './constants.js';
 import { applyEvent } from './room.js';
 import { botLevel } from './bot.js';
+import { t } from './i18n.js';
 
 export const BOT_CODE = 'BOT'; // kein gültiger Raum-Code (vier Buchstaben), die Kachel zeigt ihn nicht
 
 const clampLevel = (n) => Math.min(C.BOT_LEVELS.length, Math.max(1, Math.round(n) || C.BOT_LEVEL_DEFAULT));
-const botPlayer = (level) => ({ name: botLevel(level).name, rider: C.BOT_RIDER, ready: true, v: VERSION, bot: level });
+// Name der Stufe in der gewählten Sprache (i18n.js bot.1 … bot.6), botLevel begrenzt die Stufe auf 1 bis 6
+const botPlayer = (level) => ({ name: t('bot.' + (C.BOT_LEVELS.indexOf(botLevel(level)) + 1)), rider: C.BOT_RIDER, ready: true, v: VERSION, bot: level });
 
 // { '.sv': 'timestamp' } wie bei Firebase durch die Zeit ersetzen
 function stamp(v, now) {
