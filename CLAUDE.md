@@ -8,7 +8,7 @@ wie hier gearbeitet wird. Zwei Entwickler arbeiten mit eigenem Rechner und eigen
 
 - Deutsch: Antworten, Commit-Messages, Kommentare im Code, Regler-Namen, README.
 - Texte, die der Spieler sieht, stehen in `src/i18n.js` und kommen über `t('schlüssel')` in die App. Neue Texte immer
-  in allen drei Sprachen anlegen (Deutsch, Englisch, Japanisch), nie fest in den Code schreiben. Das Tuning-Panel bleibt
+  in allen vier Sprachen anlegen (Deutsch, Englisch, Spanisch, Japanisch), nie fest in den Code schreiben. Das Tuning-Panel bleibt
   deutsch.
 - Kommentare erklären, warum etwas so ist, nicht was die Zeile tut. Einheiten sind Meter, Sekunden, Grad, km/h nur
   in Konstanten und Anzeige.

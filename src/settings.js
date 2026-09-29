@@ -1,6 +1,6 @@
 // Kachel „Einstellungen“ (DOM), geöffnet über das Zahnrad links neben dem Ton-Icon (hud.js, body[data-panel="settings"]).
 // Oben die Einwilligung in die anonyme Spielstatistik (Opt-in, aus bis der Spieler sie einschaltet), dann Name und
-// Namenslinien (nur mit Bestenliste), die Sprache (i18n.js) als drei Kärtchen mit Flagge und die Lautstärken aus dem
+// Namenslinien (nur mit Bestenliste), die Sprache (i18n.js) als Auswahlzeile mit Flagge und die Lautstärken aus dem
 // Tuning-Abschnitt „Ton“ (TUNABLES mit user, tune.js speichert sie getrennt vom Tuning). Die Regler tragen .native und liegen in #settings-body, das input.js
 // natives Wischen lässt: so lassen sie sich ziehen und die Kachel scrollt auf kleinen iPhones.
 import { C } from './constants.js';
@@ -9,8 +9,8 @@ import { setUserTune, resetUserTune, userTunables, userTuned } from './tune.js';
 import { loadStatsOk, saveStatsOk } from './storage.js';
 import { setMarksOn } from './game.js';
 
-// Flaggen als SVG im Rahmen 3:2 (styles.css .flag). Der Union Jack ist 2:1 und wird seitlich beschnitten (slice),
-// Schwarz-Rot-Gold (5:3) darf sich strecken, Streifen vertragen das; der Kreis der japanischen Flagge nicht, sie ist 3:2.
+// Flaggen als SVG im Rahmen 3:2 (styles.css .lang-flag), je auf die Fläche beschnitten (slice): der Union Jack ist 2:1,
+// Schwarz-Rot-Gold 5:3, beide vertragen das; Spanien (vereinfacht, ohne Wappen) und Japan sind 3:2.
 const FLAGS = {
   de: '<svg viewBox="0 0 5 3" preserveAspectRatio="none"><rect width="5" height="1" fill="#000"/>'
     + '<rect y="1" width="5" height="1" fill="#DD0000"/><rect y="2" width="5" height="1" fill="#FFCE00"/></svg>',
@@ -19,10 +19,10 @@ const FLAGS = {
     + '<path d="M0,0L60,30M60,0L0,30" stroke="#fff" stroke-width="6"/>'
     + '<path d="M0,0L60,30M60,0L0,30" clip-path="url(#flag-uk)" stroke="#C8102E" stroke-width="4"/>'
     + '<path d="M30,0v30M0,15h60" stroke="#fff" stroke-width="10"/><path d="M30,0v30M0,15h60" stroke="#C8102E" stroke-width="6"/></svg>',
+  es: '<svg viewBox="0 0 3 2"><rect width="3" height="2" fill="#AA151B"/><rect y="0.5" width="3" height="1" fill="#F1BF00"/></svg>',
   ja: '<svg viewBox="0 0 3 2"><rect width="3" height="2" fill="#fff"/><circle cx="1.5" cy="1" r="0.6" fill="#BC002D"/></svg>',
 };
-// Namen jeder Sprache in ihr selbst, damit man die eigene findet, egal was gerade eingestellt ist
-const LANG_NAMES = { de: 'Deutsch', en: 'English', ja: '日本語' };
+const LANG_NAMES = { de: 'Deutsch', en: 'English', es: 'Español', ja: '日本語' };
 
 export function createSettings(doc, { onTap, g, board }) {
   const $ = (id) => doc.getElementById(id);
@@ -62,24 +62,28 @@ export function createSettings(doc, { onTap, g, board }) {
     onTap(marksBtn, () => { setMarksOn(g, !g.marksOn); syncMarks(); });
   }
 
-  const langTiles = LANGS.map((id) => {
-    const tile = el('button', 'mode-card lang-card');
-    tile.type = 'button';
-    tile.dataset.lang = id;
-    tile.lang = id;
-    const flag = el('span', 'flag');
-    flag.innerHTML = FLAGS[id]; // feste SVG-Texte von oben, keine Eingabe
-    tile.append(flag, el('span', 'mode-name', LANG_NAMES[id]));
-    onTap(tile, () => { setLang(id); markLang(); });
-    langsEl.append(tile);
-    return tile;
-  });
+  // Sprache: eine Zeile mit Flagge, Name und ▾, darüber unsichtbar ein natives select. Ein Tipp öffnet so die
+  // Auswahl des iPhones (Rad), die Zeile selbst bleibt im Look der App.
+  const langRow = el('label', 'lang-row');
+  const langFlag = el('span', 'lang-flag');
+  const langName = el('span', 'lang-name');
+  const langSel = el('select', 'native lang-select');
+  for (const id of LANGS) {
+    const opt = el('option', '', LANG_NAMES[id]);
+    opt.value = id;
+    opt.lang = id;
+    langSel.append(opt);
+  }
+  langSel.addEventListener('change', () => { setLang(langSel.value); markLang(); });
+  langRow.append(langFlag, langName, el('span', 'lang-chev', '▾'), langSel);
+  langsEl.append(langRow);
   function markLang() {
-    for (const tile of langTiles) {
-      const on = tile.dataset.lang === getLang();
-      tile.classList.toggle('active', on);
-      tile.setAttribute('aria-pressed', on ? 'true' : 'false');
-    }
+    const id = getLang();
+    langSel.value = id;
+    langSel.setAttribute('aria-label', t('settings.lang'));
+    langFlag.innerHTML = FLAGS[id]; // feste SVG-Texte von oben, keine Eingabe
+    langName.textContent = LANG_NAMES[id];
+    langName.lang = id;
   }
 
   // Lautstärke je Gruppe in Prozent wie im Tuning-Panel; der Ton liest C in jedem Bild (audio.js)

@@ -145,10 +145,11 @@ Das Zahnrad links neben dem Ton-Icon öffnet auf der Fresh-Seite die Kachel „E
 
 - **Anonyme Spielstatistik senden**: ein Häkchen, am Anfang aus (Opt-in). Gespeichert als `powder.stats.ok`; gesendet
   wird noch nichts, die Erhebung selbst kommt in einer späteren Version und fragt dann dieses Häkchen ab.
-- **Sprache**: Deutsch, Englisch (Union Jack), Japanisch. Ohne Wahl gilt die Sprache des Geräts, sofern es eine der
-  drei ist, sonst Deutsch. Alle Texte stehen in `src/i18n.js` (`t('schlüssel')`), statische Texte in `index.html`
+- **Sprache**: Deutsch, Englisch (Union Jack), Spanisch, Japanisch als Auswahlzeile mit Flagge; ein Tipp öffnet die
+  Auswahl des iPhones (unsichtbares natives `select` über der Zeile). Ohne Wahl gilt die Sprache des Geräts, sofern die
+  App sie kennt, sonst Deutsch. Alle Texte stehen in `src/i18n.js` (`t('schlüssel')`), statische Texte in `index.html`
   tragen `data-t`, `data-t-ph` oder `data-t-aria`. Zahlen folgen der Sprache (6.978 m, 6,978 m; 41,27 s, 41.27 s).
-  Das Tuning-Panel bleibt deutsch. Neue Texte immer in allen drei Sprachen anlegen.
+  Das Tuning-Panel bleibt deutsch. Neue Texte immer in allen vier Sprachen anlegen.
 - **Name**: derselbe Name wie im Feld der Bestenliste (Bestenliste und Duell), mit dem Hinweis, wenn er einem anderen
   Gerät gehört. **Namenslinien im Schnee**: die Bestweiten der anderen an oder aus (`powder.marks`, `g.marksOn` in
   `src/game.js`), die eigene rote Rekordlinie bleibt. Beides nur mit Datenbank.

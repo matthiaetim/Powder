@@ -1,12 +1,12 @@
-// Sprachen (Einstellungen): Deutsch, Englisch, Japanisch. t('schlüssel', { var }) liefert den Text der gewählten
+// Sprachen (Einstellungen): Deutsch, Englisch, Spanisch, Japanisch. t('schlüssel', { var }) liefert den Text der gewählten
 // Sprache, {var} wird ersetzt; fehlt ein Schlüssel, gilt Deutsch. Statische Texte in index.html tragen data-t
 // (Text), data-t-ph (Platzhalter) oder data-t-aria (aria-label), applyStatic setzt sie. Zahlen formatiert num() im
 // Format der Sprache (6.978 m, 6,978 m), die Uhr trennt Hundertstel mit sep() (41,27 / 41.27).
 // Das Tuning-Panel bleibt deutsch, es ist ein Entwicklerwerkzeug.
 import { loadLang, saveLang } from './storage.js';
 
-export const LANGS = ['de', 'en', 'ja'];
-const LOCALE = { de: 'de-DE', en: 'en-GB', ja: 'ja-JP' };
+export const LANGS = ['de', 'en', 'es', 'ja'];
+const LOCALE = { de: 'de-DE', en: 'en-GB', es: 'es-ES', ja: 'ja-JP' };
 
 const DE = {
   'hint': 'Tippen lenkt · Halten carvt',
@@ -431,9 +431,150 @@ const JA = {
   'snd.SND_RACE': 'スーパーG',
 };
 
-const DICT = { de: DE, en: EN, ja: JA };
+const ES = {
+  'hint': 'Toca para girar · Mantén para trazar',
+  'hint.superg': 'Toca para empezar',
+  'pause': 'Pausa',
+  'pause.sub': 'Toca para seguir',
+  'pause.duel': 'El reloj sigue corriendo · Toca para seguir',
+  'aria.rider': 'Elegir esquiador',
+  'aria.soundOn': 'Sonido activado',
+  'aria.soundOff': 'Sonido desactivado',
+  'aria.settings': 'Ajustes',
+  'aria.restart': 'Reiniciar',
+  'aria.version': 'Versión, mantén pulsado para el tuning',
+  'back': 'Volver',
+  'rider.title': 'Esquiador',
+  'stats.title': 'Clasificación',
+  'modes.title': 'Modo',
+  'modes.choose': 'Elegir modo',
+  'tapToPlay': 'Toca para jugar',
+  'name.ph': 'Tu nombre',
+  'name.aria': 'Tu nombre para la clasificación',
+  'go': '¡Ya!',
 
-// Ohne gespeicherte Wahl die Sprache des Geräts, sofern es eine der drei ist, sonst Deutsch
+  'mode.classic': 'Clásico', 'mode.classic.desc': 'Lo más lejos posible.',
+  'mode.chase': 'Avalancha', 'mode.chase.desc': 'Escapa de la avalancha.',
+  'mode.superg': 'Súper-G', 'mode.superg.desc': '21 puertas contra el reloj, 1000 m.',
+  'mode.duel': 'Duelo', 'mode.duel.desc': 'Dos jugadores, en directo. ¿Quién llega primero?',
+  'mode.offline': 'Necesita internet y la base de datos.',
+  'rider.ski': 'Esquí', 'rider.board': 'Snowboard', 'rider.sled': 'Trineo',
+  'bot.1': 'Principiante', 'bot.2': 'Aficionado', 'bot.3': 'Avanzado', 'bot.4': 'Profesional', 'bot.5': 'Copa del Mundo', 'bot.6': 'Leyenda',
+
+  'time.sec': '{v} segundos',
+  'time.min': '{v} minutos',
+  'dead.in': 'en {t}',
+  'dead.avg': ' · media {v} km/h',
+  'gates.all': 'las {n} puertas',
+  'gates.miss1': '1 puerta fallada',
+  'gates.missN': '{n} puertas falladas',
+  'noFinish': 'sin meta',
+  'best.newTime': 'Nuevo mejor tiempo',
+  'best.time': 'Mejor tiempo {t}',
+  'best.noTime': 'Aún sin mejor tiempo',
+  'best.newRecord': 'Nuevo récord',
+  'best.run': 'Mejor bajada {m}',
+  'note.miss': 'Puerta fallada +{v} s',
+  'wins1': '1 victoria',
+  'winsN': '{n} victorias',
+  'everest': 'Everest {m}',
+  'sign.start': 'Salida',
+  'sign.finish': 'Meta',
+  'sign.record': 'Récord · {m}',
+  'opp.gone': '{n} se fue',
+  'opp.fin': 'A batir {t} · {n} en meta',
+  'opp.paused': '{n} en pausa',
+
+  'board.forList': 'para la clasificación',
+  'board.taken': 'El nombre pertenece a otro dispositivo',
+  'board.stale': 'Última clasificación conocida',
+  'board.details': 'Toca para ver detalles',
+  'verdict.debug': 'Modo debug, no cuenta para la clasificación',
+  'verdict.seed': 'Semilla fija, no cuenta para la clasificación',
+  'verdict.tuned': 'Con tuning, no cuenta para la clasificación',
+  'stats.name': 'Nombre', 'stats.total': 'Total', 'stats.meters': 'Metros', 'stats.ride': 'Bajada', 'stats.time': 'Tiempo',
+  'stats.avg': 'media km/h',
+  'stats.empty': 'Aún no hay entradas',
+
+  'duel.title': 'Duelo',
+  'duel.create': 'Nueva sala',
+  'duel.share': 'Compartir',
+  'duel.levels': 'Nivel del bot',
+  'duel.target': 'Meta',
+  'duel.targetAria': 'Distancia de la carrera',
+  'duel.go': '¡Ya!',
+  'duel.again': 'Revancha',
+  'duel.code': 'Código',
+  'duel.codeAria': 'Código de sala',
+  'duel.join': 'Unirse',
+  'duel.bot': 'Contra el bot',
+  'duel.human': 'Contra un amigo',
+  'duel.level': 'Nivel {i}: {name}',
+  'duel.crash0': 'sin caídas', 'duel.crash1': '1 caída', 'duel.crashN': '{n} caídas',
+  'duel.waitingOpp': 'esperando rival',
+  'duel.you': 'tú', 'duel.youHost': 'tú · anfitrión', 'duel.host': 'Anfitrión', 'duel.youReady': 'tú · listo', 'duel.ready': 'listo',
+  'duel.notReady': 'aún no está listo', 'duel.botLevel': 'Bot · nivel {n}', 'duel.version': 'Versión {v}', 'duel.gone': '¿se fue?',
+  'duel.opponent': 'Rival',
+  'duel.finish': '¡Meta!', 'duel.over': 'Fin', 'duel.timeOut': 'Tiempo superado',
+  'duel.waitFor': 'Esperando a {n}', 'duel.at': ' · en {m}',
+  'duel.won': '¡Has ganado!', 'duel.lost': 'Has perdido', 'duel.draw': 'Empate',
+  'duel.isGone': '{n} se fue', 'duel.slower': '{n} fue más lento', 'duel.oppTimeOut': '{n} superó el tiempo',
+  'duel.me': 'Tú',
+  'duel.tally': 'Contra {n}: {w} : {l}', 'duel.tallyDraw': ' · {d} empates',
+  'duel.againWants': 'Revancha · {n} también quiere', 'duel.againAsk': '¿Revancha?', 'duel.againAsked': '¿Revancha? ✓',
+  'duel.needName': 'Necesitas un nombre para jugar contra un amigo.',
+  'duel.connecting': 'Conectando …',
+  'duel.needNet': 'Necesitas internet para jugar contra un amigo.',
+  'duel.joinHint': 'Abre una sala nueva o únete con un código.',
+  'duel.starting': 'Empezando …',
+  'duel.botHint': 'Elige un nivel y luego «¡Ya!»',
+  'duel.botPause': 'La pausa detiene la carrera',
+  'duel.allReady': 'Todo listo',
+  'duel.waitReady': 'Esperando a que {n} esté listo',
+  'duel.reload': 'El otro jugador tiene que recargar la app',
+  'duel.shareHint': 'Comparte el código para que el otro pueda unirse',
+  'duel.waitHost': 'Esperando a {n}',
+  'duel.theHost': 'el anfitrión',
+  'duel.tapReady': 'Toca «Listo»',
+  'duel.pause': 'Pausa por caída {v} s',
+  'duel.tuned': 'El tuning no cuenta en el duelo',
+  'duel.noStream': 'sin conexión en vivo',
+  'duel.copied': 'Enlace copiado',
+  'duel.tellCode': 'Dile el código: {c}',
+  'duel.readyBtn': 'Listo', 'duel.readyBtnOn': 'Listo ✓',
+  'duel.round': 'Ronda {n}',
+  'duel.err.missing': 'Sala no encontrada',
+  'duel.err.version': 'El otro jugador tiene otra versión: recarga la app',
+  'duel.err.full': 'La sala está llena',
+  'duel.err.busy': 'Ya hay una carrera en marcha',
+  'duel.err.rules': 'Faltan las reglas de las salas en la base de datos',
+  'duel.err.error': 'Sin conexión',
+  'duel.err.closed': 'El otro jugador cerró la sala',
+  'duel.err.code': 'El código tiene cuatro letras, sin I ni O',
+  'duel.shareTitle': 'Powder – Duelo',
+  'duel.shareText': '¡Compite contra mí en Powder! Código de sala {c}',
+
+  'settings.title': 'Ajustes',
+  'settings.stats': 'Enviar estadísticas anónimas',
+  'settings.statsSub': 'Qué modos se juegan, cuánto tiempo y en qué dispositivo. Sin nombre ni ubicación. Nos ayuda a mejorar Powder.',
+  'settings.name': 'Nombre',
+  'settings.nameSub': 'Para la clasificación y los duelos',
+  'settings.marks': 'Líneas de nombres en la nieve',
+  'settings.marksSub': 'Las mejores marcas de los demás como líneas en la pista.',
+  'settings.lang': 'Idioma',
+  'settings.sound': 'Sonido',
+  'settings.soundReset': 'Por defecto',
+  'snd.SND_MASTER': 'Volumen',
+  'snd.SND_WIND': 'Viento',
+  'snd.SND_SKI': 'Esquís y giros',
+  'snd.SND_AV': 'Avalancha',
+  'snd.SND_CRASH': 'Choques',
+  'snd.SND_RACE': 'Súper-G',
+};
+
+const DICT = { de: DE, en: EN, es: ES, ja: JA };
+
+// Ohne gespeicherte Wahl die Sprache des Geräts, sofern die App sie kennt, sonst Deutsch
 function detect() {
   const saved = loadLang();
   if (LANGS.includes(saved)) return saved;
@@ -476,7 +617,7 @@ export function num(v, maxFrac = 0, minFrac = 0) {
   return f.format(v);
 }
 // Dezimaltrenner der Uhr (41,27 oder 41.27)
-export const sep = () => (lang === 'de' ? ',' : '.');
+export const sep = () => (lang === 'de' || lang === 'es' ? ',' : '.');
 
 // Statische Texte in index.html (data-t, data-t-ph, data-t-aria) und die Sprache des Dokuments
 export function applyStatic(doc) {
