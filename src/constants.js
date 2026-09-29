@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.27.3';
+export const VERSION = '0.27.4';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -404,7 +404,6 @@ export const C = {
     { name: 'Legende', kmh: 160, lookS: 1.8, thinkS: 0.05, tapS: 0.05, margin: 0.6, lane: 0.08, miss: 0 },
   ],
   BOT_LEVEL_DEFAULT: 3,
-  BOT_RIDER: 'ski',            // Aussehen des Bots (riders.js)
   BOT_HEAD_DEG: [5, 10, 16, 24, 34, 48, 70], // Fahrwinkel, die er je Seite durchprobiert …
   BOT_HOLDS_S: [0.2, 0.45, 0.9, 2],          // … und wie lange er sie hält, bevor es zurück in die Falllinie geht
   BOT_DEAD_RAD: 0.03,          // so genau hält er den Fahrwinkel (knapp 2°), darunter ändert er die Eingabe nicht

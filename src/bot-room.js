@@ -5,12 +5,18 @@ import { C, VERSION } from './constants.js';
 import { applyEvent } from './room.js';
 import { botLevel } from './bot.js';
 import { t } from './i18n.js';
+import { RIDER_ORDER } from './riders.js';
 
 export const BOT_CODE = 'BOT'; // kein gültiger Raum-Code (vier Buchstaben), die Kachel zeigt ihn nicht
 
 const clampLevel = (n) => Math.min(C.BOT_LEVELS.length, Math.max(1, Math.round(n) || C.BOT_LEVEL_DEFAULT));
 // Name der Stufe in der gewählten Sprache (i18n.js bot.1 … bot.6), botLevel begrenzt die Stufe auf 1 bis 6
-const botPlayer = (level) => ({ name: t('bot.' + (C.BOT_LEVELS.indexOf(botLevel(level)) + 1)), rider: C.BOT_RIDER, ready: true, v: VERSION, bot: level });
+const botPlayer = (level, rider) => ({ name: t('bot.' + (C.BOT_LEVELS.indexOf(botLevel(level)) + 1)), rider, ready: true, v: VERSION, bot: level });
+// Der Bot fährt nie denselben Fahrer wie der Spieler, sonst sind die beiden auf der Piste kaum auseinanderzuhalten
+const otherRider = (mine) => {
+  const rest = RIDER_ORDER.filter((id) => id !== mine);
+  return rest[Math.floor(Math.random() * rest.length)];
+};
 
 // { '.sv': 'timestamp' } wie bei Firebase durch die Zeit ersetzen
 function stamp(v, now) {
@@ -31,7 +37,7 @@ export function createBotRoom({ onChange = null } = {}) {
     mirror = {
       v: VERSION, ts: Date.now(), round: 1, seed, target: C.DUEL_TARGET_DEFAULT_M, pause: C.DUEL_CRASH_PAUSE_S,
       state: 'lobby', startAt: 0, bot: lv,
-      players: { host: { name: player.name, rider: player.rider, ready: true, v: VERSION }, guest: botPlayer(lv) },
+      players: { host: { name: player.name, rider: player.rider, ready: true, v: VERSION }, guest: botPlayer(lv, otherRider(player.rider)) },
     };
     emit();
     return 'ok';
@@ -40,6 +46,9 @@ export function createBotRoom({ onChange = null } = {}) {
   function write(kind, sub, body) {
     if (!mirror) return done(false);
     mirror = applyEvent(mirror, kind, '/' + (sub || ''), stamp(body, Date.now()));
+    // Wechselt der Spieler in der Lobby auf den Fahrer des Bots, weicht der Bot auf einen der anderen aus
+    const p = mirror.players;
+    if (p && p.host && p.guest && p.host.rider === p.guest.rider) p.guest = { ...p.guest, rider: otherRider(p.host.rider) };
     emit();
     return done(true);
   }
@@ -49,7 +58,7 @@ export function createBotRoom({ onChange = null } = {}) {
     if (!mirror) return;
     const lv = clampLevel(level);
     mirror.bot = lv;
-    mirror.players.guest = botPlayer(lv);
+    mirror.players.guest = botPlayer(lv, mirror.players.guest.rider); // Stufe wechselt, Fahrer bleibt
     emit();
   }
 
