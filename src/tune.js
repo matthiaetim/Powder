@@ -1,7 +1,7 @@
 // Tuning-Panel: Regler für Steuerung und Lawine, Werte überschreiben C live und bleiben gespeichert.
 import { C, TUNABLES, VERSION } from './constants.js';
 
-const KEY = 'powder.tune.v15'; // Versionssprung verwirft alte Regler-Werte, wenn sich die Defaults ändern
+const KEY = 'powder.tune.v16'; // Versionssprung verwirft alte Regler-Werte, wenn sich die Defaults ändern
 const ROWS = TUNABLES.filter((t) => t.key); // ohne Gruppentitel
 const DEFAULTS = Object.fromEntries(ROWS.map((t) => [t.key, C[t.key]]));
 

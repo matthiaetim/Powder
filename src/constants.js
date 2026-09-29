@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.26.2';
+export const VERSION = '0.26.3';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -106,11 +106,11 @@ export const C = {
 
   // Ton (audio.js): Lautstärke gesamt und je Gruppe, 0..1. Fahrtwind und Schneezischen sind ab SND_SPEED_REF_KMH voll.
   SND_MASTER: 0.8,           // (Tuning) Lautstärke
-  SND_WIND: 0.9,             // (Tuning) Bergwind und Fahrtwind
-  SND_SKI: 0.85,             // (Tuning) Ski: Zischen, Kanten, Kratzen
+  SND_WIND: 0.6,             // (Tuning) Bergwind und Fahrtwind
+  SND_SKI: 0.8,              // (Tuning) Ski: Zischen, Kanten, Kratzen
   SND_AV: 0.5,               // (Tuning) Lawine
-  SND_CRASH: 0.8,            // (Tuning) Aufprall
-  SND_RACE: 0.7,             // (Tuning) Super-G: Countdown, Tore, Stangen, Ziel
+  SND_CRASH: 0.75,           // (Tuning) Aufprall
+  SND_RACE: 0.65,            // (Tuning) Super-G: Countdown, Tore, Stangen, Ziel
   SND_SPEED_REF_KMH: 150,
   // App verlassen (audio.js): iOS hält die Seite beim Schließen an und spielt den letzten Rest im Ausgabepuffer kurz in
   // Schleife, das klingt verzerrt. Darum geht der Ausgang beim ersten Anzeichen fürs Verlassen schnell auf null, erst
@@ -230,7 +230,7 @@ export const C = {
   // Spraydose auf den Schnee gesprüht: ein MARK_SPRAY_PX breites, gerades Band aus Farbpunkten, nie ganz deckend und
   // fest im Schnee wie die Bäume. In CSS-Pixeln, unabhängig vom Zoom; Spur, Bäume und Fahrer liegen darüber.
   MARK_M: 1000,
-  MARK_SPRAY_PX: 5,          // (Tuning) Breite des Sprühbands
+  MARK_SPRAY_PX: 4,          // (Tuning) Breite des Sprühbands
   MARK_RGBA: 'rgba(70,120,200,0.45)',
   MARK_BEST_RGBA: 'rgba(192,52,42,0.75)',
 
@@ -243,7 +243,7 @@ export const C = {
   SIGN_Y_M: 333,
   SIGN_WIDTH_FRAC: 0.86,     // (Tuning) Anteil von VIEW_W_M, den das Schild in der Breite füllt
   SIGN_BAND_M: 9,            // Hindernisfreier Streifen: SIGN_Y_M ± SIGN_BAND_M
-  SIGN_ALPHA: 0.9,           // (Tuning) Deckkraft des Schilds; unter 1 scheint der Schnee leicht durch
+  SIGN_ALPHA: 0.8,           // (Tuning) Deckkraft des Schilds; unter 1 scheint der Schnee leicht durch
   SIGN_PAD_M: 0.45,          // Innenrand der Platte um den Text
   SIGN_BORDER_M: 0.12,       // Tinte-Rand der Platte
   SIGN_SHADOW_M: 0.25,       // Versatz des harten Schattens nach unten-rechts
@@ -356,10 +356,10 @@ export const C = {
   DUEL_TARGET_MAX_M: 10000,
   DUEL_TARGET_STEP_M: 500,
   DUEL_TARGET_DEFAULT_M: 1000,
-  DUEL_CRASH_PAUSE_S: 1.5,     // (Tuning) Sturzpause: so lange liegt der Fahrer, dann geht es neben dem Hindernis weiter; im Duell gilt der Wert des Hosts
+  DUEL_CRASH_PAUSE_S: 1,       // (Tuning) Sturzpause: so lange liegt der Fahrer, dann geht es neben dem Hindernis weiter; im Duell gilt der Wert des Hosts
   DUEL_RESPAWN_GRACE_S: 0.4,   // nach der Weiterfahrt kurz keine Kollision, der Fahrer steht dicht am Hindernis
   DUEL_RESPAWN_CLEAR_M: 0.3,   // Abstand zum Hindernis beim Weiterfahren, zusätzlich zu beiden Radien
-  DUEL_GHOST_DELAY_S: 0.3,     // (Tuning) Geist-Verzögerung: der Gegner wird bei der eigenen Rennzeit minus dieser Spanne gezeigt, dann sind seine Proben da
+  DUEL_GHOST_DELAY_S: 0,       // (Tuning) Geist-Verzögerung: der Gegner wird bei der eigenen Rennzeit minus dieser Spanne gezeigt, dann sind seine Proben da
   DUEL_GHOST_EXTRAP_S: 1,      // fehlen Proben, wird der Geist so lange mit seinem Tempo fortgeschrieben, dann bleibt er stehen
   DUEL_GHOST_ALPHA: 0.45,      // Deckkraft des Geists
   DUEL_SEND_MS: 200,           // Sende-Takt der eigenen Position (5 Hz)
