@@ -1,5 +1,5 @@
 // Tuning-Panel: Regler für Steuerung und Lawine, Werte überschreiben C live und bleiben gespeichert.
-import { C, TUNABLES } from './constants.js';
+import { C, TUNABLES, VERSION } from './constants.js';
 
 const KEY = 'powder.tune.v15'; // Versionssprung verwirft alte Regler-Werte, wenn sich die Defaults ändern
 const ROWS = TUNABLES.filter((t) => t.key); // ohne Gruppentitel
@@ -35,6 +35,42 @@ const fmt = (t, v) => {
   return t.unit ? num + ' ' + t.unit : num;
 };
 
+// Abweichende Regler als Text zum Einfügen in den Chat mit Claude, der sie als neue Standards in constants.js
+// überträgt. Rohwerte wie in C (nicht die skalierte Anzeige), damit sie 1:1 in die Konstanten passen; Name und
+// Standard stehen als Kommentar dabei, damit man die Zeilen auch ohne Panel lesen kann.
+export function tuneReport() {
+  const lines = [];
+  let group = '';
+  for (const t of TUNABLES) {
+    if (t.heading) { group = t.heading; continue; }
+    if (C[t.key] === DEFAULTS[t.key]) continue;
+    lines.push(`${t.key}: ${C[t.key]}, // ${group}: ${t.label} = ${fmt(t, C[t.key])}, Standard ${DEFAULTS[t.key]}`);
+  }
+  const head = `Powder v${VERSION} Tuning`;
+  return lines.length ? [head, ...lines].join('\n') : head + '\nAlle Regler stehen auf Standard.';
+}
+
+// Auf dem iPhone öffnet sich das Teilen-Menü, so geht der Text direkt an die Claude-App; ohne Teilen-Funktion
+// (Desktop) landet er in der Zwischenablage. Liefert false, wenn beides scheitert oder abgebrochen wurde.
+async function sendReport(doc, text) {
+  const nav = doc.defaultView && doc.defaultView.navigator;
+  if (nav && nav.share) {
+    try { await nav.share({ text }); return true; } catch (e) { if (e && e.name === 'AbortError') return false; }
+  }
+  try { await nav.clipboard.writeText(text); return true; } catch { /* alter Weg unten */ }
+  const ta = doc.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  doc.body.append(ta);
+  ta.select();
+  let ok = false;
+  try { ok = doc.execCommand('copy'); } catch { /* egal */ }
+  ta.remove();
+  return ok;
+}
+
 const OPEN_KEY = 'powder.tune.open'; // welche Gruppe zuletzt offen war, reine Bequemlichkeit
 
 // TUNABLES in Gruppen zerlegen: jeder heading-Eintrag beginnt eine neue.
@@ -63,10 +99,12 @@ export function createTunePanel(doc, panel, onChange) {
   const title = el('div', 'tune-title', 'Tuning');
   const reset = el('button', 'tune-reset', 'Standard');
   reset.type = 'button';
+  const copy = el('button', 'tune-copy', 'Kopieren');
+  copy.type = 'button';
   const close = el('button', 'tune-close', '×');
   close.type = 'button';
   close.setAttribute('aria-label', 'Schließen');
-  head.append(title, reset, close);
+  head.append(title, copy, reset, close);
 
   const body = el('div', 'tune-rows');
   const inputs = [];
@@ -140,6 +178,13 @@ export function createTunePanel(doc, panel, onChange) {
     }
   }
   reset.addEventListener('click', () => { resetTune(); refresh(); if (onChange) onChange(); });
+  let copyTimer = 0;
+  copy.addEventListener('click', async () => {
+    const ok = await sendReport(doc, tuneReport());
+    copy.textContent = ok ? 'Kopiert' : 'Fehler';
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => { copy.textContent = 'Kopieren'; }, C.TUNE_COPY_NOTE_S * 1000);
+  });
   setOpen(openName);
   refresh();
   return { refresh, closeButton: close };

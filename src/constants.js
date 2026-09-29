@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.26.1';
+export const VERSION = '0.26.2';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -254,6 +254,9 @@ export const C = {
   SIGN_SPRAY_W_M: 0.6,       // so viel breiter als der Radierstrich
   SIGN_MAX_PX: 2048,         // Deckel für die Breite des Offscreen-Canvas in Gerätepixeln
   SIGN_BUILD_AHEAD_M: 150,   // Schilder weit unten (Everest) erst bauen, wenn der Fahrer so nah ist; weiter als die Sicht
+
+  // Tuning-Panel (tune.js): so lange zeigt der Kopier-Knopf „Kopiert“, bevor er wieder normal heißt
+  TUNE_COPY_NOTE_S: 1.5,
 
   // Easter Egg (Classic): Gipfelschild bei der Höhe des Mount Everest, gleiche Machart wie der Credit (render.js),
   // mit Gipfelkreuz; beim Überfahren zeigt das HUD kurz „Everest“ statt der Meter, dazu ein kleiner Dreiklang.
