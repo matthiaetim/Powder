@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.27.7';
+export const VERSION = '0.27.8';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -380,9 +380,11 @@ export const C = {
   SL_LANE_AMP_M: 6,          // Pistenmitte: Amplitude der Sinuskurve
   SL_LANE_WAVE_M: 300,       // Pistenmitte: Wellenlänge
   SL_PISTE_HALF_M: 9,        // (Tuning) freie Piste je Seite der Mitte, dort steht der Fangzaun
-  SL_PENALTY_S: 2,           // (Tuning) Zeitstrafe pro verpasstem Tor
+  SL_PENALTY_S: 1.5,         // (Tuning) Zeitstrafe pro verpasstem Tor (am iPhone getunt, v0.27.8)
   SL_POLE_KMH: 5,            // (Tuning) Tempoverlust beim Berühren einer Stange
   SL_MAX_SPEED_KMH: 80,      // (Tuning) Endtempo im Slalom, sonst sind die engen Tore nicht fahrbar
+                             // Mehr nur zusammen mit BOARD_SL_MAX_AVG_KMH und den Regeln: mit 95 km/h schafft der Pilot
+                             // 21,55 s, die Liste nimmt nur Zeiten ab 22,5 s an
   // Zwischenzeiten wie im Super-G an einem Tor, aber seltener: die Tore folgen im Sekundentakt, der Hinweis stünde
   // sonst dauernd im Bild
   SL_SPLIT_FIRST: 9,
@@ -402,7 +404,7 @@ export const C = {
   SL_LINE_TILE_M: 10,        // die Linie wird in Stücken dieser Länge vorgerendert, je Bild höchstens eines neu
   SL_ARC_W_M: 1.4,           // Bogen an der Stange: halbe Breite des Ovals (Super-G 2,5)
   SL_ARC_OVAL: 2.2,          // Höhe zu Breite: gut 6 m hoch, die engsten Stangen stehen 9 m auseinander
-  SL_ARC_PX: 5,              // (Tuning) Strichbreite des Bogens (Super-G 9)
+  SL_ARC_PX: 4,              // (Tuning) Strichbreite des Bogens (Super-G 9; am iPhone getunt, v0.27.8)
   SL_SPLIT_LINE_M: 4,        // Zwischenzeit-Tor: Linie von der Stange nach außen
   SL_SPLIT_DOT_PX: 11,       // Fleck an der Stange und Linie, feiner als im Super-G (GM_DOT_PX, GM_LINE_PX)
   SL_SPLIT_LINE_PX: 5,
