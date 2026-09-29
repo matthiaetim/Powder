@@ -457,6 +457,20 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
     } else setReady(true);
   }
 
+  // Neustart gegen den Bot (Knopf oben rechts wie im Super-G): dieselbe Strecke, dieselbe Stufe, neuer Countdown.
+  // Eine neue Runde im Raum verwirft Proben und Wertung des abgebrochenen Laufs. Gegen einen Mitspieler gibt es ihn
+  // nicht, das würde dessen Rennen zerreißen.
+  function restart() {
+    if (!d.vsBot || !(d.phase === 'count' || d.phase === 'race')) return false;
+    if (!(g.state === 'count' || g.state === 'running' || g.state === 'paused')) return false;
+    room.patch('', { state: 'count', round: d.round + 1, startAt: room.serverNow() + C.DUEL_COUNT_LEAD_MS, ts: SV, 'live/host': null, 'live/guest': null }, true);
+    const r = room.data();
+    d.round = r.round;
+    newRound();
+    startRace(r);
+    return true;
+  }
+
   async function leave() {
     const racing = d.phase === 'count' || d.phase === 'race';
     if (racing) stopRun();
@@ -519,7 +533,7 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
   }
 
   return {
-    open, create, join, setReady, setTarget, setRider, go, rematch, leave, shareData, view, hud,
+    open, create, join, setReady, setTarget, setRider, go, rematch, restart, leave, shareData, view, hud,
     openBot, openHuman, setBotLevel,
     vsBot: () => d.vsBot,
     beforeFrame, afterFrame,

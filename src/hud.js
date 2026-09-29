@@ -46,7 +46,7 @@ export function createHud(g, doc, hooks = {}) {
   const nf2 = new Intl.NumberFormat(C.HUD_LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const hintDefault = hintEl.textContent;
   let lastSpeed = -1, lastDist = '', lastTime = '', lastState = '', lastOverlay = '', lastDebug = 0, lastText = -1e9;
-  let lastMode = '', lastNote = '', lastCount = '', lastOpp = '';
+  let lastMode = '', lastRace = '', lastNote = '', lastCount = '', lastOpp = '';
   const duel = hooks.duel || null;
   const duelOn = !!(duel && hooks.net && hooks.net.enabled);
 
@@ -78,8 +78,12 @@ export function createHud(g, doc, hooks = {}) {
   };
   onTap(soundEl, () => { if (snd) { snd.toggle(); syncSound(); } });
 
-  // Neustart im Super-G: sichtbar über body[data-race] und den Zustand (styles.css), ein Tipp beginnt von vorn
-  onTap($('btn-restart'), () => { if (restart(g) && hooks.onRestart) hooks.onRestart(); });
+  // Neustart im Super-G und im Duell gegen den Bot: sichtbar über body[data-race] und den Zustand (styles.css), ein
+  // Tipp beginnt von vorn
+  onTap($('btn-restart'), () => {
+    const ok = duel && duel.vsBot() ? duel.restart() : restart(g);
+    if (ok && hooks.onRestart) hooks.onRestart();
+  });
   syncSound();
 
   // Tuning-Panel: langer Druck auf das Versions-Label öffnet es, Spiel pausiert derweil.
@@ -453,9 +457,11 @@ export function createHud(g, doc, hooks = {}) {
     if (g.mode !== lastMode) {
       lastMode = g.mode;
       doc.body.dataset.mode = g.mode;
-      doc.body.dataset.race = g.mode === 'superg' ? '1' : ''; // Torlauf: Neustart-Knopf
       hintEl.textContent = g.mode === 'superg' ? 'Tippen zum Start' : hintDefault;
     }
+    // Neustart-Knopf: im Torlauf und gegen den Bot, der Bot kann im Duell jederzeit dazukommen oder gehen
+    const race = g.mode === 'superg' || !!(duel && duel.vsBot()) ? '1' : '';
+    if (race !== lastRace) { lastRace = race; doc.body.dataset.race = race; }
     if (g.state !== lastState) {
       lastState = g.state;
       doc.body.dataset.state = g.state;

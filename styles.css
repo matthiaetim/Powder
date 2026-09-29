@@ -350,7 +350,7 @@ body[data-state="ready"][data-overlay="1"] #ov-dead { display: flex; } /* ready:
 .sound-icon .mute, #btn-sound.off .wave { display: none; }
 #btn-sound.off .mute { display: inline; }
 body[data-panel="riders"] #btn-rider { background: var(--mark); }
-/* Neustart (Super-G): oben rechts, solange gefahren wird (Countdown, Fahrt, Pause); dieselbe Kachel wie das Ton-Icon,
+/* Neustart (Super-G, Duell gegen den Bot): oben rechts, solange gefahren wird (Countdown, Fahrt, Pause); dieselbe Kachel wie das Ton-Icon,
    das erst auf der Fresh-Seite an dieser Stelle steht. Ein Tipp bricht den Lauf ab, es geht mit dem Countdown von
    vorn los. */
 #btn-restart {
