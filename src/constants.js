@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.27.4';
+export const VERSION = '0.27.5';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -368,7 +368,11 @@ export const C = {
   DUEL_TARGET_STEP_M: 500,
   DUEL_TARGET_DEFAULT_M: 1000,
   DUEL_CRASH_PAUSE_S: 1,       // (Tuning) Sturzpause: so lange liegt der Fahrer, dann geht es neben dem Hindernis weiter; im Duell gilt der Wert des Hosts
-  DUEL_RESPAWN_GRACE_S: 0.4,   // nach der Weiterfahrt kurz keine Kollision, der Fahrer steht dicht am Hindernis
+  DUEL_RESPAWN_GRACE_S: 2.5,   // (Tuning) Schonfrist: nach der Weiterfahrt fährt der Fahrer so lange durch Hindernisse, sonst folgt oft gleich der
+                               // nächste Sturz; gilt je Gerät und auch für den Bot. Steckt er am Ende noch in einem Hindernis, hält sie, bis er frei ist
+  DUEL_GRACE_BLINK_HZ: 5,      // so oft je Sekunde blinkt der Fahrer in der Schonfrist
+  DUEL_GRACE_WARN_S: 0.5,      // in dieser letzten Spanne der Schonfrist blinkt er doppelt so schnell: der Schutz endet gleich
+  DUEL_GRACE_DIM_ALPHA: 0.25,  // Deckkraft im blassen Takt des Blinkens
   DUEL_RESPAWN_CLEAR_M: 0.3,   // Abstand zum Hindernis beim Weiterfahren, zusätzlich zu beiden Radien
   DUEL_GHOST_DELAY_S: 0,       // (Tuning) Geist-Verzögerung: der Gegner wird bei der eigenen Rennzeit minus dieser Spanne gezeigt, dann sind seine Proben da
   DUEL_GHOST_EXTRAP_S: 1,      // fehlen Proben, wird der Geist so lange mit seinem Tempo fortgeschrieben, dann bleibt er stehen
@@ -496,6 +500,7 @@ export const TUNABLES = [
   { key: 'SG_MAX_SPEED_KMH', label: 'Endtempo', unit: 'km/h', min: 100, max: 300, step: 10 },
   { heading: 'Duell', tone: 'orange' },
   { key: 'DUEL_CRASH_PAUSE_S', label: 'Sturzpause', unit: 's', min: 0.5, max: 5, step: 0.1, decimals: 1 },
+  { key: 'DUEL_RESPAWN_GRACE_S', label: 'Schonfrist', unit: 's', min: 0, max: 5, step: 0.1, decimals: 1 },
   { key: 'DUEL_GHOST_DELAY_S', label: 'Geist-Verzögerung', unit: 's', min: 0, max: 1, step: 0.05 },
   { heading: 'Bild', tone: 'teal' },
   { key: 'MAX_DPR', label: 'Auflösung', unit: '×', min: 1, max: 3, step: 0.5, decimals: 1, visual: true },

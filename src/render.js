@@ -727,7 +727,12 @@ function drawSkier(R, g, sx, sy) {
   const { ctx, Sv: S } = R;
   const s = g.skier;
   ctx.save();
-  if (g.graceT > 0) ctx.globalAlpha = 0.5; // Duell: Schonfrist nach der Weiterfahrt, der Fahrer steht dicht am Hindernis
+  // Duell: in der Schonfrist nach der Weiterfahrt blinkt der Fahrer, er fährt durch Hindernisse; kurz vor dem Ende
+  // schneller, damit man merkt, dass der Schutz gleich endet
+  if (g.graceT > 0) {
+    const hz = g.graceT < C.DUEL_GRACE_WARN_S ? 2 * C.DUEL_GRACE_BLINK_HZ : C.DUEL_GRACE_BLINK_HZ;
+    if (Math.floor(g.runT * hz * 2) % 2) ctx.globalAlpha = C.DUEL_GRACE_DIM_ALPHA;
+  }
   // Schatten nach unten rechts
   ctx.fillStyle = `rgba(${C.SHADOW_RGB},0.22)`;
   ctx.beginPath();

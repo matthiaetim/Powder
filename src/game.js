@@ -252,8 +252,10 @@ function step(g, dt, left) {
     endRun(g, { duel: true });
     return;
   }
-  if (g.graceT > 0) g.graceT = Math.max(0, g.graceT - dt); // Schonfrist nach der Weiterfahrt (Duell)
-  const hit = g.graceT > 0 ? null : checkCollision(g.world, s);
+  // Schonfrist nach der Weiterfahrt (Duell): durch Hindernisse hindurch. Läuft sie ab, während der Fahrer noch in einem
+  // steckt, hält sie, bis er frei ist; sonst käme genau dann der nächste Sturz.
+  let hit = checkCollision(g.world, s);
+  if (g.graceT > 0) { g.graceT = hit ? Math.max(C.STEP, g.graceT - dt) : Math.max(0, g.graceT - dt); hit = null; }
   if (hit) { die(g, hit.t === P.TREE ? 'tree' : 'rock', hit); return; }
   if (hasAvalanche(g)) {
     if (g.dist < C.AV_INTRO_M) holdAvalanche(g.av, s, g.runT, dt, topDist(g)); // Startphase: sichtbar, harmlos
@@ -382,7 +384,7 @@ function die(g, cause, hit) {
 }
 
 // Duell: nach der Sturzpause geht es weiter, seitlich neben dem Hindernis (vom Hindernis weg, Abstand aus beiden
-// Radien plus Luft), notfalls auf der Korridor-Mitte, die immer frei ist. Kurze Schonfrist ohne Kollision, die Spur
+// Radien plus Luft), notfalls auf der Korridor-Mitte, die immer frei ist. Schonfrist ohne Kollision, die Spur
 // bekommt eine Lücke; die Zeit lief die ganze Sturzpause weiter (Wanduhr in duel.js).
 function respawn(g) {
   const old = g.skier;

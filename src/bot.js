@@ -73,8 +73,9 @@ function step(b, dt) {
     return;
   }
   view(b);
-  if (b.grace > 0) b.grace = Math.max(0, b.grace - dt);
-  const hit = b.grace > 0 ? null : checkCollision(b.world, s);
+  // Schonfrist wie beim Spieler (game.js step): hält, solange er am Ende noch in einem Hindernis steckt
+  let hit = checkCollision(b.world, s);
+  if (b.grace > 0) { b.grace = hit ? Math.max(C.STEP, b.grace - dt) : Math.max(0, b.grace - dt); hit = null; }
   if (hit) crash(b, hit);
 }
 
