@@ -28,9 +28,10 @@ const ease = (t) => (1 - Math.cos(Math.PI * clamp(t, 0, 1))) / 2;
 // 1 zwischen a und b, davor und dahinter über r weich auf 0
 const plat = (y, a, b, r) => smooth((y - (a - r)) / r) * (1 - smooth((y - b) / r));
 
-// Arten der Zweige einer Gabelung (PISTE_FORKS): die drei Farben, dazu Funpark (fährt wie rot) und Slalom (wie blau)
-export const BLUE = 0, RED = 1, BLACK = 2, PARK = 3, SLALOM = 4;
-export const gradeOfKind = (k) => (k === PARK ? RED : k === SLALOM ? BLUE : k);
+// Arten der Zweige einer Gabelung (PISTE_FORKS): die drei Farben, dazu Funpark (fährt wie rot) und Slalom (wie blau).
+// MAIN ist die Hauptpiste, wo ein Geheimweg (SECRET, PISTE_SECRETS) neben ihr herläuft: sie behält ihre Werte.
+export const BLUE = 0, RED = 1, BLACK = 2, PARK = 3, SLALOM = 4, MAIN = 5, SECRET = 6;
+export const gradeOfKind = (k) => (k === PARK || k === MAIN || k === SECRET ? RED : k === SLALOM ? BLUE : k);
 export const NL = 3; // höchstens so viele Zweige nebeneinander
 export const KICK_SMALL = 0, KICK_BIG = 1, KICK_ROLL = 2;
 
@@ -57,8 +58,8 @@ export function createPiste(seed) {
   const p = {
     seed, step, y0, n, finishY: fin,
     level: f32(), ramp: f32(), nl: u8(),
-    // je Zweig (0 links … NL−1 rechts): Mitte, halbe Breite, Waldabstand, Stufe, Farbe
-    cx: lanes(f32), half: lanes(f32), edge: lanes(f32), lv: lanes(f32), grade: lanes(u8),
+    // je Zweig (0 links … NL−1 rechts): Mitte, halbe Breite, Waldabstand, Stufe, Farbe, Art
+    cx: lanes(f32), half: lanes(f32), edge: lanes(f32), lv: lanes(f32), grade: lanes(u8), kind: lanes(u8),
     forks: [], feats: [], hits: [], trig: [], clears: [], clearRows: new Map(), npcs: [], lifts: [], banks: [], paths: [],
     gates: [], kicks: [], traps: [], tracks: [],
   };
@@ -75,13 +76,23 @@ export function createPiste(seed) {
   // 'L', 'M', 'R' im Layout: linker, mittlerer, rechter Zweig der Gabelung
   const laneIdx = (it, fk) => (it.lane === 'R' ? fk.lanes - 1 : it.lane === 'M' ? 1 : 0);
 
-  // Gabelungen, Zonen mit eigener Breite und seitliche Versätze stehen fest, bevor die Tabellen entstehen
+  // Gabelungen, Zonen mit eigener Breite und seitliche Versätze stehen fest, bevor die Tabellen entstehen. off: seitlicher
+  // Versatz je Zweig, bei einer Gabelung symmetrisch um die Hauptlinie, beim Geheimweg bleibt die Hauptpiste liegen.
   for (const [fy, len, ...kinds] of C.PISTE_FORKS) {
+    const n = kinds.length, gap = n === 2 ? 2 * C.PISTE_FORK_SEP_M : C.PISTE_FORK_GAP3_M;
     p.forks.push({
-      y0: fy, y1: fy + len, kinds, grades: kinds.map(gradeOfKind), lanes: kinds.length, ph: kinds.map(() => rf() * TAU),
-      tipY: fy, signs: [], n: p.forks.length,
+      y0: fy, y1: fy + len, kinds, grades: kinds.map(gradeOfKind), lanes: n, ph: kinds.map(() => rf() * TAU),
+      off: kinds.map((k, l) => (l - (n - 1) / 2) * gap), ramp: C.PISTE_FORK_RAMP_M, secret: false, tipY: fy, signs: [],
     });
   }
+  for (const [fy, len, side] of C.PISTE_SECRETS) {
+    p.forks.push({
+      y0: fy, y1: fy + len, kinds: [MAIN, SECRET], grades: [RED, RED], lanes: 2, ph: [0, rf() * TAU],
+      off: [0, side * C.PISTE_SECRET_GAP_M], ramp: C.PISTE_SECRET_RAMP_M, secret: true, side, tipY: fy, signs: [],
+    });
+  }
+  p.forks.sort((a, b) => a.y0 - b.y0);
+  p.forks.forEach((f, i) => { f.n = i; });
   const forkAt = (y) => { for (const f of p.forks) if (y >= f.y0 && y <= f.y1) return f; return null; };
   // Versätze (detours) gelten für alle Zweige (lane −1) oder nur einen: die Steilkurve des Funparks versetzt nur ihn
   // und wandert vor dem Ende seines Zweigs (back0 bis back1) wieder zurück, sonst trüge ein Zweig-Index den Versatz
@@ -101,7 +112,17 @@ export function createPiste(seed) {
     } else if (it.k === 'ziehweg') {
       zones.push({ y0: it.y, y1: it.y + it.len, half: C.PISTE_PATH_HALF_M, ramp: 50, lane: -1, force: true, lv: 6, edge: 1.3 });
       detours.push({ y0: it.y, y1: it.y + it.len, dx: it.dx, lane: -1, back0: 0, back1: 0 }); // ohne Rückkehr
-      p.paths.push({ y0: it.y - 25, y1: it.y + it.len + 25 });
+      p.paths.push({ y0: it.y - 25, y1: it.y + it.len + 25, lane: -1 });
+    }
+  }
+  // Geheimwege: enge Stellen mit Fangnetz an beiden Rändern, dazwischen stehen einzelne Bäume im Weg (islandAt)
+  for (const f of p.forks) {
+    if (!f.secret) continue;
+    const a = f.y0 + f.ramp + 20, b = f.y1 - f.ramp - 20;
+    for (const u of b - a >= 4 * C.PISTE_SECRET_TIGHT_LEN_M ? C.PISTE_SECRET_TIGHT_AT : [0.5]) {
+      const y0 = a + (b - a) * u - C.PISTE_SECRET_TIGHT_LEN_M / 2, y1 = y0 + C.PISTE_SECRET_TIGHT_LEN_M;
+      zones.push({ y0, y1, half: C.PISTE_SECRET_TIGHT_HALF_M, ramp: 20, lane: 1, force: true });
+      p.paths.push({ y0: y0 - 6, y1: y1 + 6, lane: 1, fork: f });
     }
   }
 
@@ -111,25 +132,26 @@ export function createPiste(seed) {
     const lv = profileAt(y), L = lv / 10;
     p.level[i] = lv;
     const fk = forkAt(y), nl = fk ? fk.lanes : 1;
-    const k = fk ? plat(y, fk.y0 + C.PISTE_FORK_RAMP_M, fk.y1 - C.PISTE_FORK_RAMP_M, C.PISTE_FORK_RAMP_M) : 0;
+    const k = fk ? plat(y, fk.y0 + fk.ramp, fk.y1 - fk.ramp, fk.ramp) : 0;
     p.ramp[i] = k;
     p.nl[i] = nl;
-    const gap = nl === 2 ? 2 * C.PISTE_FORK_SEP_M : C.PISTE_FORK_GAP3_M;
     for (let l = 0; l < NL; l++) {
       const ll = Math.min(l, nl - 1); // Zweige, die es hier nicht gibt, kopieren den letzten
+      const kind = fk ? fk.kinds[ll] : MAIN;
       let c = x, h = lerp(C.PISTE_HALF_EASY_M, C.PISTE_HALF_HARD_M, L) * C.PISTE_WIDTH_K, e = lerp(C.PISTE_EDGE_EASY_M, C.PISTE_EDGE_HARD_M, L);
       for (const d of detours) if (d.lane < 0 || d.lane === ll) c += d.dx * (smooth((y - d.y0) / (d.y1 - d.y0)) - (d.back1 > d.back0 ? smooth((y - d.back0) / (d.back1 - d.back0)) : 0));
       let lvl = lv, grade = gradeOf(lv);
-      if (fk) {
-        const g = fk.kinds[ll];
-        c += (ll - (nl - 1) / 2) * gap * k + C.PISTE_LANE_WIG_M[g] * Math.sin((TAU * y) / C.PISTE_LANE_WAVE_M[g] + fk.ph[ll]) * k;
-        h = lerp(h, C.PISTE_LANE_HALF_M[g] * C.PISTE_WIDTH_K, k);
-        e = lerp(e, C.PISTE_LANE_EDGE_M[g], k);
-        lvl = lerp(lvl, C.PISTE_LANE_LEVEL[g], k);
+      if (fk && kind !== MAIN) {
+        c += fk.off[ll] * k + C.PISTE_LANE_WIG_M[kind] * Math.sin((TAU * y) / C.PISTE_LANE_WAVE_M[kind] + fk.ph[ll]) * k;
+        h = lerp(h, C.PISTE_LANE_HALF_M[kind] * (kind === SECRET ? 1 : C.PISTE_WIDTH_K), k);
+        e = lerp(e, C.PISTE_LANE_EDGE_M[kind], k);
+        lvl = lerp(lvl, C.PISTE_LANE_LEVEL[kind], k);
         grade = fk.grades[ll];
       }
+      p.kind[l][i] = kind;
       for (const z of zones) {
-        if (z.lane >= 0 && z.lane !== ll) continue;
+        // Zonen ohne Zweig (Torstrecken, Ziehweg) gelten für die Piste, nie für einen Geheimweg
+        if (z.lane >= 0 ? z.lane !== ll : kind === SECRET) continue;
         const kz = plat(y, z.y0, z.y1, z.ramp);
         if (kz <= 0) continue;
         h = z.force ? lerp(h, z.half, kz) : Math.max(h, lerp(h, z.half, kz));
@@ -164,6 +186,8 @@ export const halfAt = (p, y, lane = 0) => at(p, p.half[lane], y);
 export const edgeAt = (p, y, lane = 0) => at(p, p.edge[lane], y);
 export const levelAt = (p, y) => at(p, p.level, y);
 export const gradeAt = (p, y, lane = 0) => p.grade[lane][row(p, y)];
+export const kindAt = (p, y, lane = 0) => p.kind[lane][row(p, y)];
+export const forkAtY = (p, y) => { for (const f of p.forks) if (y >= f.y0 && y <= f.y1) return f; return null; };
 export const lanesAt = (p, y) => p.nl[row(p, y)];
 export const forkedAt = (p, y) => p.nl[row(p, y)] > 1;
 
@@ -182,12 +206,12 @@ export function laneOf(p, x, y) {
 
 // Der Zweig, der x am nächsten liegt, mit Mitte, halber Breite, Waldabstand, Stufe und Farbe. Ohne out ein geteiltes
 // Objekt (keine Allokation je Schritt): sofort auslesen.
-const LANE = { lane: 0, c: 0, half: 0, edge: 0, lv: 0, grade: 0 };
+const LANE = { lane: 0, c: 0, half: 0, edge: 0, lv: 0, grade: 0, kind: 0 };
 export function laneAt(p, x, y, out = LANE) {
-  const l = laneOf(p, x, y);
+  const l = laneOf(p, x, y), r = row(p, y);
   out.lane = l;
   out.c = at(p, p.cx[l], y); out.half = at(p, p.half[l], y); out.edge = at(p, p.edge[l], y); out.lv = at(p, p.lv[l], y);
-  out.grade = p.grade[l][row(p, y)];
+  out.grade = p.grade[l][r]; out.kind = p.kind[l][r];
   return out;
 }
 
@@ -198,14 +222,16 @@ export function onPiste(p, x, y) {
 }
 
 // Endtempo in km/h und Hangabtrieb in m/s² an dieser Stelle: überall wie in Classic, nur im schwarzen Zweig einer
-// Gabelung steiler und schneller, im blauen flacher und langsamer. Über die Länge der Gabelung weich ein und aus.
+// Gabelung steiler und schneller, im blauen flacher und langsamer, im tiefen Schnee des Geheimwegs zäher. Über die
+// Länge der Gabelung weich ein und aus.
 const PACE = { kmh: 0, g: 0 };
 export function paceAt(p, x, y, out = PACE) {
   out.kmh = C.MAX_SPEED_KMH; out.g = C.G_SLOPE;
   const k = at(p, p.ramp, y);
   if (k <= 0) return out;
-  const g = p.grade[laneOf(p, x, y)][row(p, y)];
-  if (g === BLACK) { out.kmh = lerp(out.kmh, C.PISTE_BLACK_KMH, k); out.g *= lerp(1, C.PISTE_BLACK_G, k); }
+  const l = laneOf(p, x, y), r = row(p, y), g = p.grade[l][r];
+  if (p.kind[l][r] === SECRET) { out.kmh = lerp(out.kmh, C.PISTE_SECRET_KMH, k); out.g *= lerp(1, C.PISTE_SECRET_G, k); }
+  else if (g === BLACK) { out.kmh = lerp(out.kmh, C.PISTE_BLACK_KMH, k); out.g *= lerp(1, C.PISTE_BLACK_G, k); }
   else if (g === BLUE) { out.kmh = lerp(out.kmh, C.PISTE_BLUE_KMH, k); out.g *= lerp(1, C.PISTE_BLUE_G, k); }
   return out;
 }
@@ -222,10 +248,22 @@ export function bankAt(p, y) {
   return null;
 }
 
-// Ziehweg: steht bei y das Fangnetz an beiden Rändern?
-export function netAt(p, y) {
-  for (const z of p.paths) if (y >= z.y0 && y <= z.y1) return true;
+// Steht bei y im Zweig lane das Fangnetz an beiden Rändern (Ziehweg, enge Stellen der Geheimwege)?
+export function netAt(p, y, lane = 0) {
+  for (const z of p.paths) if (y >= z.y0 && y <= z.y1 && (z.lane < 0 || z.lane === lane)) return true;
   return false;
+}
+
+// Einzelne Bäume im Geheimweg: alle PISTE_SECRET_TREE_M eine kleine Insel an zufälliger Stelle quer im Weg, auf der
+// der Wald stehen bleibt; nicht an den engen Stellen und nicht, wo der Weg aus- und einschert. Liegt (x, y) auf einer?
+export function islandAt(p, x, y) {
+  const f = forkAtY(p, y);
+  if (!f || !f.secret) return false;
+  const g = C.PISTE_SECRET_TREE_M, i = Math.floor(y / g), iy = (i + 0.5) * g;
+  if (iy < f.y0 + f.ramp + 15 || iy > f.y1 - f.ramp - 15 || netAt(p, iy, 1)) return false;
+  const cx = at(p, p.cx[1], iy) + (hash01(p.seed ^ 0x5ec, i, 3) * 2 - 1) * Math.max(0, at(p, p.half[1], iy) - 1.6);
+  const R = C.PISTE_SECRET_TREE_R;
+  return (x - cx) * (x - cx) + (y - iy) * (y - iy) < R * R;
 }
 
 // 0..1: wie dunkel es bei y ist (Flutlicht)
@@ -255,6 +293,7 @@ export function groveAt(p, x, y) {
   let m = smooth((v - thr + 0.07) / 0.14);
   const a = laneAt(p, x, y);
   const d = Math.abs(x - a.c) - a.half - a.edge; // Abstand zum freien Streifen
+  if (a.kind === SECRET && d < 0) return islandAt(p, x, y) ? 1 : m; // im Geheimweg: auf den Inseln steht sicher ein Baum
   // Raststück: neben der Piste öffnet sich der Wald zur Lichtung
   const open = 1 - smooth((a.lv - 1.5) / 2);
   m *= 1 - 0.7 * open * (1 - smooth((d - 10) / 15));
@@ -267,7 +306,7 @@ export function groveAt(p, x, y) {
 export function clearAt(p, x, y, r) {
   const a = laneAt(p, x, y);
   const dx = Math.abs(x - a.c);
-  if (dx < a.half + a.edge + r) return true;
+  if (dx < a.half + a.edge + r) return a.kind === SECRET ? !islandAt(p, x, y) : true;
   if (y > p.finishY - 15 && y < p.finishY + 80 && Math.abs(x - at(p, p.cx[0], y)) < C.PISTE_FINISH_CLEAR_M + r) return true;
   const list = p.clearRows.get(Math.floor(y / ROW_M));
   if (list) for (const c of list) if (x + r > c.x0 && x - r < c.x1 && y + r > c.y0 && y - r < c.y1) return true;
@@ -355,6 +394,8 @@ function build(p, rf, forkAt, laneIdx) {
     let y = f.y0;
     while (y < f.y1 && (cAt(1, y) - hAt(1, y)) - (cAt(0, y) + hAt(0, y)) < 3) y += 1;
     f.tipY = y;
+    trig(f.y0 + f.ramp, 'fork', f);
+    if (f.secret) continue; // kein Schild: das ist der Witz
     const sy = y + 5;
     for (let w = 0; w < f.lanes - 1; w++) {
       const sx = (cAt(w, sy) + hAt(w, sy) + cAt(w + 1, sy) - hAt(w + 1, sy)) / 2;
@@ -362,7 +403,6 @@ function build(p, rf, forkAt, laneIdx) {
       hit(sx, sy, 0.35, 'sign');
       clear(sx - 2.5, sx + 2.5, sy - 2.5, sy + 3);
     }
-    trig(f.y0 + C.PISTE_FORK_RAMP_M, 'fork', f);
   }
 
   for (const it of C.PISTE_LAYOUT) {
@@ -466,7 +506,7 @@ function build(p, rf, forkAt, laneIdx) {
   for (let y = C.PISTE_NPC_FROM_M; C.PISTE_NPC_K > 0 && y < fin - 220;) {
     const gap = lerp(C.PISTE_NPC_GAP0_M, C.PISTE_NPC_GAP1_M, y / fin) * (1 + C.PISTE_NPC_JITTER * (rn() * 2 - 1)) / C.PISTE_NPC_K;
     const fk = forkAt(y), pick = rn();
-    const open = fk ? fk.kinds.map((kd, i) => i).filter((i) => fk.kinds[i] === BLUE || fk.kinds[i] === RED) : [0];
+    const open = fk ? fk.kinds.map((kd, i) => i).filter((i) => fk.kinds[i] === BLUE || fk.kinds[i] === RED || fk.kinds[i] === MAIN) : [0];
     const lane = open.length ? open[Math.floor(pick * open.length)] : -1;
     const d = {
       y0: y, lane, off: rn() * 2 - 1, amp: 1 + rn() * 2.2, wave: 34 + rn() * 40, ph: rn() * TAU,

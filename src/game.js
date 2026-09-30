@@ -12,7 +12,7 @@ import { createAvalanche, updateAvalanche, holdAvalanche } from './avalanche.js'
 import { checkCollision } from './collision.js';
 import { createTrack, clearTrack, pushTrack } from './track.js';
 import { createParticles, clearParticles, spawnParticle, updateParticles } from './particles.js';
-import { loadBest, saveBest, loadBestTime, saveBestTime, loadSplitRef, saveSplitRef, loadRider, saveRider, noteRecentMode, loadMarksOn, saveMarksOn } from './storage.js';
+import { loadBest, saveBest, loadBestTime, saveBestTime, loadSplitRef, saveSplitRef, loadRider, saveRider, noteRecentMode, loadMarksOn, saveMarksOn, noteSecret } from './storage.js';
 import { MODES, DEFAULT_MODE, lowerIsBetter, modeOn } from './modes.js';
 import { RIDERS, validRider } from './riders.js';
 import { createCourse, updateCourse, tickCourse, crossFrac, courseOf, cv } from './gates.js';
@@ -466,6 +466,7 @@ function courseEvent(g, type, data) {
 function lifeEvent(g, type, data) {
   if (type === 'pole') burstAt(g, data.x, data.y, 10, 3);
   if (type === 'land') { burst(g, data.kind === 1 ? 26 : data.kind === 2 ? 6 : 14, 5); g.track.pendingGap = true; }
+  if (type === 'secret') noteSecret(data.y0);
   emit(g, type, data);
 }
 

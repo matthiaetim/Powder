@@ -271,3 +271,14 @@ export function saveMarksOn(on) {
     /* egal */
   }
 }
+
+// Piste: gefundene Geheimwege (Meter ihres Beginns), damit sie im Pistenplan auch in späteren Läufen stehen
+const SECRETS_KEY = 'powder.piste.secrets';
+export function loadSecrets() {
+  const arr = loadJson(SECRETS_KEY);
+  return Array.isArray(arr) ? arr.filter((v) => typeof v === 'number') : [];
+}
+export function noteSecret(y0) {
+  const arr = loadSecrets();
+  if (!arr.includes(y0)) saveJson(SECRETS_KEY, [...arr, y0]);
+}

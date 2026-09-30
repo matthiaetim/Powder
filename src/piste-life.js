@@ -29,6 +29,7 @@ export function createLife(p) {
     secs: p.gates.map((sec) => ({ sec, hit: 0, t0: -1, time: 0, poles: poles(sec) })), // t0: Start der Slalom-Uhr, time: Ergebnis
     gateRuns: 0,       // Torstrecken, in denen alle Tore getroffen wurden
     slalomOk: 0,       // Slalom-Zweige unter der Zeit
+    secrets: 0,        // Geheimwege in diesem Lauf gefunden
     note: { key: '', a: 0, b: 0, kind: '', dec: 0, t: 99 }, // Hinweis im HUD (hud.js setzt den Text; dec: Nachkommastellen von a)
     trick: null, trickT: 99, tricks: 0,
     trapT: -1, trapKmh: p.traps.map(() => 0), topKmh: 0, flashT: 99,
@@ -134,9 +135,9 @@ function edges(L, s, dt, emit) {
   const p = L.p;
   L.netT = Math.max(0, L.netT - dt);
   L.bankK = 0;
-  const net = netAt(p, s.y), bank = net ? null : bankAt(p, s.y);
-  if (!net && !bank) return;
   const a = laneAt(p, s.x, s.y);
+  const net = netAt(p, s.y, a.lane), bank = net ? null : bankAt(p, s.y);
+  if (!net && !bank) return;
   const dx = s.x - a.c, side = dx < 0 ? -1 : 1;
   if (net) {
     // wie der Fangzaun im Slalom (fence.js): eintauchen, zurückfedern, einmal je Anprall etwas Tempo weg
@@ -189,7 +190,9 @@ function triggers(L, s, px, py, dt, emit) {
       note(L, 'piste.speed', 'split', Math.round(kmh));
       emit('trap', { kmh });
     } else if (tr.type === 'fork') {
-      L.route[tr.f.n] = laneOf(p, s.x, s.y);
+      const l = L.route[tr.f.n] = laneOf(p, s.x, s.y);
+      // Geheimweg gefunden: Hinweis, Ton, und game.js merkt ihn sich für den Pistenplan
+      if (tr.f.secret && l === 1) { L.secrets++; note(L, 'piste.secret', 'fast'); emit('secret', { y0: tr.f.y0 }); }
     } else if (tr.type === 'sl0') {
       if (laneOf(p, xc, tr.y) === tr.f.lane) L.secs[tr.f.n].t0 = L.t - (1 - f) * dt;
     } else if (tr.type === 'sl1') {

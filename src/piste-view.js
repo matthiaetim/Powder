@@ -10,8 +10,9 @@
 // drawPistePlan zeichnet den Pistenplan für die Fresh-Seite (hud.js).
 import { C } from './constants.js';
 import { t as tr, num, getLang } from './i18n.js';
-import { centerAt, halfAt, gradeAt, bankAt, netAt, nightAt, oldTrackOn, profileAt, lanesAt, gradeOfKind, NL, PARK, SLALOM, KICK_BIG, KICK_ROLL } from './piste.js';
+import { centerAt, halfAt, gradeAt, kindAt, bankAt, netAt, nightAt, oldTrackOn, profileAt, lanesAt, gradeOfKind, NL, PARK, SLALOM, SECRET, KICK_BIG, KICK_ROLL } from './piste.js';
 import { airPose, npcX } from './piste-life.js';
+import { loadSecrets } from './storage.js';
 
 const TAU = Math.PI * 2;
 const FONT = "'Luckiest Guy', ui-rounded, 'SF Pro Rounded', system-ui, sans-serif";
@@ -22,7 +23,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = (t) => { const u = clamp(t, 0, 1); return u * u * (3 - 2 * u); };
 const gradeCol = (g) => [C.GATE_BLUE, C.GATE_RED, C.PISTE_BLACK][g];
 // Art eines Zweigs (piste.js): Farbe und Name auf Wegweiser, Schild und Pistenplan; der Funpark ist gelb
-const kindCol = (k) => (k === PARK ? C.PISTE_YELLOW : gradeCol(gradeOfKind(k)));
+const kindCol = (k) => (k === PARK ? C.PISTE_YELLOW : k === SECRET ? C.PISTE_GREEN : gradeCol(gradeOfKind(k)));
 const kindLabel = (k) => (k === PARK ? tr('piste.park') : k === SLALOM ? tr('mode.slalom') : tr('piste.fork.' + k));
 // So viele Zweige gibt es zwischen y0 und y1 höchstens (für Schleifen über die Zweige im Bild)
 function lanesIn(p, y0, y1) {
@@ -341,6 +342,7 @@ export function drawPisteGround(R, g, ox, oy, t) {
   const p = g.piste, L = g.life, { ctx, Sv: S, H } = R;
   const y0 = -oy / S, y1 = (H - oy) / S;
   banks(R, p, ox, oy, y0, y1);
+  powder(R, p, ox, oy, y0, y1);
   oldTracks(R, p, ox, oy, y0, y1);
   // gesprühte Linien: Tempomessung, Beginn einer Torstrecke, Landezone hinter einem Kicker
   for (const tp of p.traps) {
@@ -378,7 +380,7 @@ function surface(R, g, ox, oy) {
     lanes = Math.max(lanes, lanesAt(p, y));
     let prevR = -Infinity;
     for (let l = 0; l < NL; l++) {
-      const c = centerAt(p, y, l), h = halfAt(p, y, l);
+      const c = centerAt(p, y, l), h = kindAt(p, y, l) === SECRET ? -1 : halfAt(p, y, l); // Geheimweg: kein präparierter Streifen
       const Lx = Math.max(c - h, prevR), Rx = Math.max(c + h, Lx);
       buf[K * j + 2 * l] = Lx; buf[K * j + 2 * l + 1] = Rx;
       prevR = Rx;
@@ -455,6 +457,35 @@ function banks(R, p, ox, oy, y0, y1) {
   }
 }
 
+// Geheimweg: unpräparierter Schnee mit Buckeln, je ein weicher Schatten und ein Lichtfleck, nur wo der Weg schon
+// neben der Piste liegt
+function powder(R, p, ox, oy, y0, y1) {
+  const { ctx, Sv: S } = R;
+  const g = C.PISTE_SECRET_POWDER_M;
+  let shade = null, light = null;
+  for (const f of p.forks) {
+    if (!f.secret) continue;
+    const a = Math.max(f.y0, y0 - 4), b = Math.min(f.y1, y1 + 4);
+    if (b <= a) continue;
+    if (!shade) {
+      shade = sprite(R, 'powderShade', 1, 1, 1, 1, (x, s) => soft(x, 0, 0, s, s, 0.55));
+      light = sprite(R, 'powderLight', 1, 1, 1, 1, (x, s) => soft(x, 0, 0, s, s, 1, '255,255,255'));
+    }
+    ctx.globalAlpha = 0.2;
+    for (let i = Math.ceil(a / g); i * g <= b; i++) {
+      const y = i * g, c = centerAt(p, y, 1), h = halfAt(p, y, 1);
+      if (Math.abs(c - centerAt(p, y, 0)) < halfAt(p, y, 0) + h) continue; // noch auf der Piste
+      for (let j = 0; j < 2; j++) {
+        const u = hash(i * 7 + j * 3), v = hash(i * 11 + j * 5 + 1);
+        const x = c + (u * 2 - 1) * Math.max(0, h - 0.6), r = (0.8 + v * 0.9) * S;
+        ctx.drawImage(shade.c, x * S + ox - r + 0.3 * S, y * S + oy - 0.7 * r + 0.25 * S, 2 * r, 1.4 * r);
+        ctx.drawImage(light.c, x * S + ox - r, y * S + oy - 0.7 * r, 2 * r, 1.4 * r);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
 // Spuren früherer Fahrer: blasse Doppellinien in ruhigen Bögen, in Stücken mal da, mal nicht
 function oldTracks(R, p, ox, oy, y0, y1) {
   const { ctx, Sv: S } = R;
@@ -469,7 +500,7 @@ function oldTracks(R, p, ox, oy, y0, y1) {
       for (const off of [-0.16, 0.16]) {
         let pen = false;
         for (let y = Math.floor(y0 / 1.5) * 1.5 - 1.5; y <= y1 + 1.5; y += 1.5) {
-          if (y < 30 || y > p.finishY - 30 || netAt(p, y) || !oldTrackOn(p, i, l, y)) { pen = false; continue; }
+          if (y < 30 || y > p.finishY - 30 || netAt(p, y, l) || !oldTrackOn(p, i, l, y)) { pen = false; continue; }
           const x = centerAt(p, y, l) + tk.a * Math.max(0, halfAt(p, y, l) - 1.6) * Math.sin((TAU * y) / tk.wave + tk.ph + 1.7 * l) + off;
           if (pen) ctx.lineTo(x * S + ox, y * S + oy); else ctx.moveTo(x * S + ox, y * S + oy);
           pen = true;
@@ -503,17 +534,18 @@ function npcTrails(R, p, L, ox, oy, y0) {
   }
 }
 
-// Fangnetz am Ziehweg: orangefarbenes Band außen an beiden Rändern, Pfosten alle SL_FENCE_POST_M
+// Fangnetz am Ziehweg und an den engen Stellen der Geheimwege: orangefarbenes Band außen an beiden Rändern, Pfosten
+// alle SL_FENCE_POST_M
 function nets(R, p, ox, oy, y0, y1) {
   const { ctx, Sv: S } = R;
   for (const z of p.paths) {
     const a = Math.max(z.y0, y0 - 2), b = Math.min(z.y1, y1 + 2);
     if (b <= a) continue;
-    const nw = C.SL_FENCE_NET_M * S;
+    const l = Math.max(0, z.lane), nw = C.SL_FENCE_NET_M * S;
     for (const side of [-1, 1]) {
       ctx.beginPath();
       for (let y = a; ; y += 2) {
-        const yy = Math.min(y, b), X = (centerAt(p, yy) + side * halfAt(p, yy)) * S + ox + side * nw / 2, Y = yy * S + oy;
+        const yy = Math.min(y, b), X = (centerAt(p, yy, l) + side * halfAt(p, yy, l)) * S + ox + side * nw / 2, Y = yy * S + oy;
         if (y === a) ctx.moveTo(X, Y); else ctx.lineTo(X, Y);
         if (y >= b) break;
       }
@@ -523,7 +555,7 @@ function nets(R, p, ox, oy, y0, y1) {
       ctx.fillStyle = C.INK;
       const pw = Math.max(2, 0.12 * S), ph = 1.2 * S, P = C.SL_FENCE_POST_M;
       for (let y = Math.ceil(a / P) * P; y <= b; y += P) {
-        const X = (centerAt(p, y) + side * halfAt(p, y)) * S + ox + side * nw / 2;
+        const X = (centerAt(p, y, l) + side * halfAt(p, y, l)) * S + ox + side * nw / 2;
         ctx.fillRect(X - pw / 2, y * S + oy - ph, pw, ph);
       }
     }
@@ -702,17 +734,22 @@ function edgePoles(R, p, y0, y1, list) {
   for (let k = Math.max(0, Math.ceil(y0 / gap)); k * gap <= Math.min(y1, p.finishY - gap); k++) {
     const y = k * gap;
     if (netAt(p, y)) continue;
-    const n = lanesAt(p, y), bank = bankAt(p, y), last = n - 1;
-    const c0 = centerAt(p, y, 0), h0 = halfAt(p, y, 0) - 0.3, c1 = centerAt(p, y, last), h1 = halfAt(p, y, last) - 0.3;
+    const n = lanesAt(p, y), bank = bankAt(p, y);
+    // nur präparierte Zweige tragen Stangen, ein Geheimweg nicht
+    const vis = [];
+    for (let l = 0; l < n; l++) if (kindAt(p, y, l) !== SECRET) vis.push(l);
+    const first = vis[0], last = vis[vis.length - 1];
+    const c0 = centerAt(p, y, first), h0 = halfAt(p, y, first) - 0.3, c1 = centerAt(p, y, last), h1 = halfAt(p, y, last) - 0.3;
     // Außenränder: an der Wand der Steilkurve keine Stange
-    if (!(bank && bank.lane === 0 && bank.side === -1)) put(Math.min(c0 - h0, c1 - h1), y, gradeAt(p, y, 0), false);
+    if (!(bank && bank.lane === first && bank.side === -1)) put(Math.min(c0 - h0, c1 - h1), y, gradeAt(p, y, first), false);
     if (!(bank && bank.lane === last && bank.side === 1)) put(Math.max(c0 + h0, c1 + h1), y, gradeAt(p, y, last), true);
     // Innenränder zwischen Nachbarn, sobald Wald dazwischen steht
-    for (let l = 0; l < last; l++) {
-      const ca = centerAt(p, y, l), ha = halfAt(p, y, l) - 0.3, cb = centerAt(p, y, l + 1), hb = halfAt(p, y, l + 1) - 0.3;
+    for (let q = 0; q < vis.length - 1; q++) {
+      const l = vis[q], l2 = vis[q + 1];
+      const ca = centerAt(p, y, l), ha = halfAt(p, y, l) - 0.3, cb = centerAt(p, y, l2), hb = halfAt(p, y, l2) - 0.3;
       if (cb - hb - (ca + ha) <= 2.5) continue;
       if (!(bank && bank.lane === l && bank.side === 1)) put(ca + ha, y, gradeAt(p, y, l), true);
-      if (!(bank && bank.lane === l + 1 && bank.side === -1)) put(cb - hb, y, gradeAt(p, y, l + 1), false);
+      if (!(bank && bank.lane === l2 && bank.side === -1)) put(cb - hb, y, gradeAt(p, y, l2), false);
     }
   }
 }
@@ -853,7 +890,7 @@ export function drawPisteOver(R, g, ox, oy, t) {
   // Vor einer Gabelung: die Schilder am oberen Bildrand, bis sich die Zweige trennen; bei drei Zweigen steht der
   // mittlere in der Mitte mit Pfeil nach oben
   for (const f of p.forks) {
-    if (s.y < f.y0 - 260 || s.y > f.tipY || g.state !== 'running') continue;
+    if (f.secret || s.y < f.y0 - 260 || s.y > f.tipY || g.state !== 'running') continue;
     const top = R.safeTop + 30;
     forkTag(ctx, 10, top, f.kinds[0], -1);
     forkTag(ctx, W - 10, top, f.kinds[f.lanes - 1], 1);
@@ -938,7 +975,8 @@ function night(R, p, ox, oy, y0, y1, dark) {
 
 // Die Strecke von links (Start) nach rechts (Talstation): unten das Profil der Schwierigkeit wie bei einer Etappe,
 // darüber die Piste mit ihren Gabelungen in den Farben der Zweige. Der gefahrene Weg ist kräftig, der andere Zweig
-// blass; Kreuze markieren die Stürze, der Punkt die Stelle, an der Schluss war.
+// blass; Kreuze markieren die Stürze, der Punkt die Stelle, an der Schluss war. Geheimwege stehen grün gestrichelt
+// neben der Piste, aber erst, wenn man sie einmal gefahren ist (storage.js).
 export function drawPistePlan(canvas, g) {
   const W = canvas.clientWidth || 280, H = canvas.clientHeight || 64;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -964,7 +1002,7 @@ export function drawPistePlan(canvas, g) {
     x.strokeStyle = col; x.lineWidth = 4;
     x.beginPath(); x.moveTo(X(a), y); x.lineTo(X(b), y); x.stroke();
   };
-  const forks = C.PISTE_FORKS;
+  const forks = g.piste.forks, found = loadSecrets();
   let from = 0;
   const main = (a, b) => {
     for (let m = a; m < b; m += 100) {
@@ -972,21 +1010,33 @@ export function drawPistePlan(canvas, g) {
       seg(m, e, line, gradeCol(gr < C.PISTE_BLUE_TO ? 0 : gr < C.PISTE_RED_TO ? 1 : 2), true);
     }
   };
-  // Versatz der Zweige im Plan: bei zwei Zweigen ±amp, bei drei −amp, 0, +amp
-  const laneDy = (lane, n) => (lane - (n - 1) / 2) * (n === 2 ? 2 * amp : amp);
-  forks.forEach(([fy, len, ...kinds], i) => {
-    main(from, fy);
-    const took = L ? L.route[i] : -1;
-    kinds.forEach((kind, lane) => {
-      const on = took < 0 || took === lane, dy = laneDy(lane, kinds.length);
-      x.globalAlpha = on ? 1 : 0.3;
-      x.strokeStyle = kindCol(kind); x.lineWidth = 4;
-      const xa = X(fy), xb = X(fy + len), r = Math.min(8, (xb - xa) / 3);
-      x.beginPath(); x.moveTo(xa, line); x.lineTo(xa + r, line + dy); x.lineTo(xb - r, line + dy); x.lineTo(xb, line); x.stroke();
+  // Versatz der Zweige im Plan: bei zwei Zweigen ±amp, bei drei −amp, 0, +amp; der Geheimweg liegt auf seiner Seite
+  const laneDy = (f, lane) => (f.secret ? (lane === 1 ? f.side * amp * 0.85 : 0) : (lane - (f.lanes - 1) / 2) * (f.lanes === 2 ? 2 * amp : amp));
+  const loop = (f, lane, col, width) => {
+    const dy = laneDy(f, lane), xa = X(f.y0), xb = X(f.y1), r = Math.min(8, (xb - xa) / 3);
+    x.strokeStyle = col; x.lineWidth = width;
+    x.beginPath(); x.moveTo(xa, line); x.lineTo(xa + r, line + dy); x.lineTo(xb - r, line + dy); x.lineTo(xb, line); x.stroke();
+  };
+  for (const f of forks) {
+    if (f.secret) continue; // die Hauptpiste läuft durch, der Geheimweg kommt unten dazu
+    main(from, f.y0);
+    const took = L ? L.route[f.n] : -1;
+    f.kinds.forEach((kind, lane) => {
+      x.globalAlpha = took < 0 || took === lane ? 1 : 0.3;
+      loop(f, lane, kindCol(kind), 4);
     });
-    from = fy + len;
-  });
+    from = f.y1;
+  }
   main(from, fin);
+  x.setLineDash([4, 3]);
+  for (const f of forks) {
+    if (!f.secret) continue;
+    const on = !!L && L.route[f.n] === 1;
+    if (!on && !found.includes(f.y0)) continue;
+    x.globalAlpha = on ? 1 : 0.45;
+    loop(f, 1, kindCol(SECRET), 3);
+  }
+  x.setLineDash([]);
   x.globalAlpha = 1;
   // Zeichen an der Strecke: Hütte, Lift, Funpark, Tore
   for (const it of C.PISTE_LAYOUT) {
@@ -1002,9 +1052,8 @@ export function drawPistePlan(canvas, g) {
   x.fillStyle = C.INK; x.fillRect(X(fin) - 7, line - 12, 7, 5);
   if (!L) return;
   const laneY = (m) => {
-    for (let i = 0; i < forks.length; i++) {
-      const [fy, len, ...kinds] = forks[i];
-      if (m > fy && m < fy + len && L.route[i] >= 0) return line + laneDy(L.route[i], kinds.length) * smooth(Math.min(m - fy, fy + len - m) / (len * 0.12));
+    for (const f of forks) {
+      if (m > f.y0 && m < f.y1 && L.route[f.n] >= 0) return line + laneDy(f, L.route[f.n]) * smooth(Math.min(m - f.y0, f.y1 - m) / ((f.y1 - f.y0) * 0.12));
     }
     return line;
   };

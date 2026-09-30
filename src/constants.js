@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.28.0';
+export const VERSION = '0.29.0';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -364,11 +364,31 @@ export const C = {
   PISTE_FORK_SEP_M: 27,
   PISTE_FORK_GAP3_M: 46,     // Abstand benachbarter Mitten bei drei Zweigen; die Zweige selbst sind höchstens 23 m breit
   PISTE_FORK_RAMP_M: 150,
-  PISTE_LANE_LEVEL: [1.2, 5, 8, 2, 1.2],
-  PISTE_LANE_HALF_M: [8.5, 6, 5, 11.5, 7.5],
-  PISTE_LANE_EDGE_M: [4, 2, 0.8, 3, 4],
-  PISTE_LANE_WIG_M: [2, 3, 5, 1.5, 2],
-  PISTE_LANE_WAVE_M: [260, 170, 120, 220, 260],
+  // Index 5 ist die Hauptpiste neben einem Geheimweg (behält ihre Werte, die Einträge sind Platzhalter), 6 der Geheimweg.
+  PISTE_LANE_LEVEL: [1.2, 5, 8, 2, 1.2, 0, 5.5],
+  PISTE_LANE_HALF_M: [8.5, 6, 5, 11.5, 7.5, 0, 4],
+  PISTE_LANE_EDGE_M: [4, 2, 0.8, 3, 4, 0, 0.6],
+  PISTE_LANE_WIG_M: [2, 3, 5, 1.5, 2, 0, 6],
+  PISTE_LANE_WAVE_M: [260, 170, 120, 220, 260, 0, 90],
+  // Geheimwege (Tim, 30.09.2026): [Meter, Länge, Seite −1 links / 1 rechts]. Nicht ausgeschildert: sie zweigen von
+  // der Hauptpiste in den Wald ab und münden wieder ein, die Hauptpiste bleibt, wo sie ist. Der Einstieg verrät sich
+  // nur durch die Schneise und die alten Spuren, die hineinführen. Unpräpariert (kein heller Streifen, Buckel im
+  // Schnee, langsamer: PISTE_SECRET_KMH, PISTE_SECRET_G), schmal und kurvig (PISTE_LANE_*[6]), mit einzelnen Bäumen im
+  // Weg (alle PISTE_SECRET_TREE_M eine kleine Insel mit Radius PISTE_SECRET_TREE_R, auf der der Wald stehen bleibt)
+  // und engen Stellen mit Fangnetz (PISTE_SECRET_TIGHT_*: zwei bei diesen Anteilen der Länge, eine in der Mitte, wenn
+  // der Weg dafür zu kurz ist). Ein Geheimweg erscheint im
+  // Pistenplan erst, wenn man ihn gefahren ist (storage.js merkt es sich).
+  PISTE_SECRETS: [[1060, 380, -1], [5290, 400, -1], [7190, 380, 1]],
+  PISTE_SECRET_GAP_M: 30,    // Abstand der Mitte des Geheimwegs zur Hauptpiste
+  PISTE_SECRET_RAMP_M: 80,   // so lang schert er aus und wieder ein
+  PISTE_SECRET_KMH: 115,     // (Tuning) Endtempo im tiefen Schnee
+  PISTE_SECRET_G: 0.85,      // Hangabtrieb als Faktor auf G_SLOPE
+  PISTE_SECRET_TREE_M: 24,   // (Tuning) Abstand der Bäume im Weg
+  PISTE_SECRET_TREE_R: 2.8,
+  PISTE_SECRET_TIGHT_HALF_M: 2.6, // (Tuning) halbe Breite an den engen Stellen
+  PISTE_SECRET_TIGHT_LEN_M: 36,
+  PISTE_SECRET_TIGHT_AT: [0.3, 0.75],
+  PISTE_SECRET_POWDER_M: 3.2, // Abstand der Buckel im Bild
   PISTE_BLACK_KMH: 230,      // (Tuning) Endtempo im schwarzen Zweig
   PISTE_BLACK_G: 1.35,       // Gefälle im schwarzen Zweig als Faktor auf G_SLOPE
   PISTE_BLUE_KMH: 150,       // (Tuning) Endtempo im blauen Zweig
@@ -908,6 +928,9 @@ export const TUNABLES = [
   { key: 'PISTE_GATE_REWARD', label: 'Alle Tore: Stürze zurück', unit: '', min: 0, max: 1, step: 1 },
   { key: 'PISTE_SLALOM_LIMIT_S', label: 'Slalom-Zweig: Zeit unter', unit: 's', min: 6, max: 20, step: 0.5, decimals: 1 },
   { key: 'PISTE_SLALOM_PENALTY_S', label: 'Slalom-Zweig: Strafe pro Tor', unit: 's', min: 0, max: 5, step: 0.5, decimals: 1 },
+  { key: 'PISTE_SECRET_KMH', label: 'Geheimweg: Endtempo', unit: 'km/h', min: 60, max: 200, step: 5 },
+  { key: 'PISTE_SECRET_TREE_M', label: 'Geheimweg: Bäume im Weg alle', unit: 'm', min: 10, max: 80, step: 2 },
+  { key: 'PISTE_SECRET_TIGHT_HALF_M', label: 'Geheimweg: Breite an der Engstelle', unit: 'm', min: 1.5, max: 5, step: 0.1, decimals: 1 },
   { key: 'PISTE_NIGHT_ALPHA', label: 'Dunkelheit im Flutlicht', unit: '%', min: 0, max: 0.85, step: 0.05, scale: 100, decimals: 0, visual: true },
   { key: 'PISTE_TURN_HARD_DEG', label: 'Schwenk an der Schlüsselstelle', unit: '°', min: 10, max: 45, step: 1 },
   { key: 'PISTE_WAVE_HARD_M', label: 'Kurvenlänge an der Schlüsselstelle', unit: 'm', min: 100, max: 400, step: 10 },

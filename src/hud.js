@@ -140,6 +140,7 @@ export function createHud(g, doc, hooks = {}) {
     if (L.tricks > 0) parts.push(L.tricks === 1 ? t('piste.tricks1') : t('piste.tricksN', { n: nf.format(L.tricks) }));
     if (L.gateRuns > 0) parts.push(L.gateRuns === 1 ? t('piste.gateRuns1') : t('piste.gateRunsN', { n: nf.format(L.gateRuns) }));
     if (L.slalomOk > 0) parts.push(t('piste.slalomDone'));
+    if (L.secrets > 0) parts.push(L.secrets === 1 ? t('piste.secrets1') : t('piste.secretsN', { n: nf.format(L.secrets) }));
     if (L.topKmh > 0) parts.push(t('piste.top', { v: nf.format(Math.round(L.topKmh)) }));
     return parts.join(' · ');
   }

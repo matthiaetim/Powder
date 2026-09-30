@@ -429,6 +429,10 @@ export function createSound(g) {
         tone(n.race, 'sine', 660, 0.12, 0.4); tone(n.race, 'sine', 880, 0.12, 0.4, 0.12); tone(n.race, 'sine', 1100, 0.3, 0.42, 0.24);
         if (d && d.bonus) tone(n.race, 'sine', 1320, 0.4, 0.42, 0.42);
         break;
+      // Geheimweg gefunden: zwei helle Töne aufwärts
+      case 'secret':
+        tone(n.race, 'sine', 880, 0.1, 0.35); tone(n.race, 'sine', 1320, 0.25, 0.35, 0.1);
+        break;
       // Slalom-Zweig über der Zeit: zwei fallende Töne
       case 'slalomSlow':
         tone(n.race, 'sine', 520, 0.16, 0.35); tone(n.race, 'sine', 390, 0.3, 0.35, 0.16);
