@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.29.1';
+export const VERSION = '0.29.2';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -105,9 +105,9 @@ export const C = {
   AV_WHITEOUT_DELAY_S: 0.3,  // nach dem Erwischen: kurz die Front über dem Fahrer zeigen, dann Weiß
 
   // Ton (audio.js): Lautstärke gesamt und je Gruppe, 0..1. Fahrtwind und Schneezischen sind ab SND_SPEED_REF_KMH voll.
-  SND_MASTER: 0.8,           // (Tuning) Lautstärke
-  SND_WIND: 0.6,             // (Tuning) Bergwind und Fahrtwind
-  SND_SKI: 0.8,              // (Tuning) Ski: Zischen, Kanten, Kratzen
+  SND_MASTER: 0.7,           // (Tuning) Lautstärke
+  SND_WIND: 0.5,             // (Tuning) Bergwind und Fahrtwind
+  SND_SKI: 0.7,              // (Tuning) Ski: Zischen, Kanten, Kratzen
   SND_AV: 0.5,               // (Tuning) Lawine
   SND_CRASH: 0.75,           // (Tuning) Aufprall
   SND_RACE: 0.65,            // (Tuning) Rennen (Super-G, Slalom, Duell): Countdown, Tore, Stangen, Ziel
@@ -325,7 +325,7 @@ export const C = {
   // behalten ihre festen Maße, weil ihre Bauten darauf stehen.
   PISTE_WIDTH_K: 1,
   PISTE_EDGE_EASY_M: 4,      // (Tuning) so weit bleibt der Wald im Raststück vom Pistenrand weg
-  PISTE_EDGE_HARD_M: 0.6,    // (Tuning) und so weit an der Schlüsselstelle
+  PISTE_EDGE_HARD_M: 1,      // (Tuning) und so weit an der Schlüsselstelle
   // Kurven: die Piste schwenkt um PISTE_TURN_*_DEG aus der Falllinie, eine volle S-Kurve ist PISTE_WAVE_*_M lang.
   // PISTE_WAVE_JITTER streckt oder staucht die Kurven abschnittsweise, damit sie nicht im Takt kommen.
   PISTE_TURN_EASY_DEG: 9,
@@ -383,15 +383,15 @@ export const C = {
   PISTE_SECRET_RAMP_M: 80,   // so lang schert er aus und wieder ein
   PISTE_SECRET_KMH: 115,     // (Tuning) Endtempo im tiefen Schnee
   PISTE_SECRET_G: 0.85,      // Hangabtrieb als Faktor auf G_SLOPE
-  PISTE_SECRET_TREE_M: 24,   // (Tuning) Abstand der Bäume im Weg
+  PISTE_SECRET_TREE_M: 38,   // (Tuning) Abstand der Bäume im Weg
   PISTE_SECRET_TREE_R: 2.8,
-  PISTE_SECRET_TIGHT_HALF_M: 2.6, // (Tuning) halbe Breite an den engen Stellen
+  PISTE_SECRET_TIGHT_HALF_M: 3,   // (Tuning) halbe Breite an den engen Stellen
   PISTE_SECRET_TIGHT_LEN_M: 36,
   PISTE_SECRET_TIGHT_AT: [0.3, 0.75],
   PISTE_SECRET_POWDER_M: 3.2, // Abstand der Buckel im Bild
   PISTE_BLACK_KMH: 230,      // (Tuning) Endtempo im schwarzen Zweig
   PISTE_BLACK_G: 1.35,       // Gefälle im schwarzen Zweig als Faktor auf G_SLOPE
-  PISTE_BLUE_KMH: 150,       // (Tuning) Endtempo im blauen Zweig
+  PISTE_BLUE_KMH: 160,       // (Tuning) Endtempo im blauen Zweig
   PISTE_BLUE_G: 0.75,
   // Was an der Strecke steht, von oben nach unten. y in m; side −1 links, 1 rechts, 0 Mitte; lane 'L', 'M' oder 'R'
   // legt es in den linken, mittleren oder rechten Zweig einer Gabelung. Arten: lift (Sessellift oder Gondel kreuzt
@@ -435,7 +435,7 @@ export const C = {
   PISTE_KICK_L_M: [4.2, 7.5, 2.4],
   PISTE_KICK_H_M: [0.9, 1.9, 0.5],
   PISTE_AIR_SMALL_S: 0.75,
-  PISTE_AIR_BIG_S: 1.35,     // (Tuning) Flugzeit am breiten Kicker
+  PISTE_AIR_BIG_S: 1.1,      // (Tuning) Flugzeit am breiten Kicker
   PISTE_AIR_ROLL_S: 0.3,
   PISTE_AIR_Z_M: [1.5, 3.4, 0.45], // Scheitelhöhe des Flugs bei PISTE_AIR_REF_KMH
   PISTE_AIR_REF_KMH: 110,
@@ -487,7 +487,7 @@ export const C = {
   // PISTE_NPC_K teilt beide Abstände: 2 heißt doppelt so viele Fahrer, 0 eine leere Piste.
   PISTE_NPC_GAP0_M: 330,     // (Tuning)
   PISTE_NPC_GAP1_M: 120,     // (Tuning)
-  PISTE_NPC_K: 1,            // (Tuning)
+  PISTE_NPC_K: 1.5,          // (Tuning)
   PISTE_NPC_JITTER: 0.35,
   PISTE_NPC_KMH: [38, 62],
   PISTE_NPC_AHEAD_M: 90,
@@ -514,7 +514,7 @@ export const C = {
   // PISTE_MAST_M werfen Lichtkegel auf die Piste.
   PISTE_NIGHT_FROM_M: 7850,
   PISTE_NIGHT_FADE_M: 350,
-  PISTE_NIGHT_ALPHA: 0.62,   // (Tuning) Deckkraft der Dunkelheit
+  PISTE_NIGHT_ALPHA: 0.5,    // (Tuning) Deckkraft der Dunkelheit
   PISTE_NIGHT_RGB: '14,24,56',
   PISTE_MAST_M: 24,
   PISTE_MAST_H_M: 7.5,
