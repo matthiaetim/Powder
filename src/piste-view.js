@@ -15,6 +15,8 @@ import { airPose, npcX } from './piste-life.js';
 import { loadSecrets } from './storage.js';
 
 const TAU = Math.PI * 2;
+const D2R = Math.PI / 180;
+let now = 0; // Zeit des Bilds (drawPisteGround), für das Flackern der Lagerfeuer
 const FONT = "'Luckiest Guy', ui-rounded, 'SF Pro Rounded', system-ui, sans-serif";
 const ROW_M = 2;        // Raster, in dem die Pistenränder fürs Bild abgetastet werden
 const HARE_S = 2.8;     // so lange braucht der Hase über die Piste
@@ -252,6 +254,78 @@ function boardShape(x, S) {
   } });
 }
 
+// Lagerfeuer ohne Flammen (die flackern und kommen je Bild dazu, flames): Steinkreis mit gekreuzten Scheiten, dahinter
+// auf der Bergseite ein Baumstamm als Bank, darauf die Leute (seats, versetzt zur Feuerstelle)
+function fireShape(x, S, seats) {
+  soft(x, 0.3 * S, 0.1 * S, 1.3 * S, 0.5 * S, 0.3);
+  if (seats.length) {
+    const a = Math.min(...seats.map((st) => st.dx)) - 0.7, b = Math.max(...seats.map((st) => st.dx)) + 0.7, by = Math.max(...seats.map((st) => st.dy));
+    soft(x, (a + b) / 2 * S + 0.3 * S, by * S + 0.15 * S, ((b - a) / 2 + 0.3) * S, 0.3 * S, 0.24);
+    for (const st of seats) sitterShape(x, S, st.dx, st.dy - 0.32, C.PISTE_NPC_COLORS[st.col % C.PISTE_NPC_COLORS.length], HATS()[st.hat % 3]);
+    x.fillStyle = C.PISTE_WOOD; x.strokeStyle = C.INK; x.lineWidth = Math.max(1, 0.07 * S);
+    rr(x, a * S, (by - 0.42) * S, (b - a) * S, 0.42 * S, 0.2 * S); x.fill(); x.stroke();
+    x.fillStyle = C.PISTE_WOOD_LIGHT; x.beginPath(); x.ellipse(b * S, (by - 0.21) * S, 0.14 * S, 0.2 * S, 0, 0, TAU); x.fill(); x.stroke();
+  }
+  // Glut und Asche im Schnee
+  x.fillStyle = '#3A2E27'; x.beginPath(); x.ellipse(0, 0, 0.62 * S, 0.3 * S, 0, 0, TAU); x.fill();
+  x.fillStyle = '#C0342A'; x.beginPath(); x.ellipse(0, 0, 0.4 * S, 0.17 * S, 0, 0, TAU); x.fill();
+  x.fillStyle = C.PISTE_WOOD_DARK; x.strokeStyle = C.INK; x.lineWidth = Math.max(1, 0.06 * S);
+  for (const [ang, len] of [[0.35, 1.1], [-0.4, 1.05], [Math.PI / 2 + 0.2, 0.7]]) {
+    x.save(); x.rotate(ang); x.scale(1, 0.55); rr(x, -len / 2 * S, -0.1 * S, len * S, 0.2 * S, 0.1 * S); x.fill(); x.stroke(); x.restore();
+  }
+  // Steine rundherum, die vorderen größer
+  x.fillStyle = C.ROCK;
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * TAU + 0.2, cx = Math.cos(a) * 0.72 * S, cy = Math.sin(a) * 0.34 * S, r = (0.15 + 0.05 * Math.sin(a)) * S;
+    x.beginPath(); x.ellipse(cx, cy, r * 1.2, r * 0.8, 0, 0, TAU); x.fill(); x.stroke();
+  }
+  x.fillStyle = C.SNOW_CAP; for (let i = 0; i < 9; i += 2) { const a = (i / 9) * TAU + 0.2; x.beginPath(); x.ellipse(Math.cos(a) * 0.72 * S - 0.04 * S, Math.sin(a) * 0.34 * S - 0.08 * S, 0.1 * S, 0.05 * S, 0, 0, TAU); x.fill(); }
+}
+
+// Sitzende Person von vorn: Beine zum Feuer, die Hände vorgestreckt
+function sitterShape(x, S, dx, dy, col, hat) {
+  x.save(); x.translate(dx * S, dy * S);
+  x.strokeStyle = C.INK; x.lineWidth = Math.max(1.4, 0.16 * S);
+  x.beginPath(); x.moveTo(-0.14 * S, 0); x.lineTo(-0.16 * S, 0.42 * S); x.moveTo(0.14 * S, 0); x.lineTo(0.16 * S, 0.42 * S); x.stroke();
+  x.fillStyle = col; rr(x, -0.3 * S, -0.72 * S, 0.6 * S, 0.8 * S, 0.18 * S); x.fill(); x.lineWidth = Math.max(0.8, 0.05 * S); x.stroke();
+  x.strokeStyle = col; x.lineWidth = Math.max(1.4, 0.15 * S);
+  x.beginPath(); x.moveTo(-0.24 * S, -0.5 * S); x.lineTo(-0.12 * S, -0.1 * S); x.moveTo(0.24 * S, -0.5 * S); x.lineTo(0.12 * S, -0.1 * S); x.stroke();
+  x.strokeStyle = C.INK; x.lineWidth = Math.max(0.8, 0.05 * S);
+  x.fillStyle = SKIN; x.beginPath(); x.arc(0, -0.94 * S, 0.21 * S, 0, TAU); x.fill(); x.stroke();
+  x.fillStyle = hat; x.beginPath(); x.arc(0, -0.98 * S, 0.22 * S, Math.PI, 0); x.fill();
+  if (hat !== C.INK) { x.fillStyle = C.PISTE_PAPER; x.beginPath(); x.arc(0, -1.22 * S, 0.07 * S, 0, TAU); x.fill(); }
+  x.restore();
+}
+
+const FIRE_CORE = '#FFF6D6';
+
+// Flammen: drei orange Zungen nebeneinander, darin eine gelbe und ein heller Kern; jede flackert mit eigener Frequenz
+// in Höhe und Neigung
+function flames(x, cx, cy, S, n) {
+  const ph = hash(n) * TAU, w = 0.34 * S;
+  const tongue = (dx, h, lean, width) => {
+    x.beginPath();
+    x.moveTo(dx - width, 0);
+    x.quadraticCurveTo(dx - width * 1.1, -h * 0.55, dx + lean, -h);
+    x.quadraticCurveTo(dx + width * 1.1, -h * 0.55, dx + width, 0);
+    x.closePath();
+  };
+  x.save(); x.translate(cx, cy);
+  // die drei äußeren Zungen: erst alle umranden, dann alle füllen, so bleibt nur der Umriss außen stehen
+  x.strokeStyle = C.INK; x.lineWidth = Math.max(1.6, 0.1 * S); x.fillStyle = C.PISTE_POLE_TIP;
+  for (const pass of [0, 1]) {
+    for (let i = 0; i < 3; i++) {
+      const f = Math.sin(now * (9 + i * 3.1) + ph + i * 2) * 0.5 + Math.sin(now * (17 + i * 5.3) + ph * 1.7) * 0.5;
+      tongue((i - 1) * 0.24 * S, (1.25 - i * 0.12 + f * 0.18) * S, Math.sin(now * (6 + i) + ph + i) * 0.14 * S, w);
+      if (pass) x.fill(); else x.stroke();
+    }
+  }
+  const f = Math.sin(now * 13 + ph) * 0.5 + Math.sin(now * 23 + ph * 2) * 0.5;
+  x.fillStyle = C.PISTE_YELLOW; tongue(0.03 * S, (0.95 + f * 0.14) * S, Math.sin(now * 7 + ph) * 0.1 * S, w * 0.72); x.fill();
+  x.fillStyle = FIRE_CORE; tongue(0, (0.5 + f * 0.08) * S, Math.sin(now * 11 + ph) * 0.06 * S, w * 0.38); x.fill();
+  x.restore();
+}
+
 function cameraShape(x, S) {
   soft(x, 0.4 * S, 0, 0.6 * S, 0.2 * S, 0.26);
   x.strokeStyle = C.INK; x.lineWidth = Math.max(2, 0.2 * S); x.beginPath(); x.moveTo(0, 0); x.lineTo(0, -2.2 * S); x.stroke();
@@ -338,6 +412,7 @@ function npcShape(x, S, col, board) {
 
 export function drawPisteGround(R, g, ox, oy, t) {
   cache(R);
+  now = t;
   surface(R, g, ox, oy);
   const p = g.piste, L = g.life, { ctx, Sv: S, H } = R;
   const y0 = -oy / S, y1 = (H - oy) / S;
@@ -787,6 +862,7 @@ const SPRITES = {
   camera: { key: () => 'camera', make: (R, o, key) => sprite(R, key, 1.2, 1.2, 3.4, 0.4, cameraShape) },
   forksign: { key: (o) => 'fork' + o.fork.n + '.' + o.wedge, make: (R, o, key) => sprite(R, key, 9.3, 9.5, 6.4, 0.7, (x, s) => forkSignShape(x, s, o.fork, o.wedge)) },
   mast: { key: (o) => 'mast' + o.dir, make: (R, o, key) => sprite(R, key, 2.3, 2.4, C.PISTE_MAST_H_M + 1, 0.5, (x, s) => mastShape(x, s, o.dir)) },
+  fire: { key: (o) => 'fire' + o.seats.map((st) => st.dx.toFixed(1) + st.col + st.hat).join(), make: (R, o, key) => sprite(R, key, 2.8, 2.8, 3.4, 1.1, (x, s) => fireShape(x, s, o.seats)) },
   arch: { key: (o) => 'arch' + o.half.toFixed(1), make: (R, o, key) => sprite(R, key, o.half + 1.6, o.half + 2, 6.8, 0.5, (x, s) => archShape(x, s, o.half)) },
 };
 
@@ -801,6 +877,7 @@ export function drawPisteItem(R, g, o, ox, oy) {
       const kmh = L ? L.trapKmh[o.trap.n] : 0;
       label(ctx, kmh > 0 ? num(Math.round(kmh)) : '– –', o.x * S + ox - 0.6 * S, o.y * S + oy - 3.65 * S, 1.9 * S, C.PISTE_YELLOW);
     } else if (o.k === 'camera' && L && L.flashT < C.PISTE_FLASH_S * 0.6) star(ctx, o.x * S + ox + 0.9 * S, o.y * S + oy - 3.2 * S, 1.1 * S);
+    else if (o.k === 'fire') flames(ctx, o.x * S + ox, o.y * S + oy - 0.2 * S, S, o.n);
     return;
   }
   if (o.k === 'pylon') pylon(R, o, ox, oy);
@@ -872,7 +949,7 @@ export function drawPisteOver(R, g, ox, oy, t) {
   if (L) for (const f of L.cannons) if (f.y > y0 - 8 && f.y < y1 + 8) plume(R, f, ox, oy, t);
   for (const lf of p.lifts) if (Math.abs(lf.y - mid) < 130) liftOver(R, lf, ox, oy, t);
   const dark = nightAt(s.y);
-  if (dark > 0.01 && C.PISTE_NIGHT_ALPHA > 0) night(R, p, ox, oy, y0, y1, dark);
+  if (dark > 0.01 && C.PISTE_NIGHT_ALPHA > 0) night(R, g, ox, oy, y0, y1, dark);
   if (!L) return;
   if (L.flashT < C.PISTE_FLASH_S) {
     ctx.fillStyle = `rgba(255,255,255,${(0.55 * (1 - L.flashT / C.PISTE_FLASH_S)).toFixed(3)})`;
@@ -933,31 +1010,45 @@ function plume(R, f, ox, oy, t) {
 }
 
 // Dunkelheit mit Lichtkegeln: klein gerechnet (ein Achtel der Auflösung) und weich vergrößert, das kostet fast nichts
-// und die Ränder der Kegel werden von selbst weich. Aus der dunklen Fläche wird unter jedem Mast ein Oval herausgenommen.
+// und die Ränder der Kegel werden von selbst weich. Aus der dunklen Fläche wird unter jedem Mast ein Oval
+// herausgenommen, vor dem Fahrer der Kegel der Stirnlampe und um jedes Lagerfeuer ein flackernder Kreis. Das warme
+// Licht (Feuer, ein Hauch in der Stirnlampe) liegt in einer zweiten kleinen Fläche, die aufaddiert wird.
 const NIGHT_DIV = 8;
-function night(R, p, ox, oy, y0, y1, dark) {
+function night(R, g, ox, oy, y0, y1, dark) {
   const { ctx, Sv: S, W, H } = R;
-  const pv = R.pv;
+  const p = g.piste, s = g.skier, pv = R.pv;
   const cw = Math.ceil(W / NIGHT_DIV), ch = Math.ceil(H / NIGHT_DIV);
-  if (!pv.night || pv.night.width !== cw || pv.night.height !== ch) { pv.night = document.createElement('canvas'); pv.night.width = cw; pv.night.height = ch; }
-  const x = pv.night.getContext('2d');
+  if (!pv.night || pv.night.width !== cw || pv.night.height !== ch) {
+    pv.night = document.createElement('canvas'); pv.night.width = cw; pv.night.height = ch;
+    pv.warm = document.createElement('canvas'); pv.warm.width = cw; pv.warm.height = ch;
+  }
+  const x = pv.night.getContext('2d'), w = pv.warm.getContext('2d');
   x.globalCompositeOperation = 'source-over';
   x.clearRect(0, 0, cw, ch);
+  w.clearRect(0, 0, cw, ch);
   x.fillStyle = `rgba(${C.PISTE_NIGHT_RGB},${(C.PISTE_NIGHT_ALPHA * dark).toFixed(3)})`;
   x.fillRect(0, 0, cw, ch);
   x.globalCompositeOperation = 'destination-out';
   const [lw, lh] = C.PISTE_LIGHT_M, F = p.feats, q = 1 / NIGHT_DIV;
-  const i0 = lowerBound(F, y0 - lh - 6);
-  for (let i = i0; i < F.length && F[i].y <= y1 + lh; i++) {
+  const i0 = lowerBound(F, y0 - Math.max(lh, C.PISTE_FIRE_LIGHT_M) - 6);
+  let fires = 0;
+  for (let i = i0; i < F.length && F[i].y <= y1 + Math.max(lh, C.PISTE_FIRE_LIGHT_M); i++) {
     const f = F[i];
-    if (f.k !== 'mast') continue;
-    x.save(); x.translate((f.tx * S + ox) * q, (f.ty * S + oy) * q); x.scale(lw * S * q, lh * S * q);
-    const gr = x.createRadialGradient(0, 0, 0, 0, 0, 1);
-    gr.addColorStop(0, 'rgba(0,0,0,0.95)'); gr.addColorStop(0.55, 'rgba(0,0,0,0.7)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
-    x.fillStyle = gr; x.beginPath(); x.arc(0, 0, 1, 0, TAU); x.fill(); x.restore();
+    if (f.k === 'mast') {
+      oval(x, (f.tx * S + ox) * q, (f.ty * S + oy) * q, lw * S * q, lh * S * q, 0.95);
+    } else if (f.k === 'fire') {
+      fires++;
+      const fl = flicker(f.n), r = C.PISTE_FIRE_LIGHT_M * (0.94 + 0.06 * fl) * S * q, fx = f.x * S + ox, fy = (f.y - 0.4) * S + oy;
+      oval(x, fx * q, fy * q, r, r * 0.8, 0.5 + 0.12 * fl);
+      oval(w, fx * q, fy * q, r * 0.85, r * 0.68, (0.46 + 0.12 * fl) * dark, C.PISTE_FIRE_RGB);
+    }
   }
+  if (C.PISTE_HEADLAMP_K > 0) headlamp(x, w, s, (s.x * S + ox) * q, (s.y * S + oy) * q, S * q, dark);
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(pv.night, 0, 0, W, H);
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.drawImage(pv.warm, 0, 0, W, H);
+  ctx.globalCompositeOperation = 'source-over';
   // die Lampen selbst leuchten
   const glow = R.pv.m.get('glow') || sprite(R, 'glow', 1, 1, 1, 1, (c, s) => soft(c, 0, 0, s, s, 0.6, C.PISTE_LAMP_RGB));
   const k = S / R.S;
@@ -967,6 +1058,57 @@ function night(R, p, ox, oy, y0, y1, dark) {
     if (f.k !== 'mast') continue;
     const hx = (f.x + f.dir * 1.3) * S + ox, hy = (f.y - C.PISTE_MAST_H_M + 0.3) * S + oy, r = 3 * R.S * k;
     ctx.drawImage(glow.c, hx - r, hy - r * 0.75, 2 * r, 1.5 * r);
+  }
+  ctx.globalAlpha = 1;
+  if (fires) for (let i = i0; i < F.length && F[i].y <= y1 + 6; i++) if (F[i].k === 'fire') sparks(ctx, F[i], ox, oy, S);
+}
+
+// Weiches Oval (Mitte cx, cy, Halbachsen rx, ry): in destination-out nimmt es Dunkelheit weg, sonst malt es Licht
+function oval(x, cx, cy, rx, ry, a, rgb = '0,0,0') {
+  x.save(); x.translate(cx, cy); x.scale(rx, ry);
+  const gr = x.createRadialGradient(0, 0, 0, 0, 0, 1);
+  gr.addColorStop(0, `rgba(${rgb},${a})`); gr.addColorStop(0.55, `rgba(${rgb},${a * 0.74})`); gr.addColorStop(1, `rgba(${rgb},0)`);
+  x.fillStyle = gr; x.beginPath(); x.arc(0, 0, 1, 0, TAU); x.fill(); x.restore();
+}
+
+// Stirnlampe: ein Fächer in Fahrtrichtung (theta 0 = talwärts, positiv = rechts), dazu ein kleiner Hof um den Fahrer.
+// Der Fächer liegt dreimal übereinander, jedes Mal breiter und mit derselben Deckkraft: so ist er in der Mitte am
+// hellsten und läuft zu den Seiten weich aus. Zusammen nehmen die drei genau PISTE_HEADLAMP_K der Dunkelheit weg.
+function headlamp(x, w, s, cx, cy, S, dark) {
+  const K = clamp(C.PISTE_HEADLAMP_K, 0, 1), reach = C.PISTE_HEADLAMP_M * S, half = C.PISTE_HEADLAMP_DEG * D2R;
+  const b = 1 - Math.cbrt(1 - K);
+  const fan = (c, spread, a, rgb) => {
+    const gr = c.createRadialGradient(0, 0, 0, 0, 0, reach);
+    gr.addColorStop(0, `rgba(${rgb},${a * 0.55})`); gr.addColorStop(0.12, `rgba(${rgb},${a})`);
+    gr.addColorStop(0.55, `rgba(${rgb},${a * 0.75})`); gr.addColorStop(1, `rgba(${rgb},0)`);
+    c.fillStyle = gr; c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, reach, Math.PI / 2 - half * spread, Math.PI / 2 + half * spread); c.closePath(); c.fill();
+  };
+  for (const c of [x, w]) { c.save(); c.translate(cx, cy + 0.3 * S); c.rotate(-s.theta); }
+  for (const spread of [0.55, 1, 1.45]) fan(x, spread, b, '0,0,0');
+  fan(w, 1, 0.09 * K * dark, C.PISTE_HEADLAMP_RGB);
+  x.restore(); w.restore();
+  const hr = C.PISTE_HEADLAMP_HALO_M * S;
+  oval(x, cx, cy, hr, hr * 0.85, K * 0.55);
+}
+
+// 0..1, wie hell ein Feuer gerade brennt: zwei Schwingungen, je Feuer versetzt
+function flicker(n) {
+  const ph = hash(n + 7) * TAU;
+  return 0.5 + 0.3 * Math.sin(now * 11 + ph) + 0.2 * Math.sin(now * 27 + ph * 3);
+}
+
+// Funken: steigen aus der Glut, treiben seitlich und verglühen; alles hängt nur an der Zeit, nichts wird gemerkt
+function sparks(ctx, f, ox, oy, S) {
+  const N = C.PISTE_FIRE_SPARKS;
+  for (let i = 0; i < N; i++) {
+    const life = 1.1 + hash(f.n * 31 + i) * 0.9, u = ((now + hash(f.n * 17 + i) * 5) / life) % 1;
+    const sx = f.x + (hash(f.n * 5 + i) - 0.5) * 0.5 + Math.sin(now * 3 + i * 1.7) * 0.25 * u + (hash(i * 3 + 1) - 0.5) * 1.2 * u;
+    const sy = f.y - 0.6 - u * (2.6 + hash(i * 11) * 1.6);
+    // erst gelb, dann orange, zuletzt verglüht
+    ctx.fillStyle = u < 0.35 ? C.PISTE_YELLOW : C.PISTE_POLE_TIP;
+    ctx.globalAlpha = (1 - u) * (1 - u) * 0.95;
+    const r = Math.max(1.5, (0.13 - 0.06 * u) * S);
+    ctx.fillRect(sx * S + ox - r / 2, sy * S + oy - r / 2, r, r);
   }
   ctx.globalAlpha = 1;
 }

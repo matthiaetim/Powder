@@ -483,6 +483,20 @@ function build(p, rf, forkAt, laneIdx) {
     alt = -alt;
   }
 
+  // Lagerfeuer im Wald neben dem äußeren Zweig. Die Leute sitzen auf der Bergseite und schauen zur Piste, so stehen
+  // sie im Bild hinter den Flammen; ein Baumstamm als Bank, darum eine kleine Lichtung.
+  for (const [y, side, out, n] of C.PISTE_FIRES) {
+    let outer = side > 0 ? -Infinity : Infinity;
+    for (let q = 0; q < NL; q++) outer = side > 0 ? Math.max(outer, cAt(q, y) + hAt(q, y)) : Math.min(outer, cAt(q, y) - hAt(q, y));
+    const x = outer + side * (out + 1.5);
+    const seats = [[-side * 1.3, -1.25], [side * 0.9, -1.4]].slice(0, n).map(([dx, dy], i) => ({ dx, dy, col: (Math.floor(rf() * 7) + i * 3) % 7, hat: i }));
+    add({ k: 'fire', x, y, seats, n: p.feats.length });
+    hit(x, y, 0.8, 'fire');
+    for (const st of seats) hit(x + st.dx, y + st.dy, 0.45, 'person');
+    const r = C.PISTE_FIRE_CLEAR_M;
+    clear(x - r, x + r, y - r - 1, y + r);
+  }
+
   // Talstation: Zielbogen, dahinter die Hütte mit Gästen und die Gondel. Nach dem Ziel zählt kein Zusammenstoß mehr.
   const cf = cAt(0, fin);
   add({ k: 'arch', x: cf, y: fin, half: Math.min(hAt(0, fin), 9) + 1 });

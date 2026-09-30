@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.29.0';
+export const VERSION = '0.29.1';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -519,6 +519,22 @@ export const C = {
   PISTE_MAST_M: 24,
   PISTE_MAST_H_M: 7.5,
   PISTE_LIGHT_M: [11, 11],   // Lichtkegel auf dem Schnee: halbe Breite, halbe Länge
+  // Stirnlampe (Tim, 30.09.2026): im Dunkeln leuchtet ein Kegel vor dem Fahrer in die Fahrtrichtung, er schwenkt im
+  // Bogen mit. Bewusst schwächer als das Flutlicht: er nimmt nur PISTE_HEADLAMP_K der Dunkelheit weg, damit die
+  // Masten weiter die hellen Inseln bleiben und man nicht weit voraus sieht. Dazu ein kleiner Hof um den Fahrer.
+  PISTE_HEADLAMP_K: 0.6,     // (Tuning) 0 = aus, 1 = so hell wie unter dem Flutlicht
+  PISTE_HEADLAMP_M: 13,      // so weit reicht der Kegel
+  PISTE_HEADLAMP_DEG: 24,    // halber Öffnungswinkel
+  PISTE_HEADLAMP_HALO_M: 2.2,
+  PISTE_HEADLAMP_RGB: '255,244,214', // ein Hauch Warmweiß auf dem Schnee im Kegel
+  // Lagerfeuer im Wald (Tim, 30.09.2026), nur im Dunkeln: [Meter, Seite −1 links / 1 rechts, Abstand vom Pistenrand
+  // in m, Zahl der Leute am Feuer]. Feuer, Steine und Leute sind Hindernisse wie ein Baum. Um das Feuer macht der
+  // Wald eine kleine Lichtung (PISTE_FIRE_CLEAR_M), das Licht reicht PISTE_FIRE_LIGHT_M und flackert.
+  PISTE_FIRES: [[8330, -1, 10, 2], [8780, 1, 15, 1], [9620, -1, 11, 2]],
+  PISTE_FIRE_CLEAR_M: 4.2,
+  PISTE_FIRE_LIGHT_M: 6.5,
+  PISTE_FIRE_RGB: '255,138,40',
+  PISTE_FIRE_SPARKS: 9,      // so viele Funken steigen gleichzeitig auf
   // Schneekanone: bläst quer über die Piste, im Nebel sieht man kurz wenig
   PISTE_CANNON_PUFFS: 22,
   PISTE_CANNON_REACH_M: 19,
@@ -932,6 +948,7 @@ export const TUNABLES = [
   { key: 'PISTE_SECRET_TREE_M', label: 'Geheimweg: Bäume im Weg alle', unit: 'm', min: 10, max: 80, step: 2 },
   { key: 'PISTE_SECRET_TIGHT_HALF_M', label: 'Geheimweg: Breite an der Engstelle', unit: 'm', min: 1.5, max: 5, step: 0.1, decimals: 1 },
   { key: 'PISTE_NIGHT_ALPHA', label: 'Dunkelheit im Flutlicht', unit: '%', min: 0, max: 0.85, step: 0.05, scale: 100, decimals: 0, visual: true },
+  { key: 'PISTE_HEADLAMP_K', label: 'Helligkeit der Stirnlampe', unit: '%', min: 0, max: 1, step: 0.05, scale: 100, decimals: 0, visual: true },
   { key: 'PISTE_TURN_HARD_DEG', label: 'Schwenk an der Schlüsselstelle', unit: '°', min: 10, max: 45, step: 1 },
   { key: 'PISTE_WAVE_HARD_M', label: 'Kurvenlänge an der Schlüsselstelle', unit: 'm', min: 100, max: 400, step: 10 },
   { key: 'PISTE_EDGE_EASY_M', label: 'Waldabstand im Raststück', unit: 'm', min: 0, max: 10, step: 0.5, decimals: 1 },
