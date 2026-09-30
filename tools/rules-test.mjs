@@ -50,6 +50,13 @@ await expect('Super-G echt 25,05 s', 'ok', req('PUT', '/boards/superg/vz', e(V, 
 await expect('Slalom 20 s', 'deny', req('PUT', '/boards/slalom/vz', e(V, { name: 'VZ', m: 2000, t: 20 }), V.tok));
 await expect('Slalom echt 33,4 s mit einer Strafe', 'ok', req('PUT', '/boards/slalom/vz', e(V, { name: 'VZ', m: 3540, t: 33.4 }), V.tok));
 await expect('Slalom langsamer als der Bestand', 'deny', req('PUT', '/boards/slalom/vz', e(V, { name: 'VZ', m: 3600, t: 34 }), V.tok));
+await expect('Piste 6420 m', 'ok', req('PUT', '/boards/piste/vz', e(V, { name: 'VZ', m: 6420, t: 330.2 }), V.tok));
+await expect('Piste im Ziel in 7:35,6', 'ok', req('PUT', '/boards/piste/vz', e(V, { name: 'VZ', m: 10000, t: 455.6 }), V.tok));
+await expect('Piste im Ziel, langsamer als der Bestand', 'deny', req('PUT', '/boards/piste/vz', e(V, { name: 'VZ', m: 10000, t: 470 }), V.tok));
+await expect('Piste im Ziel, schneller', 'ok', req('PUT', '/boards/piste/vz', e(V, { name: 'VZ', m: 10000, t: 402.18 }), V.tok));
+await expect('Piste weiter als das Ziel', 'deny', req('PUT', '/boards/piste/vw', e(V, { name: 'VW', m: 10001, t: 500 }), V.tok));
+await expect('Piste im Ziel in 2:50 (212 km/h)', 'deny', req('PUT', '/boards/piste/vw', e(V, { name: 'VW', m: 10000, t: 170 }), V.tok));
+await expect('Piste 3000 m in 60 s (180 km/h)', 'ok', req('PUT', '/boards/piste/vu', e(V, { name: 'VU', m: 3000, t: 60 }), V.tok));
 await expect('unbekannter Modus', 'deny', req('PUT', '/boards/riesenslalom/vz', e(V, { name: 'VZ', m: 3540, t: 33.4 }), V.tok));
 await expect('löschen durch Besitzer', 'deny', req('DELETE', '/boards/classic/tim', undefined, A.tok));
 // Altbestand ohne uid, wie vor v0.27.0

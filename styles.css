@@ -110,8 +110,25 @@ body[data-mode="superg"] #hud-dist, body[data-mode="slalom"] #hud-dist, body[dat
 #hud-opp:empty { display: none; }
 #hud-opp.slow { color: var(--slow); opacity: 1; }
 #hud-opp.fast { color: var(--fast); opacity: 1; }
-/* HUD weg auf der Fresh-Seite; im Duell bleibt es in der Sturzpause (dead ohne Overlay) stehen */
-body[data-state="dead"]:not([data-mode="duel"]) #hud, body[data-state="dead"][data-overlay="1"] #hud,
+/* Piste: die freien Stürze als Punkte unter den Metern, verbrauchte sind nur noch ein Ring */
+#hud-lives { display: none; justify-content: flex-end; gap: 6px; margin-top: 7px; }
+body[data-mode="piste"] #hud-lives { display: flex; }
+#hud-lives i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--ink);
+  box-shadow: 0 0 6px var(--bg);
+}
+#hud-lives i.used { background: transparent; opacity: 0.45; }
+/* Piste im Flutlicht: über der dunklen Piste wird das HUD hell */
+body[data-night="1"] #hud, body[data-night="1"] #hud-note { color: var(--paper); text-shadow: 0 0 6px var(--ink), 0 0 12px var(--ink); }
+body[data-night="1"] #hud-lives i { border-color: var(--paper); background: var(--paper); box-shadow: none; }
+body[data-night="1"] #hud-lives i.used { background: transparent; }
+body[data-night="1"][data-overlay="1"] #hud { color: var(--ink); }
+/* HUD weg auf der Fresh-Seite; im Duell und auf der Piste bleibt es in der Sturzpause (dead ohne Overlay) stehen */
+body[data-state="dead"]:not([data-mode="duel"]):not([data-mode="piste"]) #hud, body[data-state="dead"][data-overlay="1"] #hud,
 body[data-state="finished"][data-overlay="1"] #hud, body[data-state="ready"][data-overlay="1"] #hud { display: none; }
 
 /* Super-G: Hinweis unter dem Fahrer (Torfehler, Zwischenzeit), blendet über die Klasse ein */
@@ -185,6 +202,16 @@ body[data-state="ready"][data-overlay="1"] #ov-dead { display: flex; } /* ready:
 #dead-dist { font-size: 56px; line-height: 1; }
 #dead-time { font-size: 14px; margin-top: 8px; }
 #dead-best { font-size: 14px; opacity: 0.7; margin-top: 2px; }
+/* Piste: Tricks, Torstrecken und Tempomessung des Laufs, darunter der Pistenplan mit dem gefahrenen Weg */
+#dead-extra { font-size: 13px; opacity: 0.7; margin-top: 2px; }
+#dead-extra:empty { display: none; }
+#piste-plan { display: block; width: 100%; height: 64px; margin-top: 8px; }
+#piste-plan[hidden] { display: none; }
+/* kleine iPhones: Plan ohne Profil, keine Zusatzzeile; die Liste zeigt dort nur drei Zeilen (hud.js, SHORT_PX) */
+@media (max-height: 719px) {
+  #dead-extra { display: none; }
+  #piste-plan { height: 40px; margin-top: 4px; }
+}
 
 /* Bestenliste (board.js, hud.js): Rang | Name | Meter, andere Zeilen leicht zurückgenommen, die eigene deckend.
    Die eigene Zeile trägt das Namensfeld; ohne Namen steht nur das Feld da, zentriert. 16 px, damit iOS beim Fokus

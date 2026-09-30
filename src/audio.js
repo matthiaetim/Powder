@@ -10,9 +10,13 @@
 // iOS gibt Ton erst nach einer Berührung frei: der Kontext entsteht beim ersten Tipp, davor bleibt alles still.
 // Beim Verlassen der App (Heimgeste, App-Umschalter, Sperrtaste, Tab-Wechsel) blendet der Ton aus, bevor er angehalten
 // wird, sonst schnarrt es auf dem iPhone beim Schließen verzerrt (siehe „App verlassen“ unten).
+// Piste: Absprung und Landung, Piepton und Auslöser an der Tempomessung, kleine Fanfare für eine Torstrecke ohne
+// Fehler; dazu an der Strecke die Hütte (Stimmen, Kuhglocken, Polka), der Lift (Brummen, Klacken der Rollen) und das
+// Zischen der Schneekanone, alles lauter, je näher man ist.
 // Der Klingelschalter gilt wie bei nativen Spielen: steht er auf lautlos, bleibt die App stumm.
 import { C } from './constants.js';
 import { loadSoundOn, saveSoundOn } from './storage.js';
+import { ambience } from './piste-life.js';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const LOOP_S = 4; // Länge der Rauschschleifen in s, ganzzahlig lassen (siehe makeNoise)
@@ -72,7 +76,8 @@ export function createSound(g) {
   const n = {};               // Knoten des Klanggraphen
   const last = new Map();     // zuletzt gesetzter Zielwert je AudioParam (spart Automationsereignisse)
   const dbg = { rush: 0, hiss: 0, scrape: 0, rumble: 0 };
-  let prevBreaks = 0, crackleAcc = 0, lastSwish = -1, lastFrame = 0, bellAcc = 0;
+  let prevBreaks = 0, crackleAcc = 0, lastSwish = -1, lastFrame = 0, bellAcc = 0, polkaAcc = 0, polkaStep = 0, clackAcc = 0;
+  const amb = { hut: 0, lift: 0, cannon: 0 }; // Piste: Nähe zu Hütte, Lift und Schneekanone
   let away = false, stopTimer = 0; // App wird verlassen: Ausgang auf null, dann Kontext anhalten
   prepareNoise();
 
@@ -212,6 +217,12 @@ export function createSound(g) {
     cp.connect(n.crowdF1); cp.connect(n.crowdF2);
     n.crowdF1.connect(n.crowdBed); n.crowdF2.connect(n.crowdBed);
     chain(n.crowdBed, n.crowdSwell, n.crowd);
+
+    // Piste: Lift (tiefes Brummen des Antriebs) und Schneekanone (helles Zischen), beide im Wind-Bus
+    n.lift = gain(0);
+    chain(osc('sawtooth', 58), filt('lowpass', 210, 0.8), n.lift, n.wind);
+    n.cannon = gain(0);
+    chain(loop(n.white), filt('bandpass', 3600, 0.7), n.cannon, n.wind);
   }
 
   // Ton mit fester Höhe (Countdown, Torfehler, Ziel): kurzer Anstieg, gehalten, kurzer Abfall. delay schiebt den
@@ -395,6 +406,29 @@ export function createSound(g) {
       case 'finish': tone(n.race, 'sine', 660, 0.15, 0.45); tone(n.race, 'sine', 990, 0.4, 0.45, 0.17); if (g.stadium) roar(); break;
       // Gipfel (Classic, Everest-Höhe): Dreiklang aufwärts, verwandt mit dem Zielton, deshalb in derselben Gruppe
       case 'summit': tone(n.race, 'sine', 660, 0.15, 0.4); tone(n.race, 'sine', 830, 0.15, 0.4, 0.15); tone(n.race, 'sine', 990, 0.5, 0.45, 0.3); break;
+      // Piste: Absprung (der Schnee reißt ab, Luft rauscht auf), Landung (dumpf, Schnee stiebt)
+      case 'jump': {
+        const k = d.kind === 1 ? 1 : d.kind === 2 ? 0.35 : 0.65;
+        shot(n.ski, 'bandpass', 700, 0.9, 0.7 * k, 0.03, 0.35 + 0.4 * k, (fl, t0) => { fl.frequency.exponentialRampToValueAtTime(2600, t0 + 0.3 + 0.3 * k); });
+        break;
+      }
+      case 'land': {
+        const k = d.kind === 1 ? 1 : d.kind === 2 ? 0.3 : 0.6;
+        thud(n.fx, 'sine', 130, 48, 0.12, 0.55 * k, 0.22);
+        shot(n.ski, 'bandpass', 1500, 0.8, 0.8 * k, 0.005, 0.3, (fl, t0) => { fl.frequency.exponentialRampToValueAtTime(500, t0 + 0.28); });
+        break;
+      }
+      // Tempomessung: Piepton der Lichtschranke, dann der Auslöser der Kamera
+      case 'trap':
+        tone(n.race, 'sine', 1320, 0.09, 0.35);
+        shot(n.race, 'bandpass', 3200, 3, 0.5, 0.001, 0.025);
+        shot(n.race, 'bandpass', 2400, 3, 0.4, 0.001, 0.04);
+        break;
+      // Torstrecke ohne Fehler: kleine Fanfare, mit zurückgewonnenem Sturz ein Ton mehr
+      case 'gates':
+        tone(n.race, 'sine', 660, 0.12, 0.4); tone(n.race, 'sine', 880, 0.12, 0.4, 0.12); tone(n.race, 'sine', 1100, 0.3, 0.42, 0.24);
+        if (d && d.bonus) tone(n.race, 'sine', 1320, 0.4, 0.42, 0.42);
+        break;
       default: break;
     }
   }
@@ -455,8 +489,29 @@ export function createSound(g) {
       while (crackleAcc >= 1) { crackleAcc -= 1; crackle(0.5 + threat); }
     } else crackleAcc = 0;
 
-    // Publikum: nur mit Zielstadion, lauter und heller mit der Stimmung, dazu Kuhglocken
-    const hype = g.stadium ? g.stadium.hype : 0;
+    // Piste: was an der Strecke klingt. Die Hütte nutzt das Publikum des Zielstadions (Stimmen, Kuhglocken), leiser.
+    if (g.life && (running || g.state === 'dead' || g.state === 'finished')) ambience(g.life, s, amb);
+    else { amb.hut = 0; amb.lift = 0; amb.cannon = 0; }
+    set(n.lift.gain, 0.22 * amb.lift * amb.lift, 0.2);
+    set(n.cannon.gain, 0.3 * amb.cannon * amb.cannon, 0.2);
+    if (amb.lift > 0.15 && g.state !== 'paused') {
+      // die Klemmen laufen über die Rollen der Stütze: zwei kurze Schläge, dann Ruhe
+      clackAcc += dt;
+      if (clackAcc >= 1.1) { clackAcc = 0; for (const dl of [0, 0.14]) { const lv = 0.3 * amb.lift; setTimeout(() => { if (ctx && on && !away) shot(n.wind, 'bandpass', 1700, 6, lv, 0.001, 0.035); }, dl * 1000); } }
+    } else clackAcc = 0;
+    if (amb.hut > 0.12 && g.state !== 'paused') {
+      // Polka aus der Hütte: Bass auf eins und drei, Akkord dazwischen
+      polkaAcc += dt;
+      if (polkaAcc >= 0.26) {
+        polkaAcc = 0;
+        const lv = amb.hut * amb.hut, st = polkaStep++ % 8;
+        if (st % 2 === 0) tone(n.crowd, 'triangle', st % 4 === 0 ? 110 : 82.4, 0.2, 0.3 * lv);
+        else { const root = st < 4 ? 220 : 196; tone(n.crowd, 'square', root * 1.26, 0.09, 0.035 * lv); tone(n.crowd, 'square', root * 1.5, 0.09, 0.035 * lv); }
+      }
+    } else polkaAcc = 0;
+
+    // Publikum: mit Zielstadion lauter und heller mit der Stimmung, dazu Kuhglocken; an einer Hütte der Piste leise
+    const hype = g.stadium ? g.stadium.hype : 0.45 * amb.hut;
     set(n.crowdBed.gain, 0.5 * Math.pow(hype, 1.2), 0.25);
     set(n.crowdF1.frequency, 650 + 250 * hype, 0.3);
     if (hype > 0.1 && g.state !== 'paused') {

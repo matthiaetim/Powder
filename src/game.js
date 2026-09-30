@@ -2,6 +2,9 @@
 // Torlauf (Super-G, Slalom; gates.js): ready → count (Countdown) → running → finished (Auslauf) → (Fresh) → ready.
 // Duell (duel.js): ready mit hold (Lobby) → count aus einer gemeinsamen Uhr → running → dead → running (Weiterfahrt
 // nach der Sturzpause) → finished an der Zielweite oder wenn die Zeit vorbei ist.
+// Piste (piste.js): wie Classic ohne Countdown, aber mit Weiterfahrt nach dem Sturz wie im Duell (PISTE_FREE_CRASHES
+// Stürze sind frei, der nächste beendet den Lauf) und einem Ziel bei PISTE_FINISH_M. Was an der Strecke lebt (andere
+// Fahrer, Sprünge, Tore, Tempomessung), rechnet piste-life.js nach jedem Physikschritt.
 import { C } from './constants.js';
 import * as P from './physics.js';
 import { createWorld, ensureCells, laneX } from './world.js';
@@ -17,6 +20,8 @@ import { hasFence, fenceClamp, fenceRelax } from './fence.js';
 import { rollYeti, updateYeti } from './yeti.js';
 import { startStop, speedAt, distAt, headingAt, stopClock } from './hockey.js';
 import { createStadium, updateStadium, clearsWorld, glide, partying } from './stadium.js';
+import { createPiste, worldOpts, paceAt, laneAt } from './piste.js';
+import { createLife, stepLife, moveNpcs, crashesUsed } from './piste-life.js';
 
 const READY_FRAC = 0.78; // Fahrer steht im Intro weit unten im Bild
 
@@ -30,6 +35,10 @@ export function createGame(opts = {}) {
     skier: P.createSkier(), world: null, av: null,
     course: null, // Torlauf (Super-G, Slalom): Tore und Wertung (gates.js), in den anderen Modi null
     stadium: null, // Torlauf: Zielstadion (stadium.js)
+    piste: null,  // Piste: die vorgerechnete Strecke (piste.js), in den anderen Modi null
+    life: null,   // Piste: andere Fahrer, Sprung, Tore, Tempomessung (piste-life.js)
+    onLife: null, // Rückruf der Piste (einmal gebunden wie onCourse)
+    finTime: 0,   // Piste: Laufzeit beim Kreuzen der Ziellinie in s, 0 = nicht im Ziel
     yeti: null,   // Classic: Yeti-Spuren (yeti.js), nur in manchen Läufen
     summitT: -1,  // Classic: Laufzeit beim Erreichen der Everest-Höhe (HUD zeigt kurz „Everest“), < 0 = noch nicht
     track: createTrack(), particles: createParticles(),
@@ -52,7 +61,8 @@ export function createGame(opts = {}) {
     viewWm: C.VIEW_W_M, viewHm: C.VIEW_W_M * C.VIEW_ASPECT,
     debug: !!opts.debug, lastGesture: '–', runs: 0,
     trackAcc: 0, spawnAcc: 0, plowAcc: 0,
-    onEvent: null, // Haken für den Ton (main.js): press, release, plow, crash, beep, gate, pole, fence, split, finish, summit
+    onEvent: null, // Haken für den Ton (main.js): press, release, plow, crash, beep, gate, pole, fence, split, finish, summit,
+    // auf der Piste dazu jump, land, trap, gates
     onCourse: null, // Rückruf des Torlaufs (einmal gebunden, keine Allokation pro Schritt)
     // Duell (duel.js): Start gesperrt (Lobby), Countdown aus der gemeinsamen Uhr, Zielweite, Sturzpause, Zeit vorbei,
     // Schonfrist nach der Weiterfahrt, Stürze im Lauf und Radius des letzten Hindernisses, Rückruf am Ziel, Pose des
@@ -61,6 +71,7 @@ export function createGame(opts = {}) {
     onFinish: null, ghost: { on: false },
   };
   g.onCourse = (type, data) => courseEvent(g, type, data);
+  g.onLife = (type, data) => lifeEvent(g, type, data);
   loadBests(g);
   reset(g, seedFor(g), true);
   return g;
@@ -79,11 +90,15 @@ export function isDuel(g) {
   return g.mode === 'duel';
 }
 
-// Ein Torlauf fährt immer denselben Kurs (SG_SEED, SL_SEED), damit Bestzeiten vergleichbar sind; ?seed= gilt für
-// alle Modi.
+export function isPiste(g) {
+  return g.mode === 'piste';
+}
+
+// Ein Torlauf fährt immer denselben Kurs (SG_SEED, SL_SEED), damit Bestzeiten vergleichbar sind, die Piste immer
+// dieselbe Strecke (PISTE_SEED); ?seed= gilt für alle Modi.
 function seedFor(g) {
   const spec = courseOf(g.mode);
-  return g.fixedSeed ?? (spec ? cv(spec, 'seed') : randomSeed());
+  return g.fixedSeed ?? (spec ? cv(spec, 'seed') : isPiste(g) ? C.PISTE_SEED : randomSeed());
 }
 
 // Bestwerte des gewählten Modus: Meter (Classic, Lawine) und Bestzeit mit Zwischenzeiten (Super-G)
@@ -111,7 +126,10 @@ export function reset(g, seed, intro) {
       lane: { amp: cv(spec, 'laneAmp'), wave: cv(spec, 'laneWave'), amp2: 0, wave2: 97 }, phase: 0,
       pisteHalf: cv(spec, 'pisteHalf') + (spec.fence ? C.SL_FENCE_CLEAR_M : 0), startLine: false,
     })
-    : createWorld(seed);
+    : isPiste(g) ? createWorld(seed, worldOpts(g.piste = createPiste(seed))) : createWorld(seed);
+  if (!isPiste(g)) g.piste = null;
+  g.life = g.piste ? createLife(g.piste) : null;
+  g.finTime = 0;
   g.course = spec ? createCourse(seed, g.world, spec) : null;
   // Zielstadion: räumt seine Fläche in der Welt frei, bevor ensureView die ersten Zellen baut
   const sd = g.stadium = spec && spec.stadium ? createStadium(g.course) : null;
@@ -137,6 +155,8 @@ export function reset(g, seed, intro) {
   // Duell: der Lauf wartet auf den gemeinsamen Countdown (beginCount), alles andere setzt duel.js vor dem Start
   g.hold = isDuel(g);
   g.countClock = null; g.finishM = 0; g.respawnS = 0; g.raceOver = false; g.graceT = 0; g.crashes = 0; g.crashR = 0;
+  // Piste: Ziel und Weiterfahrt nach dem Sturz gehören zum Modus
+  if (isPiste(g)) { g.finishM = C.PISTE_FINISH_M; g.respawnS = C.PISTE_CRASH_PAUSE_S; }
   g.ghost.on = false;
   g.state = 'ready';
   ensureView(g);
@@ -186,7 +206,9 @@ export function update(g, dt, left = 0) {
       g.deadT += dt;
       if (g.deadCause === 'avalanche') updateAvalanche(g.av, g.skier, g.runT, dt, topDist(g)); // rollt über den Fahrer
       updateParticles(g.particles, dt);
-      if (g.respawnS > 0 && !g.raceOver && g.deadT >= g.respawnS) respawn(g); // Duell: weiter nach der Sturzpause
+      // Piste: die Uhr läuft durch die Sturzpause (im Duell zählt duel.js die Wanduhr), die anderen fahren weiter
+      if (isPiste(g) && g.respawnS > 0 && !g.raceOver) { g.runT += dt; moveNpcs(g.life, g.skier, dt); }
+      if (g.respawnS > 0 && !g.raceOver && g.deadT >= g.respawnS) respawn(g); // Duell, Piste: weiter nach der Sturzpause
       break;
     default:
       break;
@@ -238,16 +260,19 @@ function start(g) {
   if (g.mode === 'classic') g.yeti = rollYeti(g.world);
 }
 
-// Endtempo je Modus: Super-G und Slalom haben ihren eigenen Regler
+// Endtempo je Modus: Super-G und Slalom haben ihren eigenen Regler. Auf der Piste gilt das Tempo aus Classic, nur
+// die Zweige einer Gabelung sind steiler oder flacher (paceAt, dort auch der Hangabtrieb).
 const maxKmh = (g) => (g.course ? cv(g.course.spec, 'maxKmh') : C.MAX_SPEED_KMH);
 
 function step(g, dt, left) {
-  const s = g.skier;
+  const s = g.skier, L = g.life;
   g.runT += dt;
   const px = s.x, py = s.y; // Position vor dem Schritt: Super-G wertet Tor-, Zwischenzeit- und Ziellinie dazwischen
   // Hockeystop deaktiviert (Tim und Jürgen wollen ihn nicht) — auskommentiert statt gelöscht.
   // const wasHockey = s.hockeyT >= 0;
-  P.updateSkier(s, dt, maxKmh(g));
+  // Piste: im Sprung steht die Flugbahn fest (piste-life.js), sonst Physik mit Tempo und Gefälle der Stelle
+  if (L && L.air) { /* fliegt */ } else if (g.piste) { const pc = paceAt(g.piste, s.x, s.y); P.updateSkier(s, dt, pc.kmh, pc.g); } else P.updateSkier(s, dt, maxKmh(g));
+  const lifeHit = L ? stepLife(L, s, px, py, dt, g.onLife) : null;
   if (g.course && g.course.spec.ramp) startBoost(g, s, dt);
   if (g.course && hasFence(g.course.spec) && fenceClamp(g.course, g.world, s, dt)) emit(g, 'fence', { v: s.v });
   // if (!wasHockey && s.hockeyT >= 0) hockeyStop(g);
@@ -257,22 +282,25 @@ function step(g, dt, left) {
   // }
   if (s.y - s.y0 > g.dist) g.dist = s.y - s.y0;
   updateCamera(g, dt);
-  advanceTrail(g, dt);
+  if (L && L.air) { g.track.pendingGap = true; updateParticles(g.particles, dt); } else advanceTrail(g, dt); // in der Luft keine Spur
   updateYeti(g.yeti, s, dt);
   if (g.summitT < 0 && g.mode === 'classic' && g.dist >= C.EVEREST_Y_M) { g.summitT = g.runT; emit(g, 'summit'); }
 
   // Duell: Zielweite gekreuzt, die Zeit wird auf die Linie interpoliert (wie die Ziellinie im Super-G). Der Rückruf
   // bekommt, wie viel Simulationszeit vor dem Ende des Bildes die Linie lag; duel.js rechnet auf die Wanduhr um.
   if (g.finishM > 0 && s.y >= g.finishM) {
-    if (g.onFinish) g.onFinish(left + (1 - crossFrac(py, s.y, g.finishM)) * dt);
+    const late = (1 - crossFrac(py, s.y, g.finishM)) * dt; // so lange vor dem Ende des Schritts lag die Linie
+    if (g.piste) { finishPiste(g, g.runT - late); return; }
+    if (g.onFinish) g.onFinish(left + late);
     endRun(g, { duel: true });
     return;
   }
   // Schonfrist nach der Weiterfahrt (Duell): durch Hindernisse hindurch. Läuft sie ab, während der Fahrer noch in einem
   // steckt, hält sie, bis er frei ist; sonst käme genau dann der nächste Sturz.
-  let hit = checkCollision(g.world, s);
+  // Piste: dazu andere Fahrer und alles, was am Rand steht (lifeHit); im Sprung und kurz nach der Landung trifft man nichts
+  let hit = L && (L.air || L.safeT > 0) ? null : checkCollision(g.world, s) || lifeHit;
   if (g.graceT > 0) { g.graceT = hit ? Math.max(C.STEP, g.graceT - dt) : Math.max(0, g.graceT - dt); hit = null; }
-  if (hit) { die(g, hit.t === P.TREE ? 'tree' : 'rock', hit); return; }
+  if (hit) { die(g, hit.t === P.TREE ? 'tree' : hit.t === P.ROCK ? 'rock' : hit.t, hit); return; }
   if (hasAvalanche(g)) {
     if (g.dist < C.AV_INTRO_M) holdAvalanche(g.av, s, g.runT, dt, topDist(g)); // Startphase: sichtbar, harmlos
     else if (updateAvalanche(g.av, s, g.runT, dt, topDist(g))) { die(g, 'avalanche'); return; }
@@ -350,7 +378,7 @@ function coast(g, dt) {
     tickCourse(g.course, dt); // Stangen schwingen aus, Hinweis läuft ab (im Duell gibt es keinen Kurs)
     if (hasFence(g.course.spec)) fenceRelax(g.course, dt); // die Beule im Fangzaun schwingt aus
   }
-  if (s.y - s.y0 > g.dist) g.dist = s.y - s.y0;
+  if (s.y - s.y0 > g.dist && !g.piste) g.dist = s.y - s.y0; // Piste: im Auslauf bleibt es bei der Zielweite
   updateCamera(g, dt);
   g.trackAcc += s.v * dt;
   if (g.trackAcc >= C.TRACK_SPACING_M) {
@@ -392,6 +420,21 @@ export function endRun(g, data) {
   emit(g, 'finish', data);
 }
 
+// Ziel gekreuzt (Piste): die Weite ist die ganze Strecke, dazu zählt die Zeit. Die Bestzeit gilt nur unter Läufen,
+// die unten angekommen sind; Fahrer in den Auslauf wie im Duell.
+function finishPiste(g, time) {
+  g.finTime = Math.max(0.01, Math.round(time * 100) / 100);
+  g.dist = g.finishM;
+  if (g.finishM > g.best) { g.best = g.finishM; g.newBest = true; saveBest(g.runMode, g.best); }
+  const total = Math.round(g.finTime * 100);
+  if (g.bestTime === 0 || total < g.bestTime) {
+    g.bestTime = total;
+    g.newBestTime = true;
+    saveBestTime(g.runMode, total);
+  }
+  endRun(g, { piste: true, total: g.finTime, best: g.newBestTime });
+}
+
 // Ziel gekreuzt (Super-G): Zeit steht, Bestzeit und Zwischenzeiten des schnellsten Laufs speichern, Fahrer in den Auslauf
 function finish(g) {
   const cs = g.course;
@@ -415,6 +458,13 @@ function courseEvent(g, type, data) {
   emit(g, type, data);
 }
 
+// Ereignisse der Piste (piste-life.js): bei der Landung stiebt Schnee, die Spur beginnt neu
+function lifeEvent(g, type, data) {
+  if (type === 'pole') burstAt(g, data.x, data.y, 10, 3);
+  if (type === 'land') { burst(g, data.kind === 1 ? 26 : data.kind === 2 ? 6 : 14, 5); g.track.pendingGap = true; }
+  emit(g, type, data);
+}
+
 function die(g, cause, hit) {
   const s = g.skier;
   g.state = 'dead';
@@ -433,12 +483,18 @@ function die(g, cause, hit) {
   s.v = 0;
   g.crashes++;
   g.crashR = hit ? hit.r : 0;
+  if (hit && hit.npc) hit.npc.down = 1.6; // der andere Fahrer sitzt kurz im Schnee
+  if (g.life) {
+    g.life.crashAt.push(Math.floor(g.dist));
+    // die freien Stürze sind verbraucht (eine Torstrecke mit allen Toren gibt einen zurück)
+    if (crashesUsed(g.life) > C.PISTE_FREE_CRASHES) g.raceOver = true;
+  }
   const m = Math.floor(g.dist);
   // Nur Modi mit Meter-Wertung setzen einen Bestwert: der Super-G wertet Zeiten, das Duell zählt Siege
   if (MODES[g.runMode].board === 'm' && m > g.best) { g.best = m; g.newBest = true; saveBest(g.runMode, m); }
 }
 
-// Duell: nach der Sturzpause geht es weiter, seitlich neben dem Hindernis (vom Hindernis weg, Abstand aus beiden
+// Duell und Piste: nach der Sturzpause geht es weiter, seitlich neben dem Hindernis (vom Hindernis weg, Abstand aus beiden
 // Radien plus Luft), notfalls auf der Korridor-Mitte, die immer frei ist. Schonfrist ohne Kollision, die Spur
 // bekommt eine Lücke; die Zeit lief die ganze Sturzpause weiter (Wanduhr in duel.js).
 function respawn(g) {
@@ -448,7 +504,11 @@ function respawn(g) {
   s.y = old.y;
   s.y0 = old.y0;
   s.x = g.crashX + side * (C.SKIER_R + g.crashR + C.DUEL_RESPAWN_CLEAR_M);
-  if (checkCollision(g.world, s)) s.x = laneX(g.world, s.y);
+  if (g.piste) {
+    // Piste: zurück auf die Piste, in den Zweig, in dem er gestürzt ist, mit etwas Abstand zum Rand
+    const a = laneAt(g.piste, old.x, s.y), m = Math.max(0, a.half - 1.5);
+    s.x = Math.min(a.c + m, Math.max(a.c - m, s.x));
+  } else if (checkCollision(g.world, s)) s.x = laneX(g.world, s.y);
   s.v = C.START_SPEED_KMH / 3.6;
   g.skier = s;
   g.graceT = C.DUEL_RESPAWN_GRACE_S;
@@ -655,7 +715,15 @@ export function setMarksOn(g, on) {
 // „Bester Lauf“ und die rote Linie zur Bestenliste passen. Die Linie rückt erst beim nächsten Lauf.
 // Im Super-G ist m die Gesamtzeit in Hundertstel; die Zwischenzeiten des fremden Laufs kennt der Server nicht, darum
 // bleibt der Vergleich beim schnellsten Lauf auf diesem Gerät (storage.js).
-export function adoptBest(g, mode, m) {
+// Piste: mit der vollen Weite kommt die Zeit t des Laufs in s mit, sie gilt als Bestzeit, wenn sie schneller ist.
+export function adoptBest(g, mode, m, t = 0) {
+  if (MODES[mode].tie === 't' && m >= C.PISTE_FINISH_M && t > 0) {
+    const cs = Math.round(t * 100), cur = loadBestTime(mode);
+    if (cur === 0 || cs < cur) {
+      saveBestTime(mode, cs);
+      if (g.mode === mode) { g.bestTime = cs; g.newBestTime = false; }
+    }
+  }
   if (lowerIsBetter(mode)) {
     const cur = loadBestTime(mode);
     if (!(m >= 1) || (cur > 0 && !(m < cur))) return;

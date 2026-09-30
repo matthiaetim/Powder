@@ -12,6 +12,8 @@ import { drawGuide } from './guide-line.js';
 import { drawFence } from './fence-view.js';
 import { drawStartRamp, drawStartHouse } from './start-house.js';
 import { drawStadiumGround, drawStadium, drawStadiumOver } from './stadium-view.js';
+import { drawPisteGround, pushPisteItems, drawPisteItem, drawPisteOver } from './piste-view.js';
+import { airPose } from './piste-life.js';
 
 const TAU = Math.PI * 2;
 const D2R = Math.PI / 180;
@@ -134,7 +136,10 @@ function softEllipse(x, cx, cy, rx, ry, rgb, alpha) {
   x.restore();
 }
 
-function makeTree(S, dpr, v) {
+// snow (Piste): 0 kein Schnee, 1 etwas, 2 viel. Auf jeder Etage liegt eine Kappe mit welligem Rand, rechts im
+// Schatten wie das Dach des Starthauses; sie ist etwas schmaler als die Etage, damit um den Schnee ein grüner Rand
+// bleibt und der Baum sich vom weißen Hang abhebt.
+function makeTree(S, dpr, v, snow = 0) {
   const H = TREE_H * S, Wd = 1.7 * S, pad = 1.8 * S;
   const w = Wd + pad * 2, h = H + pad * 2;
   const [c, x] = makeCanvas(w, h, dpr);
@@ -148,13 +153,37 @@ function makeTree(S, dpr, v) {
     x.beginPath(); x.moveTo(ax + skew, yt); x.lineTo(ax + half, yb); x.lineTo(ax - half, yb); x.closePath(); x.fill();
     x.fillStyle = C.TREE_LIGHT;
     x.beginPath(); x.moveTo(ax + skew, yt); x.lineTo(ax - half, yb); x.lineTo(ax + skew * 0.5, yb); x.closePath(); x.fill();
+    if (snow > 0) snowCap(x, S, ax + skew, yt, yb, ax - half, ax + half, snow);
   }
   x.fillStyle = C.TRUNK;
   x.fillRect(ax - 0.07 * S, ay - 0.12 * S, 0.14 * S, 0.14 * S);
   return { img: c, w, h, ax, ay, nominal: TREE_H };
 }
 
-function makeRock(S, dpr, v) {
+// Schneekappe auf einer Etage des Baums: Spitze (tx, yt), Unterkante yb von xl bis xr
+function snowCap(x, S, tx, yt, yb, xl, xr, snow) {
+  const t = 0.3 + snow * 0.17, inset = 0.8, n = 3;
+  const y0 = yt + (yb - yt) * 0.07, ye = yt + (yb - yt) * t, dip = (yb - yt) * 0.13;
+  const el = tx + (xl - tx) * t * inset, er = tx + (xr - tx) * t * inset;
+  const cap = () => {
+    x.beginPath();
+    x.moveTo(tx, y0);
+    x.lineTo(el, ye);
+    for (let i = 0; i < n; i++) {
+      const a = el + ((er - el) * i) / n, b = el + ((er - el) * (i + 1)) / n;
+      x.quadraticCurveTo((a + b) / 2, ye + dip * (i === 1 ? 1.5 : 1), b, ye - (i === n - 1 ? 0 : dip * 0.2));
+    }
+    x.closePath();
+  };
+  cap(); x.fillStyle = C.SNOW_CAP; x.fill();
+  x.save();
+  cap(); x.clip();
+  x.fillStyle = C.SNOW_CAP_SHADE;
+  x.beginPath(); x.moveTo(tx + 0.02 * S, y0); x.lineTo(er + S, ye + S); x.lineTo(tx + (er - tx) * 0.3, ye + S); x.closePath(); x.fill();
+  x.restore();
+}
+
+function makeRock(S, dpr, v, snow = 0) {
   const H = ROCK_H * 0.75 * S, Wd = ROCK_H * S, pad = 1.2 * S;
   const w = Wd + pad * 2, h = H + pad * 2;
   const [c, x] = makeCanvas(w, h, dpr);
@@ -168,11 +197,38 @@ function makeRock(S, dpr, v) {
   outline.forEach(([px, py], i) => { const [X, Y] = P(px, py, i); i ? x.lineTo(X, Y) : x.moveTo(X, Y); });
   x.closePath(); x.fill();
   const top = [[0.5, 0.12], [0.92, 0.35], [0.55, 0.52], [0.1, 0.42]];
-  x.fillStyle = C.ROCK_TOP;
+  x.fillStyle = snow > 0 ? C.SNOW_CAP : C.ROCK_TOP;
   x.beginPath();
   top.forEach(([px, py], i) => { const [X, Y] = P(px, py, i); i ? x.lineTo(X, Y) : x.moveTo(X, Y); });
   x.closePath(); x.fill();
+  if (snow > 0) {
+    // Schnee auf der Oberseite, die rechte Hälfte im Schatten
+    x.fillStyle = C.SNOW_CAP_SHADE;
+    x.beginPath();
+    [[0.5, 0.12], [0.92, 0.35], [0.55, 0.52]].forEach(([px, py], i) => { const [X, Y] = P(px, py, i); i ? x.lineTo(X, Y) : x.moveTo(X, Y); });
+    x.closePath(); x.fill();
+  }
   return { img: c, w, h, ax, ay, nominal: ROCK_H };
+}
+
+// Randstange der Piste: dünne Stange in Tinte, die obere Hälfte in der Farbe der Schwierigkeit, am rechten Pistenrand
+// mit orangefarbener Spitze (so findet man auf echten Pisten bei Nebel die richtige Seite). Fußpunkt unten in der Mitte.
+function makeEdgePole(S, dpr, color, right) {
+  const H = C.PISTE_POLE_H_M * S, pad = 0.6 * S;
+  const w = pad * 2 + 0.4 * S, h = H + pad * 2;
+  const [c, x] = makeCanvas(w, h, dpr);
+  const ax = w / 2 - 0.1 * S, ay = pad + H;
+  softEllipse(x, ax + 0.3 * S, ay, 0.4 * S, 0.16 * S, C.SHADOW_RGB, 0.22);
+  x.lineCap = 'round';
+  x.strokeStyle = C.INK; x.lineWidth = Math.max(1.2, 0.1 * S);
+  x.beginPath(); x.moveTo(ax, ay); x.lineTo(ax, ay - H); x.stroke();
+  x.strokeStyle = color; x.lineWidth = Math.max(2, 0.2 * S);
+  x.beginPath(); x.moveTo(ax, ay - H * 0.55); x.lineTo(ax, ay - H); x.stroke();
+  if (right) {
+    x.strokeStyle = C.PISTE_POLE_TIP;
+    x.beginPath(); x.moveTo(ax, ay - H * 0.85); x.lineTo(ax, ay - H); x.stroke();
+  }
+  return { img: c, w, h, ax, ay, nominal: C.PISTE_POLE_H_M };
 }
 
 // Torstange (Super-G): stehend wie die Bäume mit Fußpunkt unten in der Mitte, oben ein Fähnchen nach außen (dir)
@@ -228,6 +284,10 @@ function makeSprites(S, dpr) {
   return {
     trees: [0, 1, 2].map((v) => makeTree(S, dpr, v)),
     rocks: [0, 1, 2].map((v) => makeRock(S, dpr, v)),
+    // Piste: Bäume [etwas, viel Schnee][Form], Felsen mit Schnee, Randstangen [blau, rot, schwarz][links, rechts]
+    treesSnow: [1, 2].map((sn) => [0, 1, 2].map((v) => makeTree(S, dpr, v, sn))),
+    rocksSnow: [0, 1, 2].map((v) => makeRock(S, dpr, v, 1)),
+    edge: [C.GATE_BLUE, C.GATE_RED, C.PISTE_BLACK].map((col) => [false, true].map((right) => makeEdgePole(S, dpr, col, right))),
     poles: makePoles(S, dpr),
     kipp: [false, true].map((red) => makeKipp(S, dpr, red)), // Slalom: [blau, rot]
     av: makeAvSprites(),
@@ -238,6 +298,7 @@ function makeSprites(S, dpr) {
 
 export function draw(R, g, t) {
   const { ctx, W, H } = R;
+  ctx.globalAlpha = 1;
   const s = g.skier;
   // Sichtmaßstab: Sprites sind für R.S vorgerendert, bei Tempo-Zoom werden sie etwas kleiner gezeichnet
   const S = R.Sv = R.S / g.zoom;
@@ -258,6 +319,7 @@ export function draw(R, g, t) {
     ox += Math.sin(t * 47) * k;
     oy += Math.sin(t * 61 + 0.7) * k * 0.8;
   }
+  if (g.piste) drawPisteGround(R, g, ox, oy, t); // präparierter Schnee, darüber liegen Linien, Spur und alles Weitere
   drawMarks(R, g, ox, oy);
   drawSignature(R, g, ox, oy);
   drawYeti(R, g, ox, oy);
@@ -279,6 +341,7 @@ export function draw(R, g, t) {
   if (g.course) drawStadiumOver(R, g, ox, oy); // Zielbogen, Blitzlichter und Konfetti über dem Fahrer
   // drawHockeyFog(R, g, ox, oy); // Hockeystop deaktiviert
   drawParticles(R, g, ox, oy);
+  if (g.piste) drawPisteOver(R, g, ox, oy, t); // Nebel, Lift, Flutlicht: über dem Fahrer
   if (g.ghost.on) drawDuelTags(R, g, ox, oy);
   if (g.mode === 'chase') drawAvalanche(R, g, ox, oy, t);
   drawWhiteout(R, g);
@@ -306,12 +369,13 @@ function drawMarks(R, g, ox, oy) {
   let labelY = Infinity;
   for (const f of g.runMarks) {
     if (f.m < y0 || f.m > y1) continue;
+    if (g.finishM > 0 && f.m >= g.finishM) continue; // Piste: wer im Ziel war, läge auf der Ziellinie
     const sy = f.m * S + oy;
     labelY = Math.min(sy - C.MARK_SPRAY_PX / 2 - 2, labelY - C.BOARD_LABEL_GAP_PX);
     sprayMark(R, g, ox, oy, sy, f.name + ' · ' + nf.format(f.m) + ' m', C.MARK_FRIEND_RGBA, TAG_WHITE, labelY);
   }
   const b = g.runBest;
-  if (b > 0 && b >= y0 && b <= y1) sprayMark(R, g, ox, oy, b * S + oy, t('sign.record', { m: nf.format(b) + ' m' }), C.MARK_BEST_RGBA, TAG_RED);
+  if (b > 0 && b >= y0 && b <= y1 && !(g.finishM > 0 && b >= g.finishM)) sprayMark(R, g, ox, oy, b * S + oy, t('sign.record', { m: nf.format(b) + ' m' }), C.MARK_BEST_RGBA, TAG_RED);
   if (g.finishM > 0) drawFinishLine(R, g.finishM, ox, oy, y0, y1); // Duell: Zielweite aus dem Raum
 }
 
@@ -707,7 +771,7 @@ function drawWorld(R, g, ox, oy) {
     const objs = cell.objs;
     for (let i = 0; i < objs.length; i++) {
       const o = objs[i];
-      const sp = o.t === TREE ? sprites.trees[o.variant] : sprites.rocks[o.variant];
+      const sp = spriteOf(sprites, o);
       const sc = (o.h / sp.nominal) * spriteScale;
       const sx = o.x * S + ox - sp.ax * sc, sy = o.y * S + oy - sp.ay * sc; // linke obere Ecke des Sprites
       if (sx - res > W || sx + sp.w * sc + res < 0 || sy - res > H || sy + sp.h * sc + res < 0) continue;
@@ -731,7 +795,9 @@ function drawWorld(R, g, ox, oy) {
       }
     }
   }
-  R.skierMarker.y = g.skier.y;
+  if (g.piste) pushPisteItems(R, g, oy, list);
+  // im Sprung liegt der Fahrer über allem, was steht
+  R.skierMarker.y = g.life && g.life.air ? Infinity : g.skier.y;
   list.push(R.skierMarker);
   if (g.ghost.on) { R.ghostMarker.y = g.ghost.y; list.push(R.ghostMarker); }
   list.sort((a, b) => a.y - b.y);
@@ -743,6 +809,12 @@ function drawWorld(R, g, ox, oy) {
       continue;
     }
     if (o.ghost) { drawGhost(R, g, ox, oy); continue; }
+    if (o.pv) { drawPisteItem(R, g, o, ox, oy); continue; }
+    if (o.edge) {
+      const sp = R.sprites.edge[o.grade][o.right ? 1 : 0];
+      ctx.drawImage(sp.img, o.x * S + ox - sp.ax * spriteScale, o.y * S + oy - sp.ay * spriteScale, sp.w * spriteScale, sp.h * spriteScale);
+      continue;
+    }
     if (o.pole) {
       const sp = o.kipp ? R.sprites.kipp[o.red ? 1 : 0] : R.sprites.poles[o.red ? 1 : 0][o.dir > 0 ? 1 : 0];
       const sx = o.x * S + ox, sy = o.y * S + oy;
@@ -760,10 +832,16 @@ function drawWorld(R, g, ox, oy) {
       } else ctx.drawImage(sp.img, sx - sp.ax * spriteScale, sy - sp.ay * spriteScale, sp.w * spriteScale, sp.h * spriteScale);
       continue;
     }
-    const sp = o.t === TREE ? R.sprites.trees[o.variant] : R.sprites.rocks[o.variant];
+    const sp = spriteOf(R.sprites, o);
     const sc = (o.h / sp.nominal) * spriteScale;
     ctx.drawImage(sp.img, o.x * S + ox - sp.ax * sc, o.y * S + oy - sp.ay * sc, sp.w * sc, sp.h * sc);
   }
+}
+
+// Bild eines Baums oder Felsens, auf der Piste je nach Schnee (o.snow: 0 keiner, 1 etwas, 2 viel)
+function spriteOf(sprites, o) {
+  if (o.t === TREE) return o.snow ? sprites.treesSnow[o.snow - 1][o.variant] : sprites.trees[o.variant];
+  return o.snow ? sprites.rocksSnow[o.variant] : sprites.rocks[o.variant];
 }
 
 function drawSkier(R, g, sx, sy) {
@@ -776,16 +854,27 @@ function drawSkier(R, g, sx, sy) {
     const hz = g.graceT < C.DUEL_GRACE_WARN_S ? 2 * C.DUEL_GRACE_BLINK_HZ : C.DUEL_GRACE_BLINK_HZ;
     if (Math.floor(g.runT * hz * 2) % 2) ctx.globalAlpha = C.DUEL_GRACE_DIM_ALPHA;
   }
+  // Piste: im Sprung hebt der Fahrer ab, dreht sich im Trick und wirft seinen Schatten weiter weg
+  const air = g.life && g.life.air ? airPose(g.life, AIR) : null;
+  const z = air ? air.z : 0;
   // Schatten nach unten rechts
-  ctx.fillStyle = `rgba(${C.SHADOW_RGB},0.22)`;
+  ctx.fillStyle = `rgba(${C.SHADOW_RGB},${air ? 0.16 : 0.22})`;
   ctx.beginPath();
-  ctx.ellipse(sx + 0.35 * S, sy + 0.25 * S, 0.5 * S, 0.3 * S, 0, 0, TAU);
+  ctx.ellipse(sx + (0.35 + 0.3 * z) * S, sy + (0.25 + 0.1 * z) * S, (0.5 + 0.08 * z) * S, (0.3 + 0.05 * z) * S, 0, 0, TAU);
   ctx.fill();
-  ctx.translate(sx, sy);
-  ctx.rotate(-s.theta);
-  riderShape(ctx, S, s, g.rider);
+  ctx.translate(sx, sy - z * S);
+  ctx.rotate(-s.theta + (air ? air.rot : 0));
+  if (air) {
+    const k = 1 + 0.06 * z;
+    ctx.scale(k, k * air.flip); // Überschlag von oben gesehen: der Fahrer staucht sich längs und klappt um
+    AIR_POSE.theta = s.theta; AIR_POSE.plowK = air.spread ? 0.8 : air.cross ? -0.9 : 0;
+    riderShape(ctx, S, AIR_POSE, g.rider);
+  } else riderShape(ctx, S, s, g.rider);
   ctx.restore();
 }
+const AIR = { z: 0, rot: 0, flip: 1, cross: false, spread: false };
+// Haltung im Sprung: Ski gespreizt (Pflugstellung) oder gekreuzt (negative Pflugstellung), sonst gerade
+const AIR_POSE = { theta: 0, carve: 0, plowK: 0, side: 0, plow: false, v: 0, brake: 0 };
 
 // Duell: der Gegner als halbtransparenter Geist mit seiner Pose (g.ghost aus duel.js, Fahrer nach seiner Wahl). Erst in
 // ein Offscreen-Canvas, dann mit Deckkraft einsetzen, sonst würden die überlappenden Flächen des Fahrers fleckig.
@@ -1175,7 +1264,7 @@ const PREVIEW_POSE = { theta: 0.25, carve: 0, plowK: 0 };
 export function drawModePreview(canvas, modeId, rider) {
   // Beim Start ist die Fresh-Seite versteckt (clientWidth 0): Fallback auf die Kartenmaße aus styles.css
   const W = canvas.clientWidth || 104, H = canvas.clientHeight || 58;
-  const superg = modeId === 'superg', slalom = modeId === 'slalom', duel = modeId === 'duel';
+  const superg = modeId === 'superg', slalom = modeId === 'slalom', duel = modeId === 'duel', piste = modeId === 'piste';
   const dpr = Math.min(window.devicePixelRatio || 1, C.MAX_DPR);
   canvas.width = Math.round(W * dpr);
   canvas.height = Math.round(H * dpr);
@@ -1189,6 +1278,24 @@ export function drawModePreview(canvas, modeId, rider) {
   const sx = W * 0.5, sy = H * 0.62;
   const trackX = (y) => (superg ? sx + Math.sin((y / H) * 9 + 0.5) * W * 0.14
     : slalom ? sx + Math.sin((y / H) * 15 + 0.6) * W * 0.085 : sx + Math.sin((y / H) * 4.5) * W * 0.09);
+  // Piste: präparierter Streifen mit Rillen, er schwingt mit der Spur
+  const pisteX = (y) => sx + Math.sin((y / H) * 3.2 + 0.4) * W * 0.07, pisteHalf = W * 0.27;
+  if (piste) {
+    ctx.save();
+    ctx.beginPath();
+    for (let y = -2; y <= H + 2; y += 2) { const x = pisteX(y) - pisteHalf; y < 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+    for (let y = H + 2; y >= -2; y -= 2) ctx.lineTo(pisteX(y) + pisteHalf, y);
+    ctx.closePath();
+    ctx.fillStyle = C.PISTE_SNOW;
+    ctx.fill();
+    ctx.clip();
+    ctx.strokeStyle = C.PISTE_CORD_RGBA;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 0.5; x < W; x += C.PISTE_CORD_M * S) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+    ctx.stroke();
+    ctx.restore();
+  }
   ctx.strokeStyle = C.TRACK;
   ctx.lineWidth = 1.2;
   for (const off of [-1, 1]) {
@@ -1200,16 +1307,23 @@ export function drawModePreview(canvas, modeId, rider) {
     ctx.stroke();
   }
   // Bäume; im Torlauf nur am Rand der Piste
-  const trees = superg || slalom
+  const trees = superg || slalom || piste
     ? [[0.04, 0.55, 0], [0.97, 0.38, 1], [0.03, 1.0, 2], [0.96, 0.92, 0]]
     : duel
       ? [[0.1, 0.5, 0], [0.9, 0.44, 1], [0.7, 0.92, 2], [0.25, 0.98, 1]]
       : [[0.16, 0.42, 0], [0.8, 0.3, 1], [0.66, 0.9, 2], [0.3, 0.98, 1], [0.9, 0.7, 0]];
-  const sprites = [0, 1, 2].map((v) => makeTree(S, dpr, v));
+  const sprites = [0, 1, 2].map((v) => makeTree(S, dpr, v, piste ? 1 + (v % 2) : 0)); // Piste: Schnee auf den Ästen
   trees.forEach(([fx, fy, v]) => {
     const sp = sprites[v];
     ctx.drawImage(sp.img, fx * W - sp.ax, fy * H - sp.ay, sp.w, sp.h);
   });
+  if (piste) {
+    // Randstangen in Blau, rechts mit orangefarbener Spitze
+    for (const fy of [0.34, 0.9]) for (const right of [false, true]) {
+      const sp = makeEdgePole(S, dpr, C.GATE_BLUE, right), y = fy * H;
+      ctx.drawImage(sp.img, pisteX(y) + (right ? 1 : -1) * (pisteHalf - 2) - sp.ax, y - sp.ay, sp.w, sp.h);
+    }
+  }
   if (superg) {
     // Zwei Tore, rot und blau, je zwei Stangen mit Fähnchen um die Spur
     const poles = makePoles(S, dpr);

@@ -53,7 +53,8 @@ function turnT(v) {
 
 // Ein Physik-Schritt.
 // maxKmh: Endtempo des Modus (game.js gibt im Super-G SG_MAX_SPEED_KMH mit)
-export function updateSkier(s, dt, maxKmh = C.MAX_SPEED_KMH) {
+// slope: Hangabtrieb in m/s², steiler oder flacher als sonst nur in den Zweigen einer Gabelung (Piste)
+export function updateSkier(s, dt, maxKmh = C.MAX_SPEED_KMH, slope = C.G_SLOPE) {
   const maxHead = C.MAX_HEADING_DEG * D2R;
 
   // Hockeystop deaktiviert (Tim und Jürgen wollen ihn nicht) — auskommentiert statt gelöscht.
@@ -110,8 +111,8 @@ export function updateSkier(s, dt, maxKmh = C.MAX_SPEED_KMH) {
   const vMax = maxKmh / 3.6;
   // Widerstand hebt den Hangabtrieb knapp über vMax auf, damit die Anzeige das Endtempo auch erreicht
   const vT = vMax * 1.02;
-  const drag = C.G_SLOPE * (s.v / vT) * (s.v / vT);
-  const a = C.G_SLOPE * cos - drag - s.brake;
+  const drag = slope * (s.v / vT) * (s.v / vT);
+  const a = slope * cos - drag - s.brake;
   s.v = clamp(s.v + a * dt, 0, vMax);
 
   s.x += s.v * sin * dt;

@@ -15,16 +15,21 @@ import { checkCollision } from './collision.js';
 
 export const botLevel = (n) => C.BOT_LEVELS[Math.min(C.BOT_LEVELS.length, Math.max(1, Math.round(n) || 1)) - 1];
 
-export function createBot({ seed, level, target, pause }) {
+// world: eine fertige Welt statt des Hangs aus dem Seed (Piste, tools/piste-sim.mjs); der Seed würfelt dann nur noch,
+// welche Hindernisse er übersieht. pace(s) liefert dort Endtempo und Hangabtrieb der Stelle ({ kmh, g }), extra() die
+// Hindernisse, die nicht in der Welt stehen (andere Fahrer, Dinge am Pistenrand, je { x, y, r }), onStep(b, dt) läuft
+// nach jedem Schritt mit.
+export function createBot({ seed, level, target, pause, world = null, pace = null, extra = null, onStep = null }) {
   const b = {
     level, p: botLevel(level), seed, target, pause,
-    world: createWorld(seed),
+    world: world || createWorld(seed), pace, extra, onStep,
     s: P.createSkier(),
     t: 0, state: 'run', // run | down (liegt nach dem Sturz) | done
     upAt: 0, grace: 0, crashes: 0, fin: 0, done: false, hit: null,
     plan: { th: 0, until: 0 }, thinkAt: 0,
     ctl: { side: 0, at: -1 }, rollCtl: { side: 0, at: -1 }, // gedrückte Seite und wann sie zuletzt wechselte
     near: [], // Hindernisse im Blick, je Denkschritt neu gesammelt
+    movers: [], // dasselbe für Hindernisse, die sich bewegen (andere Fahrer auf der Piste: vy in m/s talwärts)
     prev: { t: 0, x: 0, y: 0, th: 0, v: 0 },
     roll: P.createSkier(), // Arbeitskopie für die Vorausrechnung, ohne Allokation je Versuch
   };
@@ -65,7 +70,8 @@ function step(b, dt) {
   if (b.t >= b.thinkAt) think(b);
   steer(s, b.ctl, b.t < b.plan.until ? b.plan.th : 0, b.t, b.p.tapS);
   const py = s.y;
-  P.updateSkier(s, dt);
+  move(b, s, dt);
+  if (b.onStep) b.onStep(b, dt);
   if (s.y >= b.target) {
     b.fin = Math.max(0.01, Math.round((b.t - (1 - (b.target - py) / (s.y - py)) * dt) * 100) / 100);
     b.done = true;
@@ -74,9 +80,23 @@ function step(b, dt) {
   }
   view(b);
   // Schonfrist wie beim Spieler (game.js step): hält, solange er am Ende noch in einem Hindernis steckt
-  let hit = checkCollision(b.world, s);
+  let hit = checkCollision(b.world, s) || (b.extra ? extraHit(b, s) : null);
   if (b.grace > 0) { b.grace = hit ? Math.max(C.STEP, b.grace - dt) : Math.max(0, b.grace - dt); hit = null; }
   if (hit) crash(b, hit);
+}
+
+function move(b, s, dt) {
+  if (!b.pace) { P.updateSkier(s, dt); return; }
+  const pc = b.pace(s);
+  P.updateSkier(s, dt, pc.kmh, pc.g);
+}
+
+function extraHit(b, s) {
+  for (const o of b.extra()) {
+    const rr = C.SKIER_R + o.r, dx = o.x - s.x, dy = o.y - s.y;
+    if (dx * dx + dy * dy < rr * rr) return o;
+  }
+  return null;
 }
 
 function crash(b, hit) {
@@ -131,6 +151,15 @@ function gather(b, reach) {
       near.push(o);
     }
   }
+  b.movers.length = 0;
+  if (b.extra) {
+    for (const o of b.extra()) {
+      const dy = o.y - s.y;
+      if (dy < -C.BOT_VIEW_BACK_M || dy > reach || Math.abs(o.x - s.x) > C.BOT_SIDE_MIN_M + C.BOT_SIDE_K * Math.max(0, dy)) continue;
+      if (dy > late && overlooked(b, o)) continue;
+      if (o.vy) b.movers.push(o); else near.push(o);
+    }
+  }
   near.sort(byY); // rollout geht sie der Reihe nach durch und lässt liegen, was schon hinter ihm ist
 }
 const byY = (a, b) => a.y - b.y;
@@ -163,7 +192,7 @@ function rollout(b, th, hold) {
   for (let t = 0; t < H; t += dt) {
     steer(c, ctl, t < hold ? th : 0, t, p.tapS);
     const ax = c.x, ay = c.y;
-    P.updateSkier(c, dt);
+    move(b, c, dt);
     if (c.v > vWish) cost += C.BOT_W_SPEED * (c.v - vWish) * (c.v - vWish) * dt;
     if (grace > 0) { grace -= dt; continue; }
     // Abstand jedes Hindernisses zur Strecke dieses Schritts, nicht nur zum Endpunkt
@@ -177,6 +206,14 @@ function rollout(b, th, hold) {
       const dx = o.x - (ax + bx * f), dy = o.y - (ay + by * f);
       const d = Math.sqrt(dx * dx + dy * dy) - C.SKIER_R - o.r;
       if (d < C.BOT_HIT_PAD_M) return cost + C.BOT_W_HIT * (2 - t / H) - (c.y - y0); // früher Aufprall ist schlimmer
+      if (d < p.margin) { const k = 1 - d / p.margin; cost += C.BOT_W_NEAR * k * k * dt; }
+    }
+    // was sich bewegt, steht nach t Sekunden weiter unten; seitlich rechnet er mit der Lage von jetzt
+    for (let i = 0; i < b.movers.length; i++) {
+      const o = b.movers[i];
+      const dx = o.x - c.x, dy = o.y + o.vy * (t + dt) - c.y;
+      const d = Math.sqrt(dx * dx + dy * dy) - C.SKIER_R - o.r;
+      if (d < C.BOT_HIT_PAD_M) return cost + C.BOT_W_HIT * (2 - t / H) - (c.y - y0);
       if (d < p.margin) { const k = 1 - d / p.margin; cost += C.BOT_W_NEAR * k * k * dt; }
     }
   }

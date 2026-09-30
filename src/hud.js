@@ -13,8 +13,12 @@ import { loadBest, loadBestTime, loadDuelTally, loadRecentModes } from './storag
 import { createDuelCard } from './duel-card.js';
 import { t, num, sep, applyStatic, onLang } from './i18n.js';
 import { createSettings } from './settings.js';
+import { levelAt, laneAt, paceAt, onPiste, nightAt } from './piste.js';
+import { crashesUsed } from './piste-life.js';
+import { drawPistePlan } from './piste-view.js';
 
 const pad2 = (n) => String(n).padStart(2, '0');
+const SHORT_PX = 720; // darunter ist das Bild zu niedrig für Liste und Pistenplan zusammen (styles.css nutzt dieselbe Grenze)
 
 // Laufzeit: unter einer Minute „43,27 Sekunden“, sonst „1:34:07 Minuten“ (Minuten:Sekunden:Hundertstel). Trenner
 // und Wort je Sprache (i18n.js).
@@ -40,6 +44,7 @@ export function createHud(g, doc, hooks = {}) {
   const $ = (id) => doc.getElementById(id);
   const doFresh = hooks.fresh || (() => fresh(g));
   const speedEl = $('hud-speed'), distEl = $('hud-dist'), timeEl = $('hud-time'), raceNoteEl = $('hud-note'), oppEl = $('hud-opp');
+  const livesEl = $('hud-lives'), planEl = $('piste-plan'), extraEl = $('dead-extra');
   const pauseSub = doc.querySelector('#ov-pause .ov-sub');
   const countEl = $('ov-count'), hintEl = $('hint');
   const deadDist = $('dead-dist'), deadTime = $('dead-time'), deadBest = $('dead-best'), debugEl = $('debug');
@@ -51,7 +56,7 @@ export function createHud(g, doc, hooks = {}) {
   const nf1 = { format: (v) => num(v, 1) };
   const nf2 = { format: (v) => num(v, 2, 2) };
   let lastSpeed = -1, lastDist = '', lastTime = '', lastState = '', lastOverlay = '', lastDebug = 0, lastText = -1e9;
-  let lastMode = '', lastRace = '', lastNote = '', lastCount = '', lastOpp = '';
+  let lastMode = '', lastRace = '', lastNote = '', lastCount = '', lastOpp = '', lastLives = '', lastNight = '';
   const duel = hooks.duel || null;
   const duelOn = !!(duel && hooks.net && hooks.net.enabled);
 
@@ -121,9 +126,31 @@ export function createHud(g, doc, hooks = {}) {
   // Durchschnittstempo des Laufs wie in der Detail-Kachel (board.js statsFor): Weite durch Laufzeit, im Super-G die
   // Kurslänge durch die reine Fahrzeit ohne Strafen
   const avgText = (meters, sec) => (sec > 0 ? t('dead.avg', { v: nf.format((meters / sec) * 3.6) }) : '');
+  // Piste: die Zeit zählt erst im Ziel, eine Bestzeit hat also nur, wer schon unten war
+  const tied = (id) => MODES[id].tie === 't';
+  const crashText = (n) => (n === 0 ? t('piste.crashes0') : n === 1 ? t('piste.crashes1') : t('piste.crashesN', { n: nf.format(n) }));
+  // Piste: was im Lauf sonst noch war, als eine Zeile unter der Laufzeit (Tricks, Torstrecken, Tempomessung), und
+  // der Pistenplan mit dem gefahrenen Weg
+  function pisteExtra() {
+    const L = g.life;
+    if (!L || g.runMode !== 'piste') return '';
+    const parts = [];
+    if (L.tricks > 0) parts.push(L.tricks === 1 ? t('piste.tricks1') : t('piste.tricksN', { n: nf.format(L.tricks) }));
+    if (L.gateRuns > 0) parts.push(L.gateRuns === 1 ? t('piste.gateRuns1') : t('piste.gateRunsN', { n: nf.format(L.gateRuns) }));
+    if (L.topKmh > 0) parts.push(t('piste.top', { v: nf.format(Math.round(L.topKmh)) }));
+    return parts.join(' · ');
+  }
   function refreshDead() {
     const cs = g.course;
-    if (lowerIsBetter(g.runMode) && g.state === 'finished') {
+    const plan = g.runMode === 'piste' && g.mode === 'piste' && !!g.life && (g.state === 'dead' || g.state === 'finished');
+    planEl.hidden = !plan;
+    if (plan) drawPistePlan(planEl, g);
+    extraEl.textContent = plan ? pisteExtra() : '';
+    if (tied(g.runMode) && g.state === 'finished' && g.finTime > 0) {
+      // im Tal: die Zeit groß, darunter die Stürze und das Durchschnittstempo
+      deadDist.textContent = formatClock(g.finTime, true);
+      deadTime.textContent = t('piste.valley') + ' · ' + crashText(g.crashes) + avgText(C.PISTE_FINISH_M, g.finTime);
+    } else if (lowerIsBetter(g.runMode) && g.state === 'finished') {
       deadDist.textContent = formatClock(cs.total, true);
       deadTime.textContent = (cs.misses === 0
         ? t('gates.all', { n: nf.format(cs.gates.length) })
@@ -134,7 +161,7 @@ export function createHud(g, doc, hooks = {}) {
       deadDist.textContent = nf.format(m) + ' m';
       deadTime.textContent = lowerIsBetter(g.runMode) ? t('noFinish') : t('dead.in', { t: formatRunTime(g.runT) }) + avgText(m, g.runT);
     }
-    if (lowerIsBetter(g.mode)) {
+    if (lowerIsBetter(g.mode) || (tied(g.mode) && g.bestTime > 0)) {
       deadBest.textContent = g.newBestTime && g.mode === g.runMode ? t('best.newTime')
         : g.bestTime > 0 ? t('best.time', { t: formatClock(g.bestTime / 100, true) }) : t('best.noTime');
     } else {
@@ -167,7 +194,7 @@ export function createHud(g, doc, hooks = {}) {
       const w = Object.values(loadDuelTally()).reduce((n, e) => n + (e && e.w ? e.w : 0), 0);
       return w > 0 ? (w === 1 ? t('wins1') : t('winsN', { n: nf.format(w) })) : '–';
     }
-    if (MODES[id].board === 'time') { const v = loadBestTime(id); return v > 0 ? formatClock(v / 100, true) : '–'; }
+    if (MODES[id].board === 'time' || (tied(id) && loadBestTime(id) > 0)) { const v = loadBestTime(id); return v > 0 ? formatClock(v / 100, true) : '–'; }
     const v = loadBest(id);
     return v > 0 ? nf.format(v) + ' m' : '–';
   };
@@ -341,11 +368,13 @@ export function createHud(g, doc, hooks = {}) {
   const ownRow = boardEl.querySelector('.board-own'), nameInput = $('board-name');
   const ownRank = ownRow.querySelector('.board-rank'), ownM = ownRow.querySelector('.board-m');
   doc.body.dataset.board = boardOn ? '1' : '';
-  const scoreText = (m) => (lowerIsBetter(g.mode) ? formatClock(m / 100, true) : nf.format(m) + ' m');
-  const rowEl = (rank, name, m) => {
+  // Wert einer Zeile: Meter oder Gesamtzeit; in der Piste steht bei allen, die im Ziel waren, die Laufzeit
+  const scoreText = (e) => (tied(g.mode) && e.m >= C.PISTE_FINISH_M && e.t > 0 ? formatClock(e.t, true)
+    : lowerIsBetter(g.mode) ? formatClock(e.m / 100, true) : nf.format(e.m) + ' m');
+  const rowEl = (rank, name, e) => {
     const row = doc.createElement('div');
     row.className = 'board-row';
-    for (const [cls, text] of [['board-rank', rank], ['board-name', name], ['board-m', scoreText(m)]]) {
+    for (const [cls, text] of [['board-rank', rank], ['board-name', name], ['board-m', scoreText(e)]]) {
       const span = doc.createElement('span');
       span.className = cls;
       span.textContent = text;
@@ -364,12 +393,13 @@ export function createHud(g, doc, hooks = {}) {
     moreEl.hidden = true;
     nameInput.value = name;
     if (!name) { noteEl.textContent = t('board.forList'); return; }
-    const v = board.view(g.mode);
+    // Piste auf kleinen iPhones: der Pistenplan braucht Platz, darum dort nur die ersten drei Zeilen
+    const v = board.view(g.mode, !planEl.hidden && window.innerHeight < SHORT_PX ? 3 : undefined);
     for (const e of v.top) {
-      if (!e.own) { rowsEl.append(rowEl(e.rank, e.name, e.m)); continue; }
+      if (!e.own) { rowsEl.append(rowEl(e.rank, e.name, e)); continue; }
       rowsEl.append(ownRow);
       ownRank.textContent = e.rank;
-      ownM.textContent = scoreText(e.m);
+      ownM.textContent = scoreText(e);
     }
     if (!v.ownInTop) {
       // Eigener Eintrag unter den Top-Zeilen mit Rang, oder noch nicht auf dem Server: dann der lokale Bestwert ohne
@@ -377,7 +407,7 @@ export function createHud(g, doc, hooks = {}) {
       moreEl.hidden = !v.own;
       ownRank.textContent = v.own ? v.own.rank : '–';
       const local = lowerIsBetter(g.mode) ? g.bestTime : g.best;
-      ownM.textContent = v.own ? scoreText(v.own.m) : local > 0 ? scoreText(local) : '–';
+      ownM.textContent = v.own ? scoreText(v.own) : local > 0 ? scoreText({ m: local, t: tied(g.mode) ? g.bestTime / 100 : 0 }) : '–';
     }
     const verdict = board.lastVerdict();
     noteEl.textContent = verdict ? verdictText(verdict) : board.taken() ? t('board.taken')
@@ -479,6 +509,19 @@ export function createHud(g, doc, hooks = {}) {
         if (opp !== lastOpp) { lastOpp = opp; oppEl.textContent = opp; oppEl.className = cls; }
       } else if (lastOpp) { lastOpp = ''; oppEl.textContent = ''; oppEl.className = ''; }
     }
+    // Piste: freie Stürze als Punkte, verbrauchte bleiben als Ring stehen (eine Torstrecke mit allen Toren gibt einen zurück)
+    const usedNow = g.life ? Math.min(crashesUsed(g.life), C.PISTE_FREE_CRASHES) : 0;
+    const lives = g.mode === 'piste' ? `${C.PISTE_FREE_CRASHES}:${usedNow}` : '';
+    if (lives !== lastLives) {
+      lastLives = lives;
+      const used = usedNow;
+      livesEl.replaceChildren(...Array.from({ length: lives ? C.PISTE_FREE_CRASHES : 0 }, (_, i) => {
+        const dot = doc.createElement('i');
+        if (i >= C.PISTE_FREE_CRASHES - used) dot.className = 'used';
+        return dot;
+      }));
+      livesEl.setAttribute('aria-label', lives ? t('piste.lives', { n: nf.format(C.PISTE_FREE_CRASHES - used) }) : '');
+    }
     if (g.mode !== lastMode) {
       lastMode = g.mode;
       doc.body.dataset.mode = g.mode;
@@ -497,12 +540,17 @@ export function createHud(g, doc, hooks = {}) {
     }
     // Hinweis unter dem Fahrer, verschwindet nach SG_NOTE_S (gates.js zählt note.t hoch)
     const note = cs && cs.note && cs.note.t < C.SG_NOTE_S && g.state !== 'finished' ? cs.note : null;
-    const noteKey = note ? `${note.kind}:${note.value}` : '';
+    // Piste: Tor 2/5, alle Tore, gemessenes Tempo (piste-life.js)
+    const pn = g.life && g.life.note.t < C.PISTE_NOTE_S && g.state === 'running' ? g.life.note : null;
+    const noteKey = note ? `${note.kind}:${note.value}` : pn ? `${pn.key}:${pn.a}:${pn.b}` : '';
     if (noteKey !== lastNote) {
       lastNote = noteKey;
-      raceNoteEl.className = note ? note.kind : '';
-      raceNoteEl.textContent = note ? noteText(note) : '';
+      raceNoteEl.className = note ? note.kind : pn ? pn.kind : '';
+      raceNoteEl.textContent = note ? noteText(note) : pn ? t(pn.key, { a: nf.format(pn.a), b: nf.format(pn.b) }) : '';
     }
+    // Flutlicht: im Dunkeln wird das HUD hell (styles.css)
+    const night = g.piste && g.state !== 'ready' && nightAt(g.skier.y) * C.PISTE_NIGHT_ALPHA > 0.3 ? '1' : '';
+    if (night !== lastNight) { lastNight = night; doc.body.dataset.night = night; }
     // Countdown 3 · 2 · 1 in der Mitte, nach dem Start kurz „Go“
     let count = '';
     if (g.state === 'count') count = String(Math.min(C.SG_COUNT_BEEPS, Math.max(1, C.SG_COUNT_BEEPS - Math.floor(g.countT / C.SG_COUNT_STEP_S))));
@@ -532,17 +580,23 @@ export function createHud(g, doc, hooks = {}) {
         `${R.W}x${R.H}@${R.dpr}  S=${R.S.toFixed(2)} px/m  zoom=${g.zoom.toFixed(2)}  frac=${g.skierFrac.toFixed(2)}`,
         `state=${g.state}  mode=${g.mode}  intro=${g.intro}  seed=${g.seed}  runs=${g.runs}  t=${g.runT.toFixed(1)} s`,
         `v=${s.v.toFixed(1)} m/s (${Math.round(s.v * 3.6)} km/h)  θ=${deg(s.theta)}°  brake=${s.brake.toFixed(1)}  side=${s.side}${s.plow ? '  PFLUG' : ''}`,
-        `tap=${C.TURN_TAP_DEG}°+${C.TURN_DEEPEN_DEG_S}°/s  T=${C.TURN_T}-${C.TURN_T_FAST}/${C.RETURN_T}s  target=${deg(s.target)}°  brake=turn ${C.TURN_BRAKE_K} + ${C.BRAKE_K}@${C.BRAKE_START_DEG}-${C.BRAKE_FULL_DEG}° + plow ${C.PLOW_MIN}  g=${C.G_SLOPE}  v0=${C.START_SPEED_KMH}  vmax=${g.mode === 'superg' ? C.SG_MAX_SPEED_KMH : C.MAX_SPEED_KMH}`,
+        `tap=${C.TURN_TAP_DEG}°+${C.TURN_DEEPEN_DEG_S}°/s  T=${C.TURN_T}-${C.TURN_T_FAST}/${C.RETURN_T}s  target=${deg(s.target)}°  brake=turn ${C.TURN_BRAKE_K} + ${C.BRAKE_K}@${C.BRAKE_START_DEG}-${C.BRAKE_FULL_DEG}° + plow ${C.PLOW_MIN}  g=${C.G_SLOPE}  v0=${C.START_SPEED_KMH}  vmax=${g.mode === 'superg' ? C.SG_MAX_SPEED_KMH : g.piste ? Math.round(paceAt(g.piste, s.x, s.y).kmh) : C.MAX_SPEED_KMH}`,
         g.mode === 'chase'
           ? `lawine gap=${av.gap.toFixed(1)} m  v=${(av.speed * 3.6).toFixed(0)} km/h  pace=${(av.pace * 3.6).toFixed(0)} km/h  stall=${av.stallT.toFixed(1)} s  near=${av.near.toFixed(2)}  threat=${av.threat.toFixed(2)}  gnade=${av.mercy.toFixed(2)}`
           : cs
             ? `torlauf tor=${cs.next}/${cs.gates.length}  verpasst=${cs.misses}  strafe=${cs.penalty} s  stangen=${cs.hits}  splits=${cs.splits.map((c) => (c / 100).toFixed(2)).join('/')}  best=${(g.bestTime / 100).toFixed(2)} [${g.bestSplits.map((c) => (c / 100).toFixed(2)).join('/')}]  ziel=${cs.finished ? cs.total.toFixed(2) : '-'}`
-            : 'lawine: aus (Classic)',
+            : g.piste
+              ? pisteDebug()
+              : 'lawine: aus (Classic)',
         `objs=${g.world.objCount}  cells=${g.world.cells.size}  track=${g.track.n}`,
         `gesture=${g.lastGesture}`,
         snd ? snd.debugLine() : '',
       ].join('\n');
     }
+  }
+  function pisteDebug() {
+    const s = g.skier, a = laneAt(g.piste, s.x, s.y), L = g.life, pc = paceAt(g.piste, s.x, s.y);
+    return `piste stufe=${levelAt(g.piste, s.y).toFixed(1)}  zweig=${a.lane} farbe=${a.grade}  breite=${(2 * a.half).toFixed(1)} m  vmax=${pc.kmh.toFixed(0)} km/h g=${pc.g.toFixed(2)}  mitte=${a.c.toFixed(1)}  stürze=${crashesUsed(L)}/${C.PISTE_FREE_CRASHES} (+${L.bonus})  ${onPiste(g.piste, s.x, s.y) ? 'auf' : 'neben'} der Piste  fahrer=${L.npcs.length}  tricks=${L.tricks}  tore=${L.gateRuns}  ${L.air ? 'FLUG' : ''}`;
   }
   // Sprachwechsel (Einstellungen): statische Texte, Kacheln, Liste und Ergebnis neu beschriften; was sync() nur bei
   // Änderungen schreibt, wird über die last*-Merker neu angestoßen
@@ -557,7 +611,7 @@ export function createHud(g, doc, hooks = {}) {
     if (duelCard) duelCard.render();
     refreshDead();
     renderBoard();
-    lastMode = ''; lastSpeed = -1; lastDist = ''; lastTime = ''; lastOpp = ''; lastNote = ''; lastText = -1e9;
+    lastMode = ''; lastSpeed = -1; lastDist = ''; lastTime = ''; lastOpp = ''; lastNote = ''; lastText = -1e9; lastLives = '';
     lastCount = ''; // Countdown und Laufwerte im nächsten Bild neu, sync läuft in jedem Bild
     if (pauseSub) pauseSub.textContent = t('pause.sub'); // nicht über lastState: der Zustandswechsel meldet den Lauf
   });

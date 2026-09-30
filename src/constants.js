@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.27.8';
+export const VERSION = '0.27.9';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -192,6 +192,7 @@ export const C = {
   BOARD_MAX_AVG_KMH: 150,
   BOARD_SG_MAX_AVG_KMH: 185,
   BOARD_SL_MAX_AVG_KMH: 80,  // Slalom: schneller als sein Endtempo (SL_MAX_SPEED_KMH) geht es nicht
+  BOARD_PISTE_MAX_AVG_KMH: 200, // Piste: präparierte Strecke ohne Bäume, dazu die steilen schwarzen Zweige (PISTE_BLACK_KMH)
 
   // Anmeldung (auth.js): anonymes Firebase-Konto je Gerät per REST ohne SDK. Die uid steht in jedem Eintrag und jedem
   // Duell-Platz, die Regeln lassen nur ihren Besitzer schreiben. AUTH_KEY ist der Web-API-Schlüssel des Projekts
@@ -293,6 +294,219 @@ export const C = {
   YETI_FOOT_W_M: 0.4,
   YETI_ALPHA: 0.32,          // Deckkraft eines frischen Abdrucks, etwa wie eine kräftige Skispur
   YETI_WIPE_PER_M: 0.6,      // Verwischen je Meter Fahrt über einem Abdruck; eine Überfahrt ist rund 1 m, wie SIGN_ERASE_ALPHA
+
+  // Piste (nur piste; piste.js, piste-life.js, piste-view.js, world.js, game.js, render.js, hud.js): geführte Abfahrt
+  // auf einer präparierten Piste bis zur Talstation bei PISTE_FINISH_M. Die Strecke ist fest (PISTE_SEED, ?seed=
+  // überschreibt), damit man sie kennenlernt und die Bestenliste fair bleibt. Auf der Piste steht kein Baum, daneben
+  // steht Wald in Gruppen mit Lichtungen; wer die Piste verlässt, fährt wie in Classic zwischen den Bäumen. Gefahren
+  // wird mit der Physik aus Classic (G_SLOPE, MAX_SPEED_KMH), nur die Zweige einer Gabelung sind steiler oder flacher.
+  // Ein Sturz ist nicht das Ende: nach PISTE_CRASH_PAUSE_S geht es auf der Piste weiter (Schonfrist wie im Duell,
+  // DUEL_RESPAWN_GRACE_S), die Uhr läuft durch. PISTE_FREE_CRASHES Stürze sind frei, der nächste beendet den Lauf.
+  // Gewertet werden die Meter; wer das Ziel erreicht, steht über allen anderen und wird nach Zeit sortiert.
+  PISTE_FINISH_M: 10000,
+  PISTE_SEED: 20260930,      // feste Strecke
+  PISTE_FREE_CRASHES: 3,     // (Tuning) so viele Stürze sind frei
+  PISTE_CRASH_PAUSE_S: 1,    // (Tuning) so lange liegt der Fahrer nach einem Sturz
+  // Schwierigkeit in Wellen wie das Profil einer Etappe (Tim, 30.09.2026): [Meter, Stufe 0..10], dazwischen weich
+  // verbunden. Auf jede Schlüsselstelle folgt ein Raststück, jede Welle ist etwas höher als die davor. Die schwerste
+  // Stelle vor dem Hobby-Ziel (7000 m) liegt bei 6400 m, danach führt ein Raststück über die Marke; die höchste Welle
+  // ist der Zielhang. Die Stufe steuert Breite, Kurven und Waldabstand (PISTE_*_EASY bei Stufe 0, PISTE_*_HARD bei
+  // Stufe 10), dazu die Zahl der anderen Fahrer. Das Tempo bleibt überall das aus Classic (Tim, 30.09.2026).
+  PISTE_PROFILE: [
+    [0, 0.8], [600, 1.2], [1100, 3.0], [1400, 1.4], [2500, 3.4], [3300, 2.4], [3700, 4.4], [4200, 3.4], [4700, 5.4],
+    [5700, 2.4], [6400, 6.8], [6950, 3.0], [7300, 5.2], [7700, 4.4], [8700, 8.2], [9100, 5.4], [9600, 9.6], [10000, 4.0],
+  ],
+  PISTE_HALF_EASY_M: 9,      // (Tuning) halbe Pistenbreite im Raststück
+  PISTE_HALF_HARD_M: 4,      // (Tuning) halbe Pistenbreite an der Schlüsselstelle
+  PISTE_EDGE_EASY_M: 4,      // (Tuning) so weit bleibt der Wald im Raststück vom Pistenrand weg
+  PISTE_EDGE_HARD_M: 0.6,    // (Tuning) und so weit an der Schlüsselstelle
+  // Kurven: die Piste schwenkt um PISTE_TURN_*_DEG aus der Falllinie, eine volle S-Kurve ist PISTE_WAVE_*_M lang.
+  // PISTE_WAVE_JITTER streckt oder staucht die Kurven abschnittsweise, damit sie nicht im Takt kommen.
+  PISTE_TURN_EASY_DEG: 9,
+  PISTE_TURN_HARD_DEG: 26,   // (Tuning) Schwenk an der Schlüsselstelle
+  PISTE_WAVE_EASY_M: 420,
+  PISTE_WAVE_HARD_M: 190,    // (Tuning) Länge einer S-Kurve an der Schlüsselstelle
+  PISTE_WAVE_JITTER: 0.25,
+  PISTE_HOME_M: 500,         // die Piste zieht mit dieser Länge zur Hangmitte zurück, sonst wandert sie seitlich davon
+  PISTE_STEP_M: 1,           // Raster der vorgerechneten Strecke (piste.js)
+  PISTE_PAD_M: 400,          // so weit reicht die Strecke über Start und Ziel hinaus (Anlauf, Auslauf)
+  // Wald neben der Piste (world.js): Baumgruppen mit Lichtungen dazwischen. Ein weiches Zufallsmuster mit Flecken von
+  // PISTE_GROVE_M entscheidet, wo Wald steht; PISTE_GROVE_FILL ist der Anteil der Fläche. An Schlüsselstellen rückt
+  // der Wald als Wand an den Pistenrand (Schneise), ab Stufe PISTE_WALL_FROM, voll ab PISTE_WALL_FULL.
+  PISTE_FOREST_D: 0.07,      // (Tuning) Bäume je m² im Wald
+  PISTE_SPACING_M: 2.4,      // Mindestabstand der Bäume, enger als in Classic (MIN_SPACING_M): es soll Wald sein
+  PISTE_ROCK_FRAC: 0.12,
+  PISTE_GROVE_M: 26,
+  PISTE_GROVE_FILL: 0.5,
+  PISTE_WALL_FROM: 3.5,
+  PISTE_WALL_FULL: 6,
+  PISTE_WALL_M: 12,          // so tief steht die Wand aus Wald neben der Schneise
+  PISTE_SNOW_P0: 0.35,       // Anteil der Bäume mit Schnee auf den Ästen am Start …
+  PISTE_SNOW_P1: 0.9,        // … und im Tal
+  PISTE_FINISH_CLEAR_M: 26,  // um das Ziel bleibt der Hang so weit frei (Auslauf und Talstation)
+
+  // Gabelungen: [Meter, Länge, Farbe links, Farbe rechts] mit 0 blau, 1 rot, 2 schwarz. Die Piste teilt sich über
+  // PISTE_FORK_RAMP_M in zwei Zweige, deren Mitten 2 × PISTE_FORK_SEP_M auseinanderliegen, und läuft am Ende ebenso
+  // wieder zusammen; dazwischen steht Wald. Je Farbe: Stufe (Wald, Fahrer), halbe Breite, Waldabstand, eigene
+  // Schlenker (Ausschlag, Wellenlänge), Endtempo und Gefälle als Faktor auf G_SLOPE. Blau ist breit, flach und
+  // gemütlich, Schwarz schmal, steil und frei von anderen Fahrern, Rot liegt dazwischen und fährt wie die Hauptpiste.
+  PISTE_FORKS: [[2000, 900, 0, 1], [4000, 900, 1, 2], [6000, 850, 0, 2], [8000, 950, 1, 2]],
+  PISTE_FORK_SEP_M: 27,
+  PISTE_FORK_RAMP_M: 150,
+  PISTE_LANE_LEVEL: [1.2, 5, 8],
+  PISTE_LANE_HALF_M: [8.5, 6, 5],
+  PISTE_LANE_EDGE_M: [4, 2, 0.8],
+  PISTE_LANE_WIG_M: [2, 3, 5],
+  PISTE_LANE_WAVE_M: [260, 170, 120],
+  PISTE_BLACK_KMH: 230,      // (Tuning) Endtempo im schwarzen Zweig
+  PISTE_BLACK_G: 1.35,       // Gefälle im schwarzen Zweig als Faktor auf G_SLOPE
+  PISTE_BLUE_KMH: 150,       // (Tuning) Endtempo im blauen Zweig
+  PISTE_BLUE_G: 0.75,
+  // Was an der Strecke steht, von oben nach unten. y in m; side −1 links, 1 rechts, 0 Mitte; lane 'L' oder 'R' legt
+  // es in den linken oder rechten Zweig einer Gabelung. Arten: lift (Sessellift oder Gondel kreuzt über der Piste),
+  // kicker (klein am Rand, big: breit mit weitem Flug), hut (Hütte mit Gästen), deer und hare (Tiere, nur Kulisse),
+  // gates (Torstrecke: sg = Super-G-Tore, sl = Slalomstangen; ein Angebot ohne Strafe), trap (Tempomessung mit Foto),
+  // park (Funpark: kleiner und breiter Kicker, Wellenbahn, Steilkurve), cannon (Schneekanone), ziehweg (schmaler
+  // Weg quer zum Hang mit Fangnetz).
+  PISTE_LAYOUT: [
+    { k: 'lift', y: 760, type: 'chair', dir: 1 },
+    { k: 'kicker', y: 950, side: -1 },
+    { k: 'hut', y: 1420, side: 1, name: 'alm' },
+    { k: 'deer', y: 1560, side: -1 },
+    { k: 'kicker', y: 1750, side: 1 },
+    { k: 'gates', y: 2260, lane: 'R', type: 'sg', n: 5 },
+    { k: 'hare', y: 2520, lane: 'L' },
+    { k: 'trap', y: 3060, side: 1 },
+    { k: 'park', y: 3300 },
+    { k: 'cannon', y: 3850, side: -1 },
+    { k: 'gates', y: 4290, lane: 'L', type: 'sl', n: 8 },
+    { k: 'kicker', y: 5020, side: -1 },
+    { k: 'lift', y: 5230, type: 'gondola', dir: -1 },
+    { k: 'cannon', y: 5460, side: 1 },
+    { k: 'hut', y: 5720, side: -1, name: 'jause' },
+    { k: 'kicker', y: 6400, lane: 'L', side: 1 },
+    { k: 'deer', y: 6610, lane: 'L', side: -1 },
+    { k: 'ziehweg', y: 6900, len: 260, dx: -34 },
+    { k: 'gates', y: 7400, type: 'sg', n: 5 },
+    { k: 'kicker', y: 7760, big: true, side: 0 },
+    { k: 'kicker', y: 8460, lane: 'L', side: -1 },
+    { k: 'hare', y: 8600, lane: 'L' },
+    { k: 'trap', y: 9040, side: -1 },
+    { k: 'hut', y: 9140, side: 1, name: 'einkehr' },
+    { k: 'lift', y: 9330, type: 'gondola', dir: 1 },
+  ],
+  // Kicker: Breite, Länge der Rampe und Höhe der Kante in m [klein, breit, Welle der Wellenbahn]. Wer mit mindestens
+  // PISTE_JUMP_MIN_KMH über die Kante fährt, springt von selbst: PISTE_AIR_*_S in der Luft bei PISTE_AIR_REF_KMH,
+  // mit dem Tempo zwischen PISTE_AIR_K_MIN und PISTE_AIR_K_MAX mal so lang und so hoch. In der Luft lenkt man nicht
+  // und trifft nichts, gelandet wird immer auf der Piste; danach PISTE_LAND_SAFE_S ohne Zusammenstoß.
+  PISTE_KICK_W_M: [3.2, 9.5, 8],
+  PISTE_KICK_L_M: [4.2, 7.5, 2.4],
+  PISTE_KICK_H_M: [0.9, 1.9, 0.5],
+  PISTE_AIR_SMALL_S: 0.75,
+  PISTE_AIR_BIG_S: 1.35,     // (Tuning) Flugzeit am breiten Kicker
+  PISTE_AIR_ROLL_S: 0.3,
+  PISTE_AIR_Z_M: [1.5, 3.4, 0.45], // Scheitelhöhe des Flugs bei PISTE_AIR_REF_KMH
+  PISTE_AIR_REF_KMH: 110,
+  PISTE_AIR_K_MIN: 0.7,
+  PISTE_AIR_K_MAX: 1.25,
+  PISTE_JUMP_MIN_KMH: 30,
+  PISTE_LAND_SAFE_S: 0.4,
+  PISTE_LAND_EDGE_M: 1.6,    // so weit vom Pistenrand landet man mindestens
+  PISTE_TRICK_SHOW_S: 1.1,   // so lange steht der Name des Tricks nach der Landung noch am Fahrer
+  // Tricks [Schlüssel in i18n, Drehungen um die Hochachse, Überschläge, Ski gekreuzt, Ski gespreizt]
+  PISTE_TRICKS_SMALL: [['t360', 1, 0, 0, 0], ['grab', 0, 0, 1, 0], ['spread', 0, 0, 0, 1], ['t180', 0.5, 0, 0, 0]],
+  PISTE_TRICKS_BIG: [['backflip', 0, 1, 0, 0], ['t720', 2, 0, 0, 0], ['t360grab', 1, 0, 1, 0], ['frontflip', 0, -1, 0, 0], ['cork', 2, 1, 0, 0]],
+  // Funpark (Layout: park): ab dem Schild PISTE_PARK_LEN_M lang und PISTE_PARK_HALF_M je Seite breit. Darin, vom
+  // Schild aus gemessen: kleiner Kicker, breiter Kicker, drei Wellen, dann die Steilkurve, in der die Piste um
+  // PISTE_BANK_DX_M zur Seite springt. Die Wand der Steilkurve fängt auf, wer geradeaus weiterfährt: kein Sturz.
+  PISTE_PARK_LEN_M: 330,
+  PISTE_PARK_HALF_M: 11.5,
+  PISTE_PARK_AT_M: [50, 110, 170, 250], // kleiner Kicker, breiter Kicker, erste Welle, Beginn der Steilkurve
+  PISTE_ROLL_GAP_M: 13,
+  PISTE_BANK_LEN_M: 56,
+  PISTE_BANK_DX_M: 16,
+  PISTE_BANK_W_M: 3.4,       // so breit ist die Wand an ihrer höchsten Stelle
+  PISTE_BANK_SPRING: 5,      // 1/s: so schnell trägt die Wand den Fahrer zurück auf die Piste
+  // Ziehweg: halbe Breite, Fangnetz an beiden Rändern wie im Slalom (fence.js): abprallen statt stürzen
+  PISTE_PATH_HALF_M: 4.2,
+  PISTE_PATH_KEEP: 0.9,      // Tempo, das beim Anprall ans Netz bleibt
+  // Torstrecken: Abstand der Tore und Versatz zur Mitte [Super-G-Tore, Slalomstangen]. Die Tore sind ein Angebot:
+  // verpasste kosten nichts. Wer alle Tore einer Strecke trifft, bekommt PISTE_GATE_REWARD verbrauchte Stürze zurück.
+  PISTE_GATE_GAP_M: [45, 13],
+  PISTE_GATE_OFF_M: [5.5, 1.6],
+  PISTE_GATE_HALF_M: [11.5, 7.5], // so breit ist die Piste an einer Torstrecke mindestens
+  PISTE_GATE_REWARD: 1,      // (Tuning)
+  PISTE_NOTE_S: 2,           // so lange steht ein Hinweis im HUD (Tor 2/5, Tempo, Sturz zurück)
+  // Tempomessung: zwei gesprühte Linien im Abstand PISTE_TRAP_M, die Tafel dahinter zeigt das gemessene Tempo. An
+  // der zweiten Linie blitzt der Fotopunkt.
+  PISTE_TRAP_M: 20,
+  PISTE_TRAP_BOARD_M: 46,    // so weit hinter der ersten Linie steht die Tafel
+  PISTE_TRAP_RGBA: 'rgba(255,122,26,0.75)',
+  PISTE_FLASH_S: 0.3,
+  // Andere Fahrer: einer alle PISTE_NPC_GAP0_M am Start, unten alle PISTE_NPC_GAP1_M (± PISTE_NPC_JITTER). Sie fahren
+  // langsamer als der Spieler in ruhigen Bögen und erscheinen PISTE_NPC_AHEAD_M vor ihm. Ein Zusammenstoß ist ein
+  // Sturz. In einer Gabelung nimmt jeder einen Zweig, in den schwarzen fährt keiner.
+  PISTE_NPC_GAP0_M: 330,
+  PISTE_NPC_GAP1_M: 120,     // (Tuning)
+  PISTE_NPC_JITTER: 0.35,
+  PISTE_NPC_KMH: [38, 62],
+  PISTE_NPC_AHEAD_M: 90,
+  PISTE_NPC_BEHIND_M: 45,
+  PISTE_NPC_FROM_M: 260,     // davor ist die Piste leer
+  PISTE_NPC_R: 0.45,
+  PISTE_NPC_TRAIL_M: 42,     // so lang ist die Spur hinter einem anderen Fahrer
+  PISTE_NPC_COLORS: ['#C0342A', '#3568B5', '#FFD84A', '#FF7A1A', '#2FB457', '#5F8ACB', '#D25A50'],
+  // Spuren früherer Fahrer im präparierten Schnee: je Zweig PISTE_OLD_TRACKS blasse Linien, in Stücken von
+  // PISTE_OLD_TRACK_M mal da, mal nicht
+  PISTE_OLD_TRACKS: 3,
+  PISTE_OLD_TRACK_M: 160,
+  PISTE_OLD_TRACK_ALPHA: 0.075,
+  // Lift: das Seil hängt PISTE_LIFT_H_M hoch, Stützen stehen neben der Piste. Im Bild liegen Seil und Sessel über
+  // allem und verschieben sich mit der Höhe gegen den Boden (PISTE_LIFT_PARALLAX je m Höhe), das gibt die Tiefe.
+  PISTE_LIFT_H_M: 8.5,
+  PISTE_LIFT_HALF_M: 2.3,    // halber Abstand der beiden Seile
+  PISTE_LIFT_GAP_M: 11,      // Abstand der Sessel
+  PISTE_LIFT_MS: 2.4,        // Tempo des Seils in m/s
+  PISTE_LIFT_PARALLAX: 0.03,
+  PISTE_LIFT_PYLON_M: 46,    // Abstand der Stützen
+  PISTE_LIFT_ANGLE_DEG: 34,  // so schräg quert die Trasse die Falllinie (0 = waagrecht im Bild)
+  // Flutlicht: ab PISTE_NIGHT_FROM_M wird es über PISTE_NIGHT_FADE_M dunkel, Masten am Pistenrand alle
+  // PISTE_MAST_M werfen Lichtkegel auf die Piste.
+  PISTE_NIGHT_FROM_M: 7850,
+  PISTE_NIGHT_FADE_M: 350,
+  PISTE_NIGHT_ALPHA: 0.62,   // (Tuning) Deckkraft der Dunkelheit
+  PISTE_NIGHT_RGB: '14,24,56',
+  PISTE_MAST_M: 24,
+  PISTE_MAST_H_M: 7.5,
+  PISTE_LIGHT_M: [11, 11],   // Lichtkegel auf dem Schnee: halbe Breite, halbe Länge
+  // Schneekanone: bläst quer über die Piste, im Nebel sieht man kurz wenig
+  PISTE_CANNON_PUFFS: 22,
+  PISTE_CANNON_REACH_M: 19,
+  // Ton an der Strecke: Hütte (Stimmen, Glocken, Musik) und Lift (Brummen, Klacken) ab diesem Abstand hörbar
+  PISTE_HUT_HEAR_M: 60,
+  PISTE_LIFT_HEAR_M: 45,
+  // Tiere (nur Kulisse): das Reh flieht, wenn der Fahrer näher als PISTE_DEER_FLEE_M kommt, der Hase quert die Piste
+  PISTE_DEER_FLEE_M: 24,
+  PISTE_HARE_AT_M: 65,
+  // Farben der Bauten
+  PISTE_WOOD: '#A9764B', PISTE_WOOD_DARK: '#7D5636', PISTE_WOOD_LIGHT: '#C08D5E',
+  PISTE_STEEL: '#8793A0', PISTE_STEEL_DARK: '#5C6875', PISTE_GLASS: '#BFD9EE', PISTE_FACE: '#C3D2E2',
+  PISTE_YELLOW: '#FFD84A', PISTE_GREEN: '#2FB457', PISTE_PAPER: '#F4F3EF',
+  PISTE_LAMP: '#FFF3B8', PISTE_LAMP_RGB: '255,236,160',
+  // Piste im Bild (render.js): präparierter Schnee, etwas heller als der Hang, mit feinen Rillen in der Falllinie
+  // (Cord). Randstangen alle PISTE_POLE_M in der Farbe der Schwierigkeit: blau bis PISTE_BLUE_TO, rot bis
+  // PISTE_RED_TO, darüber schwarz; rechts mit orangefarbener Spitze wie auf echten Pisten.
+  PISTE_SNOW: '#FFFFFF',
+  PISTE_CORD_RGBA: 'rgba(60,80,100,0.075)',
+  PISTE_CORD_M: 0.45,        // Abstand der Rillen
+  PISTE_POLE_M: 12,
+  PISTE_POLE_H_M: 1.5,
+  PISTE_BLUE_TO: 3.5,
+  PISTE_RED_TO: 6.5,
+  PISTE_BLACK: '#14140F',
+  PISTE_POLE_TIP: '#FF7A1A',
+  SNOW_CAP: '#FFFFFF',       // Schnee auf Ästen und Felsen, Schattenseite wie beim Starthaus
+  SNOW_CAP_SHADE: '#CFDDEA',
 
   // Super-G (nur superg; gates.js, game.js, render.js, hud.js): Zeitfahren bis SG_FINISH_M durch Tore, abwechselnd
   // rot und blau. Der Kurs ist fest (SG_SEED, ?seed= überschreibt), damit Bestzeiten vergleichbar bleiben. Tore
@@ -656,6 +870,22 @@ export const TUNABLES = [
   { key: 'SL_FENCE_KEEP', label: 'Tempo nach Zaun', unit: '%', min: 0.3, max: 1, step: 0.05, scale: 100, decimals: 0 },
   { key: 'SL_ARC_PX', label: 'Bogen an der Stange', unit: 'px', min: 2, max: 12, step: 1, visual: true },
   { key: 'SL_LINE_PX', label: 'Ideallinie', unit: 'px', min: 0, max: 10, step: 1, visual: true },
+  { heading: 'Piste', tone: 'blue' },
+  { key: 'PISTE_FREE_CRASHES', label: 'Freie Stürze', unit: '', min: 0, max: 9, step: 1 },
+  { key: 'PISTE_CRASH_PAUSE_S', label: 'Sturzpause', unit: 's', min: 0.5, max: 5, step: 0.1, decimals: 1 },
+  { key: 'PISTE_HALF_EASY_M', label: 'Breite im Raststück', unit: 'm', min: 5, max: 14, step: 0.5, decimals: 1 },
+  { key: 'PISTE_HALF_HARD_M', label: 'Breite an der Schlüsselstelle', unit: 'm', min: 2, max: 10, step: 0.5, decimals: 1 },
+  { key: 'PISTE_BLACK_KMH', label: 'Endtempo Schwarz (Gabelung)', unit: 'km/h', min: 150, max: 300, step: 5 },
+  { key: 'PISTE_BLUE_KMH', label: 'Endtempo Blau (Gabelung)', unit: 'km/h', min: 80, max: 200, step: 5 },
+  { key: 'PISTE_NPC_GAP1_M', label: 'Andere Fahrer im Tal alle', unit: 'm', min: 40, max: 400, step: 10 },
+  { key: 'PISTE_AIR_BIG_S', label: 'Flugzeit breiter Kicker', unit: 's', min: 0.6, max: 2.5, step: 0.05, decimals: 2 },
+  { key: 'PISTE_GATE_REWARD', label: 'Alle Tore: Stürze zurück', unit: '', min: 0, max: 1, step: 1 },
+  { key: 'PISTE_NIGHT_ALPHA', label: 'Dunkelheit im Flutlicht', unit: '%', min: 0, max: 0.85, step: 0.05, scale: 100, decimals: 0, visual: true },
+  { key: 'PISTE_TURN_HARD_DEG', label: 'Schwenk an der Schlüsselstelle', unit: '°', min: 10, max: 45, step: 1 },
+  { key: 'PISTE_WAVE_HARD_M', label: 'Kurvenlänge an der Schlüsselstelle', unit: 'm', min: 100, max: 400, step: 10 },
+  { key: 'PISTE_EDGE_EASY_M', label: 'Waldabstand im Raststück', unit: 'm', min: 0, max: 10, step: 0.5, decimals: 1 },
+  { key: 'PISTE_EDGE_HARD_M', label: 'Waldabstand an der Schlüsselstelle', unit: 'm', min: 0, max: 6, step: 0.2, decimals: 1 },
+  { key: 'PISTE_FOREST_D', label: 'Walddichte', unit: '/100 m²', min: 0.01, max: 0.1, step: 0.005, scale: 100, decimals: 1 },
   { heading: 'Duell', tone: 'orange' },
   { key: 'DUEL_CRASH_PAUSE_S', label: 'Sturzpause', unit: 's', min: 0.5, max: 5, step: 0.1, decimals: 1 },
   { key: 'DUEL_RESPAWN_GRACE_S', label: 'Schonfrist', unit: 's', min: 0, max: 5, step: 0.1, decimals: 1 },

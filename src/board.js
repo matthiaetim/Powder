@@ -3,9 +3,11 @@
 // Cache, Namen und Upload-Stand, spricht mit dem Server und reicht die Linien an game.js weiter (setMarks).
 // Das Feld m ist je Modus etwas anderes (modes.js): Meter in Classic und Lawine, mehr ist besser; im Super-G die
 // Gesamtzeit in Hundertstel, weniger ist besser. Alle Vergleiche laufen über better(), nie direkt über m.
+// Piste (modes.js, tie 't'): Meter wie in Classic, aber bei gleichen Metern gewinnt die kürzere Laufzeit t. Das
+// betrifft alle, die das Ziel erreichen: sie stehen mit der vollen Weite oben, sortiert nach Zeit (betterRun).
 import { C, VERSION } from './constants.js';
 import { createNet } from './net.js';
-import { BOARD_MODES, lowerIsBetter } from './modes.js';
+import { MODES, BOARD_MODES, lowerIsBetter } from './modes.js';
 import { courseOf, cv } from './gates.js';
 import { isTuned } from './tune.js';
 import { t } from './i18n.js';
@@ -14,6 +16,16 @@ import { setMarks, adoptBest } from './game.js';
 
 // Ist der Wert a im Modus echt besser als b?
 export const better = (mode, a, b) => (lowerIsBetter(mode) ? a < b : a > b);
+
+// Zählt bei gleichem Wert die Laufzeit (Piste)?
+const tied = (mode) => MODES[mode].tie === 't';
+// Ist der Lauf a { m, t } im Modus echt besser als b? Wie better(), bei Gleichstand in der Piste die kürzere Zeit;
+// ein Lauf ohne Zeit verliert gegen einen mit.
+export function betterRun(mode, a, b) {
+  if (a.m !== b.m || !tied(mode)) return better(mode, a.m, b.m);
+  return a.t > 0 && (!(b.t > 0) || a.t < b.t);
+}
+const tieOrder = (a, b) => (a.t > 0 ? a.t : Infinity) - (b.t > 0 ? b.t : Infinity);
 
 // Schlüssel eines Eintrags: der Name klein und auf a-z0-9- reduziert, Umlaute ausgeschrieben. Nur ASCII, damit der
 // Regex in den Firebase-Regeln sicher greift und der Pfad ohne Kodierung auskommt. Identität ist der Name: gleicher
@@ -62,8 +74,9 @@ export function sanitizeBoards(raw) {
 // Gesamtzeit in Hundertstel, die nie unter der reinen Fahrzeit t liegt (Strafen kommen nur dazu).
 const courseM = (mode) => cv(courseOf(mode), 'finishM');
 export function plausible(mode, m, t) {
+  if (tied(mode) && m > C.PISTE_FINISH_M) return false; // weiter als das Ziel geht es in der Piste nicht
   if (lowerIsBetter(mode)) return t >= courseM(mode) / (cv(courseOf(mode), 'boardKmh') / 3.6) && m >= t * 100 - 1;
-  return m <= t * (C.BOARD_MAX_AVG_KMH / 3.6);
+  return m <= t * ((tied(mode) ? C.BOARD_PISTE_MAX_AVG_KMH : C.BOARD_MAX_AVG_KMH) / 3.6);
 }
 
 // Derselbe Lauf unter mehreren Schlüsseln: wer sich umbenennt, lädt seinen Bestwert unter dem neuen Namen hoch, und
@@ -72,14 +85,15 @@ export function plausible(mode, m, t) {
 // gleiche Meter allein können auch zwei Spieler haben.
 const runId = (e) => (e.t > 0 ? e.m + '|' + e.t : '');
 
-// Rangfolge: der bessere Wert zuerst (Meter absteigend, Zeiten aufsteigend), bei Gleichstand wer früher da war (ts),
+// Rangfolge: der bessere Wert zuerst (Meter absteigend, Zeiten aufsteigend), in der Piste bei gleichen Metern die
+// kürzere Laufzeit, sonst bei Gleichstand wer früher da war (ts),
 // dann der Schlüssel, damit die Liste stabil bleibt. Doppelte Läufe erscheinen einmal, auf dem Platz des frühesten
 // Eintrags (da wurde der Lauf gefahren) und unter dem eigenen Schlüssel, sonst dem neuesten (der aktuelle Name).
 export function sortEntries(byKey, mode, ownKey = '') {
   const sign = lowerIsBetter(mode) ? 1 : -1;
   const list = Object.entries(byKey || {})
     .map(([key, e]) => ({ key, ...e }))
-    .sort((a, b) => sign * (a.m - b.m) || a.ts - b.ts || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+    .sort((a, b) => sign * (a.m - b.m) || (tied(mode) ? tieOrder(a, b) : 0) || a.ts - b.ts || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   const pick = new Map();
   for (const e of list) {
     const id = runId(e);
@@ -110,7 +124,7 @@ export function mergeBoards(a, b) {
     const A = (a && a[mode]) || {}, B = (b && b[mode]) || {};
     for (const key of new Set([...Object.keys(A), ...Object.keys(B)])) {
       const x = A[key], y = B[key];
-      out[mode][key] = !x ? y : !y ? x : better(mode, x.m, y.m) ? x : y;
+      out[mode][key] = !x ? y : !y ? x : betterRun(mode, x, y) ? x : y;
     }
   }
   return out;
@@ -119,9 +133,9 @@ export function mergeBoards(a, b) {
 // Ansicht für die Fresh-Seite: die ersten rows Einträge und der eigene mit Rang, falls er auf dem Server steht.
 export function viewFor(boards, mode, ownKey, rows = C.BOARD_ROWS) {
   const list = sortEntries(boards && boards[mode], mode, ownKey);
-  const top = list.slice(0, rows).map((e, i) => ({ rank: i + 1, key: e.key, name: e.name, m: e.m, own: !!ownKey && e.key === ownKey }));
+  const top = list.slice(0, rows).map((e, i) => ({ rank: i + 1, key: e.key, name: e.name, m: e.m, t: e.t, own: !!ownKey && e.key === ownKey }));
   const idx = ownKey ? list.findIndex((e) => e.key === ownKey) : -1;
-  const own = idx >= 0 ? { rank: idx + 1, key: ownKey, name: list[idx].name, m: list[idx].m } : null;
+  const own = idx >= 0 ? { rank: idx + 1, key: ownKey, name: list[idx].name, m: list[idx].m, t: list[idx].t } : null;
   return { top, own, ownInTop: idx >= 0 && idx < rows, total: list.length };
 }
 
@@ -140,15 +154,20 @@ export function statsFor(boards, mode, ownKey) {
 
 // Fremde Bestweiten für die Linien im Schnee, Meter absteigend (render.js zeichnet sie von unten nach oben).
 // Zeiten lassen sich nicht als Linie in den Hang legen: im Super-G bleibt der Schnee ohne Namenslinien.
+// Piste: wer im Ziel war, hat keine Linie, sie lägen alle auf der Ziellinie.
 export function friendMarks(boards, mode, ownKey) {
   if (lowerIsBetter(mode)) return [];
-  return sortEntries(boards && boards[mode], mode, ownKey).filter((e) => e.key !== ownKey).map((e) => ({ name: e.name, m: e.m }));
+  return sortEntries(boards && boards[mode], mode, ownKey)
+    .filter((e) => e.key !== ownKey && !(tied(mode) && e.m >= C.PISTE_FINISH_M))
+    .map((e) => ({ name: e.name, m: e.m }));
 }
 
 // Was ein beendeter Lauf für die Liste wert ist: Meter beim Sturz, im Super-G die Gesamtzeit in Hundertstel, aber nur
 // nach dem Zieleinlauf (ein Sturz vor dem Ziel hat keine Zeit). 0 = nichts zu melden. Dazu t für den Eintrag:
 // die Laufzeit in Sekunden, im Super-G die reine Fahrzeit ohne Strafen (Strafe = m/100 − t).
+// Piste: im Ziel die volle Weite mit der Zeit an der Ziellinie, sonst die Meter mit der Laufzeit samt Sturzpausen.
 export function runScore(g) {
+  if (g.piste && g.state === 'finished' && g.finTime > 0) return { m: C.PISTE_FINISH_M, t: g.finTime };
   if (lowerIsBetter(g.runMode)) {
     const cs = g.course;
     if (g.state !== 'finished' || !cs || !cs.finished) return { m: 0, t: 0 };
@@ -223,7 +242,7 @@ export function createBoard({ url = '', g = null, fetchFn = null, debug = false,
     if (!k || !g || taken()) return;
     for (const mode of BOARD_MODES) {
       const e = boards[mode][k];
-      if (e) adoptBest(g, mode, e.m);
+      if (e) adoptBest(g, mode, e.m, e.t);
     }
   }
 
@@ -263,7 +282,7 @@ export function createBoard({ url = '', g = null, fetchFn = null, debug = false,
     const back = same && newerDuplicate(boards[mode], k, e);
     const claim = same && !e.uid && !!net.uid();
     if (o.sentAs === k && !claim) return;
-    if (e && !better(mode, o.m, e.m) && !back && !claim) { o.sentAs = k; saveBoardOwn(own); return; }
+    if (e && !betterRun(mode, o, e) && !back && !claim) { o.sentAs = k; saveBoardOwn(own); return; }
     busy[mode] = true;
     try {
       const uid = await net.whoami();
@@ -306,8 +325,8 @@ export function createBoard({ url = '', g = null, fetchFn = null, debug = false,
     verdict = runVerdict(game);
     const mode = game.runMode;
     const { m, t } = runScore(game);
-    const cur = own[mode] ? own[mode].m : 0;
-    if (!verdict && m >= 1 && m <= C.BOARD_MAX_M && BOARD_MODES.includes(mode) && (!cur || better(mode, m, cur))) {
+    const cur = own[mode];
+    if (!verdict && m >= 1 && m <= C.BOARD_MAX_M && BOARD_MODES.includes(mode) && (!cur || betterRun(mode, { m, t }, cur))) {
       own[mode] = { m, t, sentAs: null };
       saveBoardOwn(own);
     }
@@ -337,7 +356,7 @@ export function createBoard({ url = '', g = null, fetchFn = null, debug = false,
     enabled,
     name: () => name,
     setName,
-    view: (mode) => viewFor(boards, mode, ownKey()),
+    view: (mode, rows) => viewFor(boards, mode, ownKey(), rows),
     stats: (mode) => statsFor(boards, mode, ownKey()),
     taken,
     lastVerdict: () => verdict,

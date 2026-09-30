@@ -1,10 +1,12 @@
 // Mock der Firebase-REST-Schnittstelle für die Bestenliste, nur zum lokalen Testen: node tools/serve.js 8082 --board,
 // im Browser ?board=local. Hält die Einträge im Speicher (Neustart = Ausgangsstand) und prüft wie
 // tools/firebase-rules.json: Schreiben nur angemeldet (auth-mock.js) und nur in eigene Einträge (uid) oder in einen
-// Altbestand ohne uid mit gleichem Namen; nur classic/chase/superg/slalom, Schlüssel a-z0-9- mit 2 bis 24 Zeichen, genau die
+// Altbestand ohne uid mit gleichem Namen; nur classic/chase/superg/slalom/piste, Schlüssel a-z0-9- mit 2 bis 24 Zeichen, genau die
 // sechs Felder, m ganz 1..99999 und nie schlechter als der Bestand (Meter nie kleiner, Zeit im Super-G und Slalom in Hundertstel nie
-// größer), plausibles Tempo, kein Löschen. Antwortet wie Firebase: 200 mit Echo, 401 Permission denied.
-const MODES = ['classic', 'chase', 'superg', 'slalom'];
+// größer), plausibles Tempo, kein Löschen. Piste: höchstens die Zielweite, bei gleichen Metern nur mit kürzerer oder
+// gleicher Laufzeit. Antwortet wie Firebase: 200 mit Echo, 401 Permission denied.
+const MODES = ['classic', 'chase', 'superg', 'slalom', 'piste'];
+const PISTE_M = 10000; // Zielweite der Piste (PISTE_FINISH_M)
 const TIME_MODES = ['superg', 'slalom'];
 const MIN_T = { superg: 19.46, slalom: 22.5 }; // schnellste denkbare Fahrzeit (Regeln)
 const FIELDS = ['name', 'm', 't', 'ts', 'v', 'uid'];
@@ -19,6 +21,7 @@ function seed(rows) {
 const boards = {
   classic: seed([['Luki', 4321, 263.27], ['Mia', 2890, 191.02], ['Jonas', 1750, 120.1], ['Ela', 980, 25.4], ['Tom', 640, 17.9], ['Ida', 150, 6.2]]),
   chase: seed([['Luki', 2210, 85.3], ['Mia', 1430, 38.8], ['Tom', 510, 15.1]]),
+  piste: seed([['Luki', 10000, 402.18], ['Mia', 10000, 455.6], ['Jonas', 8740, 431.9], ['Ela', 6420, 330.2], ['Tom', 3710, 205.7], ['Ida', 1150, 71.4]]),
   slalom: seed([['Luki', 3342, 33.42], ['Mia', 3688, 34.88], ['Jonas', 3915, 37.15], ['Tom', 4630, 40.3]]),
   superg: seed([['Luki', 2712, 27.12], ['Mia', 2980, 26.8], ['Jonas', 3350, 30.5], ['Ela', 4120, 35.2], ['Tom', 5205, 43.05], ['Ida', 6890, 62.9]]),
 };
@@ -49,7 +52,8 @@ function accept(mode, key, data, existing, uid) {
   if (typeof m !== 'number' || !Number.isInteger(m) || m < 1 || m > 99999) return null;
   if (existing && (TIME_MODES.includes(mode) ? m > existing.m : m < existing.m)) return null;
   if (typeof t !== 'number' || t <= 0 || t > 86400) return null;
-  if (TIME_MODES.includes(mode) ? t < MIN_T[mode] || m < t * 100 - 1 : m > t * 41.66) return null;
+  if (TIME_MODES.includes(mode) ? t < MIN_T[mode] || m < t * 100 - 1 : m > t * (mode === 'piste' ? 55.56 : 41.66)) return null;
+  if (mode === 'piste' && (m > PISTE_M || (existing && m === existing.m && t > existing.t))) return null;
   if (!(ts && typeof ts === 'object' && ts['.sv'] === 'timestamp')) return null; // Regeln: ts == now
   ts = Date.now();
   if (typeof v !== 'string' || v.length > 16) return null;

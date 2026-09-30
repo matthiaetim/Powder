@@ -1,5 +1,7 @@
 // Unendlicher Hang aus 40-m-Zellen. Deterministisch pro Seed, mit unsichtbarem Safe-Lane-Korridor.
 // Super-G gibt der Welt eine flachere Korridor-Mitte (lane) und eine hindernisfreie Piste darum (pisteHalf) mit.
+// Der Modus Piste bringt seine eigene Mitte (center) und seinen Wald mit (forest, siehe piste.js): Bäume in Gruppen
+// mit Lichtungen statt gleichmäßig gestreut, dichter gestellt und zum Teil mit Schnee auf den Ästen.
 // Jede Zelle hängt nur von Seed, Zellkoordinate und Konstanten ab, nicht davon, in welcher Reihenfolge die Zellen
 // entstehen: zwei Geräte mit gleichem Seed sehen exakt dieselben Bäume, egal wie breit ihre Sicht ist, wie sie
 // fahren oder was zwischendurch verworfen wurde (Duell). Bis v0.21.0 wurde der Mindestabstand gegen die gerade
@@ -38,6 +40,9 @@ export function createWorld(seed, opts = {}) {
     lane: opts.lane || { amp: C.LANE_AMP, wave: C.LANE_WAVELENGTH, amp2: 6, wave2: 97 },
     pisteHalf: opts.pisteHalf || 0, // > 0: so weit ist die Piste um die Mitte frei von Hindernissen (Super-G)
     clear: opts.clear || null, // (x, y, r) => true: dort steht nichts (Zielstadion im Slalom)
+    center: opts.center || null, // (y) => x: Mitte der Piste statt der Sinuswellen (Piste)
+    // Wald der Piste: { density, spacing, rockFrac, mask(x, y) 0..1, blocked(x, y, r), snow(y, rng) }
+    forest: opts.forest || null,
     startLine: opts.startLine ?? true, // Linie unter dem Start freihalten (Classic, Lawine, Duell), nicht im Super-G
     cx0: NaN, cx1: NaN, cy0: NaN, cy1: NaN, // zuletzt sichergestellter Zellbereich (ensureCells)
   };
@@ -45,6 +50,7 @@ export function createWorld(seed, opts = {}) {
 
 // Mittellinie des garantiert freien Korridors.
 export function laneX(w, y) {
+  if (w.center) return w.center(y);
   const l = w.lane;
   return l.amp * Math.sin((TAU * y) / l.wave + w.phase) + l.amp2 * Math.sin((TAU * y) / l.wave2 + w.phase2);
 }
@@ -58,6 +64,8 @@ function density(y) {
 function rockFrac(y) {
   return lerp(C.ROCK_FRAC0, C.ROCK_FRAC1, clamp(y / C.RAMP_M, 0, 1));
 }
+
+const spacing = (w) => (w.forest ? w.forest.spacing : C.MIN_SPACING_M);
 
 const key = (cx, cy) => cx + ',' + cy;
 
@@ -73,12 +81,15 @@ function rawCell(w, cx, cy) {
   const x0 = cx * size;
   const y0 = cy * size;
   const yMid = y0 + size / 2;
-  const total = Math.round(density(yMid) * size * size);
+  const f = w.forest;
+  const total = Math.round((f ? f.density : density(yMid)) * size * size);
   const cap = Math.ceil(total * C.CELL_RAW_EXTRA);
-  const rf = rockFrac(yMid);
+  const rf = f ? f.rockFrac : rockFrac(yMid);
   const objs = [];
-  const minD2 = C.MIN_SPACING_M * C.MIN_SPACING_M;
-  let attempts = cap * 3;
+  const minD2 = spacing(w) * spacing(w);
+  // Wald: jeder Versuch ist ein zufälliger Punkt, den das Muster mit seiner Dichte annimmt. Genau cap Versuche, dann
+  // stimmt die Dichte im Wald auch in Zellen, die zur Hälfte Lichtung sind; mit Nachschlag stünde dort alles voll.
+  let attempts = f ? cap : cap * 3;
   while (objs.length < cap && attempts-- > 0) {
     const x = x0 + rng() * size;
     const y = y0 + rng() * size;
@@ -93,6 +104,7 @@ function rawCell(w, cx, cy) {
     if (Math.abs(x - laneX(w, y)) < laneHalf(y) + r) continue;
     if (w.pisteHalf > 0 && Math.abs(x - laneX(w, y)) < w.pisteHalf + r) continue; // Torlauf: freie Piste
     if (w.clear && w.clear(x, y, r)) continue;
+    if (f && (f.blocked(x, y, r) || rng() >= f.mask(x, y))) continue;
     let ok = true;
     for (let i = 0; i < objs.length && ok; i++) {
       const o = objs[i];
@@ -100,7 +112,7 @@ function rawCell(w, cx, cy) {
       if (ddx * ddx + ddy * ddy < minD2) ok = false;
     }
     if (!ok) continue;
-    objs.push({ t: isRock ? ROCK : TREE, x, y, r, variant, h });
+    objs.push({ t: isRock ? ROCK : TREE, x, y, r, variant, h, snow: f ? f.snow(y, rng) : 0 });
   }
   const cell = { cx, cy, total, objs };
   w.raw.set(k, cell);
@@ -114,7 +126,7 @@ function rawCell(w, cx, cy) {
 function genCell(w, cx, cy) {
   const raw = rawCell(w, cx, cy);
   const prior = [rawCell(w, cx - 1, cy - 1), rawCell(w, cx, cy - 1), rawCell(w, cx + 1, cy - 1), rawCell(w, cx - 1, cy)];
-  const minD2 = C.MIN_SPACING_M * C.MIN_SPACING_M;
+  const minD2 = spacing(w) * spacing(w);
   const objs = [];
   for (let n = 0; n < raw.objs.length && objs.length < raw.total; n++) {
     const o = raw.objs[n];
