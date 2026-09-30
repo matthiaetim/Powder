@@ -102,12 +102,12 @@ export function createPiste(seed) {
     p.ramp[i] = k;
     p.two[i] = fk ? 1 : 0;
     for (let l = 0; l < 2; l++) {
-      let c = mx, h = lerp(C.PISTE_HALF_EASY_M, C.PISTE_HALF_HARD_M, L), e = lerp(C.PISTE_EDGE_EASY_M, C.PISTE_EDGE_HARD_M, L);
+      let c = mx, h = lerp(C.PISTE_HALF_EASY_M, C.PISTE_HALF_HARD_M, L) * C.PISTE_WIDTH_K, e = lerp(C.PISTE_EDGE_EASY_M, C.PISTE_EDGE_HARD_M, L);
       let lvl = lv, grade = gradeOf(lv);
       if (fk) {
         const g = fk.grades[l];
         c += (l ? 1 : -1) * C.PISTE_FORK_SEP_M * k + C.PISTE_LANE_WIG_M[g] * Math.sin((TAU * y) / C.PISTE_LANE_WAVE_M[g] + fk.ph[l]) * k;
-        h = lerp(h, C.PISTE_LANE_HALF_M[g], k);
+        h = lerp(h, C.PISTE_LANE_HALF_M[g] * C.PISTE_WIDTH_K, k);
         e = lerp(e, C.PISTE_LANE_EDGE_M[g], k);
         lvl = lerp(lvl, C.PISTE_LANE_LEVEL[g], k);
         grade = g;
@@ -438,8 +438,8 @@ function build(p, rf, forkAt, laneIdx) {
   }
   const rn = mulberry32((p.seed ^ 0x4e50) >>> 0);
   const [v0, v1] = C.PISTE_NPC_KMH;
-  for (let y = C.PISTE_NPC_FROM_M; y < fin - 220;) {
-    const gap = lerp(C.PISTE_NPC_GAP0_M, C.PISTE_NPC_GAP1_M, y / fin) * (1 + C.PISTE_NPC_JITTER * (rn() * 2 - 1));
+  for (let y = C.PISTE_NPC_FROM_M; C.PISTE_NPC_K > 0 && y < fin - 220;) {
+    const gap = lerp(C.PISTE_NPC_GAP0_M, C.PISTE_NPC_GAP1_M, y / fin) * (1 + C.PISTE_NPC_JITTER * (rn() * 2 - 1)) / C.PISTE_NPC_K;
     const fk = forkAt(y), lane = fk && rn() < 0.5 ? 1 : 0;
     const d = {
       y0: y, lane, off: rn() * 2 - 1, amp: 1 + rn() * 2.2, wave: 34 + rn() * 40, ph: rn() * TAU,

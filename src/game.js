@@ -13,7 +13,7 @@ import { checkCollision } from './collision.js';
 import { createTrack, clearTrack, pushTrack } from './track.js';
 import { createParticles, clearParticles, spawnParticle, updateParticles } from './particles.js';
 import { loadBest, saveBest, loadBestTime, saveBestTime, loadSplitRef, saveSplitRef, loadRider, saveRider, noteRecentMode, loadMarksOn, saveMarksOn } from './storage.js';
-import { MODES, DEFAULT_MODE, lowerIsBetter } from './modes.js';
+import { MODES, DEFAULT_MODE, lowerIsBetter, modeOn } from './modes.js';
 import { RIDERS, validRider } from './riders.js';
 import { createCourse, updateCourse, tickCourse, crossFrac, courseOf, cv } from './gates.js';
 import { hasFence, fenceClamp, fenceRelax } from './fence.js';
@@ -660,8 +660,7 @@ export function fresh(g) {
 // Modus wechseln (auf der Fresh-Seite): Bestwerte gehören zum Modus. Bewusst nicht gespeichert, die App startet
 // immer in Classic; gemerkt wird nur, dass er zuletzt gewählt war (Reihenfolge der Vorschauen).
 export function selectMode(g, id) {
-  const m = MODES[id];
-  if (!m || m.soon) return false;
+  if (!modeOn(id)) return false;
   g.mode = id;
   noteRecentMode(id);
   loadBests(g);

@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.27.9';
+export const VERSION = '0.27.10';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -303,6 +303,9 @@ export const C = {
   // Ein Sturz ist nicht das Ende: nach PISTE_CRASH_PAUSE_S geht es auf der Piste weiter (Schonfrist wie im Duell,
   // DUEL_RESPAWN_GRACE_S), die Uhr läuft durch. PISTE_FREE_CRASHES Stürze sind frei, der nächste beendet den Lauf.
   // Gewertet werden die Meter; wer das Ziel erreicht, steht über allen anderen und wird nach Zeit sortiert.
+  // Der Modus ist ein Entwurf (Beta): in der Moduswahl steht er nur, wenn PISTE_ON im Tuning-Panel an ist (modes.js
+  // modeOn). Der Schalter überlebt „Standard“ und neue Tuning-Schlüssel und zählt nicht als Tuning (tune.js, keep).
+  PISTE_ON: 0,               // (Tuning) 1 = Piste in der Moduswahl
   PISTE_FINISH_M: 10000,
   PISTE_SEED: 20260930,      // feste Strecke
   PISTE_FREE_CRASHES: 3,     // (Tuning) so viele Stürze sind frei
@@ -318,6 +321,9 @@ export const C = {
   ],
   PISTE_HALF_EASY_M: 9,      // (Tuning) halbe Pistenbreite im Raststück
   PISTE_HALF_HARD_M: 4,      // (Tuning) halbe Pistenbreite an der Schlüsselstelle
+  // (Tuning) Faktor auf die Breite der ganzen Piste samt Zweigen der Gabelungen. Funpark, Torstrecken und Ziehweg
+  // behalten ihre festen Maße, weil ihre Bauten darauf stehen.
+  PISTE_WIDTH_K: 1,
   PISTE_EDGE_EASY_M: 4,      // (Tuning) so weit bleibt der Wald im Raststück vom Pistenrand weg
   PISTE_EDGE_HARD_M: 0.6,    // (Tuning) und so weit an der Schlüsselstelle
   // Kurven: die Piste schwenkt um PISTE_TURN_*_DEG aus der Falllinie, eine volle S-Kurve ist PISTE_WAVE_*_M lang.
@@ -446,8 +452,10 @@ export const C = {
   // Andere Fahrer: einer alle PISTE_NPC_GAP0_M am Start, unten alle PISTE_NPC_GAP1_M (± PISTE_NPC_JITTER). Sie fahren
   // langsamer als der Spieler in ruhigen Bögen und erscheinen PISTE_NPC_AHEAD_M vor ihm. Ein Zusammenstoß ist ein
   // Sturz. In einer Gabelung nimmt jeder einen Zweig, in den schwarzen fährt keiner.
-  PISTE_NPC_GAP0_M: 330,
+  // PISTE_NPC_K teilt beide Abstände: 2 heißt doppelt so viele Fahrer, 0 eine leere Piste.
+  PISTE_NPC_GAP0_M: 330,     // (Tuning)
   PISTE_NPC_GAP1_M: 120,     // (Tuning)
+  PISTE_NPC_K: 1,            // (Tuning)
   PISTE_NPC_JITTER: 0.35,
   PISTE_NPC_KMH: [38, 62],
   PISTE_NPC_AHEAD_M: 90,
@@ -807,7 +815,9 @@ export const C = {
 // und macht Läufe deshalb nicht ungültig für die Bestenliste (tune.js isTuned, hud.js). fair: im Duell steht der Regler
 // auf Standard (tune.js), weil er Welt, Sicht oder Fahrphysik ändert und beide Geräte dieselbe Strecke gleich schnell
 // fahren müssen. user: der Regler steht auch in den Einstellungen für jeden Spieler (hud.js, Ton), zählt nie als
-// Tuning und wird eigens gespeichert, damit ein neuer KEY in tune.js die Wahl des Spielers nicht verwirft.
+// Tuning und wird eigens gespeichert, damit ein neuer KEY in tune.js die Wahl des Spielers nicht verwirft. keep: ein
+// Schalter des Entwicklers (Beta-Modi), eigener Speicher wie user, aber nur im Tuning-Panel; „Standard“ lässt ihn
+// stehen und er zählt nie als Tuning. onoff: Schalter statt Regler, Werte 0 und 1.
 export const TUNABLES = [
   { heading: 'Fahren', tone: 'blue' },
   { key: 'TURN_TAP_DEG', label: 'Tipp-Winkel', unit: '°', min: 10, max: 80, step: 5, fair: true },
@@ -871,12 +881,16 @@ export const TUNABLES = [
   { key: 'SL_ARC_PX', label: 'Bogen an der Stange', unit: 'px', min: 2, max: 12, step: 1, visual: true },
   { key: 'SL_LINE_PX', label: 'Ideallinie', unit: 'px', min: 0, max: 10, step: 1, visual: true },
   { heading: 'Piste', tone: 'blue' },
+  { key: 'PISTE_ON', label: 'Modus Piste (Beta) anzeigen', min: 0, max: 1, step: 1, onoff: true, keep: true },
+  { key: 'PISTE_WIDTH_K', label: 'Pistenbreite gesamt', unit: '×', min: 0.5, max: 1.6, step: 0.05, decimals: 2 },
   { key: 'PISTE_FREE_CRASHES', label: 'Freie Stürze', unit: '', min: 0, max: 9, step: 1 },
   { key: 'PISTE_CRASH_PAUSE_S', label: 'Sturzpause', unit: 's', min: 0.5, max: 5, step: 0.1, decimals: 1 },
   { key: 'PISTE_HALF_EASY_M', label: 'Breite im Raststück', unit: 'm', min: 5, max: 14, step: 0.5, decimals: 1 },
   { key: 'PISTE_HALF_HARD_M', label: 'Breite an der Schlüsselstelle', unit: 'm', min: 2, max: 10, step: 0.5, decimals: 1 },
   { key: 'PISTE_BLACK_KMH', label: 'Endtempo Schwarz (Gabelung)', unit: 'km/h', min: 150, max: 300, step: 5 },
   { key: 'PISTE_BLUE_KMH', label: 'Endtempo Blau (Gabelung)', unit: 'km/h', min: 80, max: 200, step: 5 },
+  { key: 'PISTE_NPC_K', label: 'Andere Fahrer: Häufigkeit', unit: '×', min: 0, max: 3, step: 0.1, decimals: 1 },
+  { key: 'PISTE_NPC_GAP0_M', label: 'Andere Fahrer am Start alle', unit: 'm', min: 60, max: 800, step: 10 },
   { key: 'PISTE_NPC_GAP1_M', label: 'Andere Fahrer im Tal alle', unit: 'm', min: 40, max: 400, step: 10 },
   { key: 'PISTE_AIR_BIG_S', label: 'Flugzeit breiter Kicker', unit: 's', min: 0.6, max: 2.5, step: 0.05, decimals: 2 },
   { key: 'PISTE_GATE_REWARD', label: 'Alle Tore: Stürze zurück', unit: '', min: 0, max: 1, step: 1 },

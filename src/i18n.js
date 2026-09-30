@@ -32,6 +32,7 @@ const DE = {
 
   'mode.classic': 'Classic', 'mode.classic.desc': 'So weit es geht.',
   'mode.piste': 'Piste', 'mode.piste.desc': 'Geführt bis ins Tal, 10.000 m.',
+  'mode.beta': 'Beta',
   'mode.chase': 'Lawine', 'mode.chase.desc': 'Fahr der Lawine davon.',
   'mode.superg': 'Super-G', 'mode.superg.desc': '21 Tore auf Zeit, 1000 m.',
   'mode.slalom': 'Slalom', 'mode.slalom.desc': '30 Tore im Rhythmus, 500 m.',
@@ -189,6 +190,7 @@ const EN = {
 
   'mode.classic': 'Classic', 'mode.classic.desc': 'As far as you can.',
   'mode.piste': 'Piste', 'mode.piste.desc': 'Guided to the valley, 10,000 m.',
+  'mode.beta': 'Beta',
   'mode.chase': 'Avalanche', 'mode.chase.desc': 'Outrun the avalanche.',
   'mode.superg': 'Super-G', 'mode.superg.desc': '21 gates against the clock, 1000 m.',
   'mode.slalom': 'Slalom', 'mode.slalom.desc': '30 gates in rhythm, 500 m.',
@@ -346,6 +348,7 @@ const JA = {
 
   'mode.classic': 'クラシック', 'mode.classic.desc': 'どこまで行けるか。',
   'mode.piste': 'ゲレンデ', 'mode.piste.desc': '整備されたコースを麓まで、10,000 m。',
+  'mode.beta': 'ベータ',
   'mode.chase': '雪崩', 'mode.chase.desc': '雪崩から逃げ切れ。',
   'mode.superg': 'スーパーG', 'mode.superg.desc': '21旗門のタイムレース、1000 m。',
   'mode.slalom': 'スラローム', 'mode.slalom.desc': 'リズムよく30旗門、500 m。',
@@ -503,6 +506,7 @@ const ES = {
 
   'mode.classic': 'Clásico', 'mode.classic.desc': 'Lo más lejos posible.',
   'mode.piste': 'Pista', 'mode.piste.desc': 'Guiado hasta el valle, 10.000 m.',
+  'mode.beta': 'Beta',
   'mode.chase': 'Avalancha', 'mode.chase.desc': 'Escapa de la avalancha.',
   'mode.superg': 'Súper-G', 'mode.superg.desc': '21 puertas contra el reloj, 1000 m.',
   'mode.slalom': 'Eslalon', 'mode.slalom.desc': '30 puertas con ritmo, 500 m.',

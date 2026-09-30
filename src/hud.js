@@ -6,7 +6,7 @@ import { C, VERSION } from './constants.js';
 import { overlayReady, togglePause, pauseIfRunning, fresh, restart, selectMode, selectRider } from './game.js';
 import { createTunePanel, isTuned } from './tune.js';
 import { verdictText } from './board.js';
-import { MODES, MODE_ORDER, lowerIsBetter } from './modes.js';
+import { MODES, MODE_ORDER, lowerIsBetter, modeOn, onlineBoard } from './modes.js';
 import { RIDER_ORDER } from './riders.js';
 import { drawModePreview, drawRiderPreview } from './render.js';
 import { loadBest, loadBestTime, loadDuelTally, loadRecentModes } from './storage.js';
@@ -101,8 +101,10 @@ export function createHud(g, doc, hooks = {}) {
   const versionEl = $('version');
   const markTuned = (t) => {
     versionEl.classList.toggle('tuned', isTuned());
-    // mitten im Lauf verstellt: zählt nicht online (board.js); Regler, die nur das Bild ändern (visual), ausgenommen
-    if (!(t && t.visual) && (g.state === 'running' || g.state === 'paused')) g.runTainted = true;
+    // mitten im Lauf verstellt: zählt nicht online (board.js); Regler, die nur das Bild ändern (visual), und
+    // Beta-Schalter (keep) ausgenommen
+    if (!(t && (t.visual || t.keep)) && (g.state === 'running' || g.state === 'paused')) g.runTainted = true;
+    if (t && t.keep) showBeta();
     if (hooks.onTune) hooks.onTune();
   };
   const tune = createTunePanel(doc, tuneEl, markTuned);
@@ -214,6 +216,8 @@ export function createHud(g, doc, hooks = {}) {
     const desc = doc.createElement('span');
     desc.className = 'mode-desc';
     text.append(name, desc);
+    if (m.beta) name.after(betaTag());
+    row.hidden = !!m.beta && !modeOn(id);
     const best = doc.createElement('span');
     best.className = 'mode-best';
     row.append(cv, text, best);
@@ -237,11 +241,13 @@ export function createHud(g, doc, hooks = {}) {
     name.className = 'mode-name';
     const cta = doc.createElement('span');
     cta.className = 'mode-cta';
+    const beta = betaTag();
+    beta.hidden = true;
     // nur beim gewählten sichtbar, steht überall, damit die Kärtchen gleich hoch sind (Text: labelModes)
-    card.append(cv, name, cta);
+    card.append(cv, name, beta, cta);
     onTap(card, () => {
       const id = card.dataset.mode;
-      if (!id || MODES[id].soon || modeOff(id)) return;
+      if (!id || !modeOn(id) || modeOff(id)) return;
       if (id === g.mode) { doFresh(); return; }
       if (id === 'duel') { openDuel(); return; }
       if (selectMode(g, id)) { markActive(); refreshDead(); renderBoard(); }
@@ -253,7 +259,7 @@ export function createHud(g, doc, hooks = {}) {
   // getippte Vorschau unter dem Finger auf den mittleren Platz; neu sortiert wird, wenn die Fresh-Seite erscheint.
   function layoutModes(keep) {
     if (keep && cards.some((c) => c.dataset.mode === g.mode)) return;
-    const ok = (id) => MODES[id] && !MODES[id].soon && !modeOff(id) && id !== 'classic';
+    const ok = (id) => modeOn(id) && !modeOff(id) && id !== 'classic';
     // der gewählte Modus steht vorn, auch wenn der Speicher fehlt (selectMode merkt ihn sonst ohnehin)
     const ids = ['classic', ...new Set([g.mode, ...loadRecentModes(), ...MODE_ORDER].filter(ok))].slice(0, 3);
     cards.forEach((card, i) => {
@@ -261,6 +267,7 @@ export function createHud(g, doc, hooks = {}) {
       card.hidden = !id;
       if (!id || card.dataset.mode === id) return;
       card.dataset.mode = id;
+      card.querySelector('.mode-beta').hidden = !MODES[id].beta;
       card.querySelector('.mode-name').textContent = t('mode.' + id);
       drawModePreview(card.querySelector('.mode-preview'), id, g.rider);
     });
@@ -276,6 +283,7 @@ export function createHud(g, doc, hooks = {}) {
       card.querySelector('.mode-cta').textContent = t('tapToPlay');
       if (card.dataset.mode) card.querySelector('.mode-name').textContent = t('mode.' + card.dataset.mode);
     }
+    for (const tag of doc.querySelectorAll('.mode-beta')) tag.textContent = t('mode.beta');
   }
   labelModes();
   const drawModes = () => {
@@ -286,6 +294,22 @@ export function createHud(g, doc, hooks = {}) {
     for (const row of modeRows) row.classList.toggle('active', row.dataset.mode === g.mode);
     layoutModes(keep);
     for (const card of cards) card.classList.toggle('active', card.dataset.mode === g.mode);
+  }
+  // Beta-Modi (modes.js beta): Etikett neben dem Namen, Text aus i18n wie alle Texte des Spielers
+  function betaTag() {
+    const tag = doc.createElement('span');
+    tag.className = 'mode-beta';
+    tag.textContent = t('mode.beta');
+    return tag;
+  }
+  // Beta-Schalter im Tuning-Panel umgelegt: Zeile ein- oder ausblenden. Ist der gewählte Modus nun gesperrt, geht
+  // die Wahl auf der Fresh-Seite zurück auf Classic; ein laufender Lauf bleibt, wie er ist.
+  function showBeta() {
+    for (const row of modeRows) if (MODES[row.dataset.mode].beta) row.hidden = !modeOn(row.dataset.mode);
+    if (!modeOn(g.mode) && (g.state === 'dead' || g.state === 'finished')) {
+      selectMode(g, 'classic'); refreshDead(); renderBoard();
+    }
+    markActive(false);
   }
   function openModes() {
     for (const row of modeRows) row.querySelector('.mode-best').textContent = bestText(row.dataset.mode);
@@ -384,7 +408,7 @@ export function createHud(g, doc, hooks = {}) {
   };
   function renderBoard() {
     if (!boardOn || doc.activeElement === nameInput) return; // ohne Server bleibt #board hidden; nicht unter den Fingern umbauen
-    boardEl.hidden = !MODES[g.mode].board; // das Duell hat keine Bestenliste
+    boardEl.hidden = !onlineBoard(g.mode); // das Duell hat keine Bestenliste, die Piste (Beta) keine online
     if (boardEl.hidden) return;
     const name = board.name();
     boardEl.dataset.named = name ? '1' : '';
@@ -535,7 +559,7 @@ export function createHud(g, doc, hooks = {}) {
       doc.body.dataset.state = g.state;
       doc.body.dataset.intro = g.state === 'ready' && g.intro && !g.hold ? '1' : '';
       // Bestwert steht fest: die() bzw. finish() lief im Physikschritt davor; das Duell hat keine Liste
-      if ((g.state === 'dead' || g.state === 'finished') && boardOn && MODES[g.runMode].board) board.onRunEnd(g);
+      if ((g.state === 'dead' || g.state === 'finished') && boardOn && onlineBoard(g.runMode)) board.onRunEnd(g);
       if (pauseSub && g.state === 'paused') pauseSub.textContent = t(duel && duel.racing() && !duel.vsBot() ? 'pause.duel' : 'pause.sub');
     }
     // Hinweis unter dem Fahrer, verschwindet nach SG_NOTE_S (gates.js zählt note.t hoch)

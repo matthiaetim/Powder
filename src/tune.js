@@ -8,7 +8,10 @@ const DEFAULTS = Object.fromEntries(ROWS.map((t) => [t.key, C[t.key]]));
 // nur, was vom Standard abweicht, sonst verdeckte ein gespeicherter alter Standard einen neuen.
 const USER_KEY = 'powder.settings.tune';
 const USER_ROWS = ROWS.filter((t) => t.user);
-const DEV_ROWS = ROWS.filter((t) => !t.user);
+// Schalter mit keep (Beta-Modi): eigener Speicher, damit „Standard“ und KEY-Sprünge sie nicht zurücksetzen
+const KEEP_KEY = 'powder.tune.keep';
+const KEEP_ROWS = ROWS.filter((t) => t.keep);
+const DEV_ROWS = ROWS.filter((t) => !t.user && !t.keep);
 
 export function loadTune() {
   try {
@@ -16,6 +19,8 @@ export function loadTune() {
     for (const t of DEV_ROWS) if (typeof saved[t.key] === 'number') C[t.key] = saved[t.key];
     const mine = JSON.parse(localStorage.getItem(USER_KEY) || '{}');
     for (const t of USER_ROWS) if (typeof mine[t.key] === 'number') C[t.key] = mine[t.key];
+    const kept = JSON.parse(localStorage.getItem(KEEP_KEY) || '{}');
+    for (const t of KEEP_ROWS) if (typeof kept[t.key] === 'number') C[t.key] = kept[t.key];
   } catch { /* egal */ }
 }
 
@@ -24,6 +29,7 @@ function saveTune() {
     localStorage.setItem(KEY, JSON.stringify(Object.fromEntries(DEV_ROWS.map((t) => [t.key, C[t.key]]))));
     localStorage.setItem(USER_KEY, JSON.stringify(Object.fromEntries(USER_ROWS
       .filter((t) => C[t.key] !== DEFAULTS[t.key]).map((t) => [t.key, C[t.key]]))));
+    localStorage.setItem(KEEP_KEY, JSON.stringify(Object.fromEntries(KEEP_ROWS.map((t) => [t.key, C[t.key]]))));
   } catch { /* egal */ }
 }
 
@@ -46,14 +52,15 @@ export function resetUserTune() {
 export const userTunables = () => USER_ROWS;
 export const userTuned = () => USER_ROWS.some((t) => C[t.key] !== DEFAULTS[t.key]);
 
-// Weicht ein Regler vom Standard ab, der das Spiel verändert? Regler mit visual (nur Bild) oder user (Ton, Wahl des
-// Spielers) zählen nicht.
+// Weicht ein Regler vom Standard ab, der das Spiel verändert? Regler mit visual (nur Bild), user (Ton, Wahl des
+// Spielers) oder keep (Beta-Schalter) zählen nicht.
 export function isTuned() {
-  return ROWS.some((t) => !t.visual && !t.user && C[t.key] !== DEFAULTS[t.key]);
+  return ROWS.some((t) => !t.visual && !t.user && !t.keep && C[t.key] !== DEFAULTS[t.key]);
 }
 
 // Anzeige eines Werts: Name aus names (1 = erster), sonst Zahl mit Einheit.
 const fmt = (t, v) => {
+  if (t.onoff) return v ? 'An' : 'Aus';
   if (t.names) return t.names[Math.round(v) - 1] ?? String(v);
   const num = (v * (t.scale || 1)).toFixed(t.decimals ?? (t.step < 1 ? 2 : 0));
   return t.unit ? num + ' ' + t.unit : num;
@@ -67,7 +74,7 @@ export function tuneReport() {
   let group = '';
   for (const t of TUNABLES) {
     if (t.heading) { group = t.heading; continue; }
-    if (C[t.key] === DEFAULTS[t.key]) continue;
+    if (t.keep || C[t.key] === DEFAULTS[t.key]) continue;
     lines.push(`${t.key}: ${C[t.key]}, // ${group}: ${t.label} = ${fmt(t, C[t.key])}, Standard ${DEFAULTS[t.key]}`);
   }
   const head = `Powder v${VERSION} Tuning`;
@@ -151,12 +158,17 @@ export function createTunePanel(doc, panel, onChange) {
       const row = el('label', 'tune-row');
       const val = el('span', 'tune-value');
       const input = doc.createElement('input');
-      input.type = 'range';
-      input.min = String(t.min);
-      input.max = String(t.max);
-      input.step = String(t.step);
-      input.addEventListener('input', () => {
-        C[t.key] = Number(input.value);
+      if (t.onoff) {
+        input.type = 'checkbox';
+        row.classList.add('tune-switch');
+      } else {
+        input.type = 'range';
+        input.min = String(t.min);
+        input.max = String(t.max);
+        input.step = String(t.step);
+      }
+      input.addEventListener(t.onoff ? 'change' : 'input', () => {
+        C[t.key] = t.onoff ? (input.checked ? 1 : 0) : Number(input.value);
         show(entry);
         saveTune();
         if (onChange) onChange(t);
@@ -197,7 +209,8 @@ export function createTunePanel(doc, panel, onChange) {
 
   function refresh() {
     for (const e of inputs) {
-      e.input.value = String(C[e.t.key]);
+      if (e.t.onoff) e.input.checked = !!C[e.t.key];
+      else e.input.value = String(C[e.t.key]);
       show(e);
     }
   }

@@ -304,6 +304,26 @@ body[data-state="ready"][data-overlay="1"] #ov-dead { display: flex; } /* ready:
 .mode-card:active { transform: translate(3px, 4px); box-shadow: 0 0 0 var(--ink); }
 .mode-card.active { background: var(--mark); }
 .mode-card.soon { opacity: 0.4; cursor: default; }
+/* Beta-Modus (modes.js beta): Aufkleber an der oberen rechten Ecke, damit Name und Vorschau stehen bleiben */
+.mode-card { position: relative; }
+.mode-beta {
+  position: absolute;
+  top: -8px;
+  right: -6px;
+  padding: 2px 5px 1px;
+  font-family: var(--display);
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--paper);
+  background: var(--slow);
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  transform: rotate(6deg);
+  pointer-events: none;
+}
+.mode-beta[hidden], .mode-row[hidden] { display: none; }
 .mode-preview {
   display: block;
   width: 72px;
@@ -802,6 +822,8 @@ body[data-panel="duel"] #dead-card, body[data-panel="settings"] #dead-card { dis
 /* abweichend vom Standard: Wert eingerahmt in Gruppenfarbe, damit man getunte Regler sofort findet */
 .tune-row.changed .tune-label { opacity: 1; }
 .tune-row.changed .tune-value { color: var(--tone-ink); background: var(--tone); border-color: var(--ink); }
+.tune-switch { grid-template-columns: 1fr auto auto; }
+.tune-switch input[type="checkbox"] { width: 22px; height: 22px; margin: 0; accent-color: var(--tone); }
 .tune-row input[type="range"] { grid-column: 1 / -1; width: 100%; margin: 0; accent-color: var(--tone); touch-action: pan-x; }
 
 #debug {
