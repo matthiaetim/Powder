@@ -5,7 +5,8 @@
 // - Sprung: wer über die Kante eines Kickers fährt, fliegt auf einer festen Bahn zu einem Landepunkt auf der Piste.
 //   In der Luft lenkt man nicht und trifft nichts, der Trick läuft von selbst.
 // - Torstrecken: Tore und Stangen sind ein Angebot. Gezählt wird beim Kreuzen der Torlinie; wer alle trifft, bekommt
-//   einen verbrauchten Sturz zurück (PISTE_GATE_REWARD).
+//   einen verbrauchten Sturz zurück (PISTE_GATE_REWARD). Im Slalom-Zweig läuft stattdessen die Uhr von Linie zu Linie,
+//   verpasste Tore kosten Strafsekunden, unter PISTE_SLALOM_LIMIT_S gibt es den Sturz zurück.
 // - Tempomessung mit Foto, Fangnetz am Ziehweg, Wand der Steilkurve, Dinge am Pistenrand, an denen man stürzt, Tiere.
 // game.js ruft stepLife nach jedem Physikschritt; zurück kommt das Hindernis, an dem der Fahrer hängt, oder null.
 import { C } from './constants.js';
@@ -25,9 +26,10 @@ export function createLife(p) {
     air: null,         // Flug: { t, T, x0, y0, x1, y1, z, lip, kind, trick }
     safeT: 0,          // nach der Landung so lange kein Zusammenstoß
     crashAt: [], bonus: 0, // Meter jedes Sturzes; zurückgewonnene Stürze
-    secs: p.gates.map((sec) => ({ sec, hit: 0, poles: poles(sec) })),
+    secs: p.gates.map((sec) => ({ sec, hit: 0, t0: -1, time: 0, poles: poles(sec) })), // t0: Start der Slalom-Uhr, time: Ergebnis
     gateRuns: 0,       // Torstrecken, in denen alle Tore getroffen wurden
-    note: { key: '', a: 0, b: 0, kind: '', t: 99 }, // Hinweis im HUD (hud.js setzt den Text)
+    slalomOk: 0,       // Slalom-Zweige unter der Zeit
+    note: { key: '', a: 0, b: 0, kind: '', dec: 0, t: 99 }, // Hinweis im HUD (hud.js setzt den Text; dec: Nachkommastellen von a)
     trick: null, trickT: 99, tricks: 0,
     trapT: -1, trapKmh: p.traps.map(() => 0), topKmh: 0, flashT: 99,
     route: p.forks.map(() => -1), // gewählter Zweig je Gabelung, −1 = noch nicht dort
@@ -48,12 +50,18 @@ function poles(sec) {
   return out;
 }
 
+// Lauf beginnt mitten auf der Strecke (?at=, game.js): Auslöser oberhalb überspringen, sonst feuerten sie alle im
+// ersten Schritt (etwa beide Linien einer Tempomessung auf einmal)
+export function skipTo(L, y) {
+  while (L.ti < L.p.trig.length && L.p.trig[L.ti].y < y) L.ti++;
+}
+
 // Verbrauchte Stürze: die zurückgewonnenen zählen nicht mehr
 export const crashesUsed = (L) => Math.max(0, L.crashAt.length - L.bonus);
 
-function note(L, key, kind, a = 0, b = 0) {
+function note(L, key, kind, a = 0, b = 0, dec = 0) {
   const n = L.note;
-  n.key = key; n.kind = kind; n.a = a; n.b = b; n.t = 0;
+  n.key = key; n.kind = kind; n.a = a; n.b = b; n.dec = dec; n.t = 0;
 }
 
 // Ein Schritt nach der Physik. px, py: Lage vor dem Schritt. emit(type, data) meldet Ereignisse für den Ton.
@@ -145,7 +153,7 @@ function edges(L, s, dt, emit) {
     emit('fence', { v: s.v });
     return;
   }
-  if (bank.side !== side || bank.w <= 0.05) return;
+  if (bank.lane !== a.lane || bank.side !== side || bank.w <= 0.05) return; // die Wand steht nur im Funpark-Zweig
   let pen = Math.abs(dx) - a.half;
   if (pen <= 0) return;
   // die Wand trägt den Fahrer um die Kurve: er kommt nicht über sie hinaus und verliert kein Tempo
@@ -182,6 +190,10 @@ function triggers(L, s, px, py, dt, emit) {
       emit('trap', { kmh });
     } else if (tr.type === 'fork') {
       L.route[tr.f.n] = laneOf(p, s.x, s.y);
+    } else if (tr.type === 'sl0') {
+      if (laneOf(p, xc, tr.y) === tr.f.lane) L.secs[tr.f.n].t0 = L.t - (1 - f) * dt;
+    } else if (tr.type === 'sl1') {
+      slalomFinish(L, tr.f, L.t - (1 - f) * dt, emit);
     }
   }
 }
@@ -198,10 +210,38 @@ function gate(L, sec, i, xc, emit) {
   if (i < n - 1) return;
   if (st.hit < n) { if (st.hit > 0) note(L, 'piste.gate', 'split', st.hit, n); return; }
   L.gateRuns++;
-  const back = C.PISTE_GATE_REWARD > 0 && crashesUsed(L) > 0;
-  if (back) L.bonus += Math.min(crashesUsed(L), Math.round(C.PISTE_GATE_REWARD));
+  if (sec.timed) return; // im Slalom-Zweig entscheidet die Uhr an der Ziellinie
+  const back = refund(L);
   note(L, back ? 'piste.gatesBonus' : 'piste.gatesAll', 'fast', n);
   emit('gates', { bonus: back });
+}
+
+// Einen verbrauchten Sturz zurückgeben, wenn es einen gibt
+function refund(L) {
+  const back = C.PISTE_GATE_REWARD > 0 && crashesUsed(L) > 0;
+  if (back) L.bonus += Math.min(crashesUsed(L), Math.round(C.PISTE_GATE_REWARD));
+  return back;
+}
+
+// Ziellinie des Slalom-Zweigs: Zeit seit der Startlinie plus Strafe je verpasstem Tor; unter der Grenze gibt es den
+// Sturz zurück. Ohne Startlinie (von der Seite hereingefahren) zählt nichts.
+function slalomFinish(L, sec, now, emit) {
+  const st = L.secs[sec.n];
+  if (st.t0 < 0) return;
+  const n = sec.gates.length, miss = n - st.hit;
+  st.time = now - st.t0 + miss * C.PISTE_SLALOM_PENALTY_S;
+  st.t0 = -1;
+  const ok = st.time <= C.PISTE_SLALOM_LIMIT_S;
+  const shown = Math.round(st.time * 10) / 10;
+  if (ok) {
+    L.slalomOk++;
+    const back = refund(L);
+    note(L, back ? 'piste.slalomBonus' : 'piste.slalomOk', 'fast', shown, miss, 1);
+    emit('gates', { bonus: back });
+  } else {
+    note(L, 'piste.slalomSlow', 'slow', shown, miss, 1);
+    emit('slalomSlow', {});
+  }
 }
 
 function touchPoles(L, s, emit) {

@@ -20,8 +20,8 @@ import { hasFence, fenceClamp, fenceRelax } from './fence.js';
 import { rollYeti, updateYeti } from './yeti.js';
 import { startStop, speedAt, distAt, headingAt, stopClock } from './hockey.js';
 import { createStadium, updateStadium, clearsWorld, glide, partying } from './stadium.js';
-import { createPiste, worldOpts, paceAt, laneAt } from './piste.js';
-import { createLife, stepLife, moveNpcs, crashesUsed } from './piste-life.js';
+import { createPiste, worldOpts, paceAt, laneAt, centerAt } from './piste.js';
+import { createLife, stepLife, moveNpcs, crashesUsed, skipTo } from './piste-life.js';
 
 const READY_FRAC = 0.78; // Fahrer steht im Intro weit unten im Bild
 
@@ -60,6 +60,7 @@ export function createGame(opts = {}) {
     camX: 0, skierFrac: READY_FRAC, zoom: 1,
     viewWm: C.VIEW_W_M, viewHm: C.VIEW_W_M * C.VIEW_ASPECT,
     debug: !!opts.debug, lastGesture: '–', runs: 0,
+    startAt: opts.startAt || 0, startLane: opts.startLane || 0, // Piste (?at=Meter&lane=Zweig): der Lauf beginnt dort, zum Prüfen einer Stelle; zählt wie Tuning
     trackAcc: 0, spawnAcc: 0, plowAcc: 0,
     onEvent: null, // Haken für den Ton (main.js): press, release, plow, crash, beep, gate, pole, fence, split, finish, summit,
     // auf der Piste dazu jump, land, trap, gates
@@ -156,7 +157,10 @@ export function reset(g, seed, intro) {
   g.hold = isDuel(g);
   g.countClock = null; g.finishM = 0; g.respawnS = 0; g.raceOver = false; g.graceT = 0; g.crashes = 0; g.crashR = 0;
   // Piste: Ziel und Weiterfahrt nach dem Sturz gehören zum Modus
-  if (isPiste(g)) { g.finishM = C.PISTE_FINISH_M; g.respawnS = C.PISTE_CRASH_PAUSE_S; }
+  if (isPiste(g)) {
+    g.finishM = C.PISTE_FINISH_M; g.respawnS = C.PISTE_CRASH_PAUSE_S;
+    if (g.startAt > 0) { g.skier.y = g.startAt; g.skier.x = centerAt(g.piste, g.startAt, g.startLane); skipTo(g.life, g.startAt); g.runTainted = true; }
+  }
   g.ghost.on = false;
   g.state = 'ready';
   ensureView(g);

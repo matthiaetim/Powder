@@ -10,7 +10,7 @@
 // drawPistePlan zeichnet den Pistenplan für die Fresh-Seite (hud.js).
 import { C } from './constants.js';
 import { t as tr, num, getLang } from './i18n.js';
-import { centerAt, halfAt, gradeAt, bankAt, netAt, nightAt, oldTrackOn, profileAt, KICK_BIG, KICK_ROLL } from './piste.js';
+import { centerAt, halfAt, gradeAt, bankAt, netAt, nightAt, oldTrackOn, profileAt, lanesAt, gradeOfKind, NL, PARK, SLALOM, KICK_BIG, KICK_ROLL } from './piste.js';
 import { airPose, npcX } from './piste-life.js';
 
 const TAU = Math.PI * 2;
@@ -21,6 +21,15 @@ const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = (t) => { const u = clamp(t, 0, 1); return u * u * (3 - 2 * u); };
 const gradeCol = (g) => [C.GATE_BLUE, C.GATE_RED, C.PISTE_BLACK][g];
+// Art eines Zweigs (piste.js): Farbe und Name auf Wegweiser, Schild und Pistenplan; der Funpark ist gelb
+const kindCol = (k) => (k === PARK ? C.PISTE_YELLOW : gradeCol(gradeOfKind(k)));
+const kindLabel = (k) => (k === PARK ? tr('piste.park') : k === SLALOM ? tr('mode.slalom') : tr('piste.fork.' + k));
+// So viele Zweige gibt es zwischen y0 und y1 höchstens (für Schleifen über die Zweige im Bild)
+function lanesIn(p, y0, y1) {
+  let n = 1;
+  for (let y = y0; y <= y1 + 40; y += 40) n = Math.max(n, lanesAt(p, Math.min(y, y1)));
+  return n;
+}
 function hash(n) {
   let h = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
   h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
@@ -249,28 +258,24 @@ function cameraShape(x, S) {
   x.fillStyle = C.PISTE_GLASS; x.beginPath(); x.arc(0.25 * S, -2.62 * S, 0.3 * S, 0, TAU); x.fill();
 }
 
-// Wegweiser im Keil der Gabelung: links und rechts je ein Schild mit Pfeil, Punkt in der Pistenfarbe und Namen
-function forkSignShape(x, S, fk) {
+// Wegweiser im Keil zwischen zwei Zweigen (wedge: der linke der beiden): links und rechts je ein Schild mit Pfeil,
+// Punkt in der Farbe des Zweigs und Namen
+function forkSignShape(x, S, fk, wedge) {
   soft(x, 0.8 * S, 0, 1.6 * S, 0.5 * S, 0.3);
   x.strokeStyle = C.INK; x.lineWidth = 0.34 * S + 2.4; x.beginPath(); x.moveTo(0, 0); x.lineTo(0, -5.4 * S); x.stroke();
   x.strokeStyle = C.PISTE_WOOD; x.lineWidth = 0.34 * S; x.beginPath(); x.moveTo(0, 0); x.lineTo(0, -5.4 * S); x.stroke();
   const pw = 8.4 * S, ph = 2.1 * S, px = 1.15 * S;
-  const [gl, gr] = fk.grades;
+  const kl = fk.kinds[wedge], kr = fk.kinds[wedge + 1];
   plate(x, -pw / 2 - 0.25 * S, -4.3 * S, pw, ph, { tilt: -2, sh: 0.25 * S, r: 0.5 * S, draw: (c, w) => {
-    arrow(c, -w / 2 + 0.95 * S, 0, 1.1 * S, Math.PI, gradeCol(gl), 0.26 * S);
-    disc(c, -w / 2 + 2.4 * S, 0, 0.55 * S, gradeCol(gl));
-    fitLabel(c, tr('piste.fork.' + gl), -w / 2 + 3.2 * S, 0, px, w - 3.5 * S, C.INK, 'left');
+    arrow(c, -w / 2 + 0.95 * S, 0, 1.1 * S, Math.PI, kindCol(kl), 0.26 * S);
+    disc(c, -w / 2 + 2.4 * S, 0, 0.55 * S, kindCol(kl));
+    fitLabel(c, kindLabel(kl), -w / 2 + 3.2 * S, 0, px, w - 3.5 * S, C.INK, 'left');
   } });
   plate(x, pw / 2 + 0.25 * S, -3.4 * S, pw, ph, { tilt: 1.5, sh: 0.25 * S, r: 0.5 * S, draw: (c, w) => {
-    arrow(c, w / 2 - 0.95 * S, 0, 1.1 * S, 0, gradeCol(gr), 0.26 * S);
-    disc(c, w / 2 - 2.4 * S, 0, 0.55 * S, gradeCol(gr));
-    fitLabel(c, tr('piste.fork.' + gr), w / 2 - 3.2 * S, 0, px, w - 3.5 * S, C.INK, 'right');
+    arrow(c, w / 2 - 0.95 * S, 0, 1.1 * S, 0, kindCol(kr), 0.26 * S);
+    disc(c, w / 2 - 2.4 * S, 0, 0.55 * S, kindCol(kr));
+    fitLabel(c, kindLabel(kr), w / 2 - 3.2 * S, 0, px, w - 3.5 * S, C.INK, 'right');
   } });
-}
-
-function parkSignShape(x, S) {
-  posts(x, S, [-2.1, 2.1], 3.4, null, 0.22);
-  plate(x, 0, -2.8 * S, 5.6 * S, 1.7 * S, { fill: C.INK, sh: 0, tilt: -1.5, r: 0.4 * S, draw: (c, w) => fitLabel(c, tr('piste.park'), 0, 0, 1.05 * S, w * 0.86, C.PISTE_YELLOW) });
 }
 
 // Zielbogen der Talstation: zwei rote Pfosten, darüber das Schild
@@ -342,8 +347,9 @@ export function drawPisteGround(R, g, ox, oy, t) {
     for (const y of [tp.y, tp.y1]) if (y > y0 - 1 && y < y1 + 1) sprayAcross(R, p, tp.lane, y, ox, oy, C.PISTE_TRAP_RGBA);
   }
   for (const sec of p.gates) {
-    const y = sec.y - 14;
-    if (y > y0 - 1 && y < y1 + 1) sprayAcross(R, p, sec.lane, y, ox, oy, `rgba(${C.GM_RGB},0.7)`);
+    // Slalom-Zweig: Start- und Ziellinie der Uhr, sonst nur eine Linie vor dem ersten Tor
+    const ys = sec.timed ? [sec.y - C.PISTE_SLALOM_LINE_M, sec.y1 + C.PISTE_SLALOM_LINE_M] : [sec.y - 14];
+    for (const y of ys) if (y > y0 - 1 && y < y1 + 1) sprayAcross(R, p, sec.lane, y, ox, oy, `rgba(${C.GM_RGB},0.7)`);
   }
   for (const k of p.kicks) {
     if (k.kind === KICK_ROLL) continue;
@@ -357,35 +363,39 @@ export function drawPisteGround(R, g, ox, oy, t) {
 
 // Präparierter Schnee: ein heller Streifen zwischen den Rändern, darauf feine Rillen in der Falllinie (Cord). Die
 // Rillen liegen fest im Schnee (Welt-x), jede beginnt und endet genau am Pistenrand. Die Ränder werden alle ROW_M
-// abgetastet und gerade verbunden, Fläche und Rillen nutzen dieselben Punkte. In einer Gabelung gibt es zwei Zweige;
-// der rechte wird dort, wo beide sich noch überdecken, am rechten Rand des linken abgeschnitten, damit nichts doppelt
-// liegt.
+// abgetastet und gerade verbunden, Fläche und Rillen nutzen dieselben Punkte. In einer Gabelung gibt es mehrere
+// Zweige von links nach rechts; jeder wird dort, wo er sich mit dem linken Nachbarn noch überdeckt, an dessen rechtem
+// Rand abgeschnitten, damit nichts doppelt liegt.
 function surface(R, g, ox, oy) {
   const p = g.piste;
   const { ctx, Sv: S, W, H } = R;
   const ya = Math.floor((-oy / S) / ROW_M) * ROW_M - ROW_M, n = Math.ceil(H / S / ROW_M) + 4;
-  const buf = R.pvRows && R.pvRows.length >= 4 * n ? R.pvRows : (R.pvRows = new Float32Array(4 * n + 64));
-  let forked = false;
+  const K = 2 * NL;
+  const buf = R.pvRows && R.pvRows.length >= K * n ? R.pvRows : (R.pvRows = new Float32Array(K * n + 64));
+  let lanes = 1;
   for (let j = 0; j < n; j++) {
     const y = ya + j * ROW_M;
-    const c0 = centerAt(p, y, 0), h0 = halfAt(p, y, 0), c1 = centerAt(p, y, 1), h1 = halfAt(p, y, 1);
-    const r0 = c0 + h0;
-    buf[4 * j] = Math.min(c0 - h0, c1 - h1); buf[4 * j + 1] = r0;
-    buf[4 * j + 2] = Math.max(c1 - h1, r0); buf[4 * j + 3] = Math.max(c1 + h1, r0);
-    if (buf[4 * j + 3] > r0 + 0.01) forked = true;
+    lanes = Math.max(lanes, lanesAt(p, y));
+    let prevR = -Infinity;
+    for (let l = 0; l < NL; l++) {
+      const c = centerAt(p, y, l), h = halfAt(p, y, l);
+      const Lx = Math.max(c - h, prevR), Rx = Math.max(c + h, Lx);
+      buf[K * j + 2 * l] = Lx; buf[K * j + 2 * l + 1] = Rx;
+      prevR = Rx;
+    }
   }
-  for (let l = 0; l < (forked ? 2 : 1); l++) {
+  for (let l = 0; l < lanes; l++) {
     const a = 2 * l, b = a + 1;
     let lo = Infinity, hi = -Infinity;
     ctx.fillStyle = C.PISTE_SNOW;
     ctx.beginPath();
     for (let j = 0; j < n; j++) {
-      const X = buf[4 * j + a] * S + ox, Y = (ya + j * ROW_M) * S + oy;
+      const X = buf[K * j + a] * S + ox, Y = (ya + j * ROW_M) * S + oy;
       if (j) ctx.lineTo(X, Y); else ctx.moveTo(X, Y);
-      if (buf[4 * j + a] < lo) lo = buf[4 * j + a];
-      if (buf[4 * j + b] > hi) hi = buf[4 * j + b];
+      if (buf[K * j + a] < lo) lo = buf[K * j + a];
+      if (buf[K * j + b] > hi) hi = buf[K * j + b];
     }
-    for (let j = n - 1; j >= 0; j--) ctx.lineTo(buf[4 * j + b] * S + ox, (ya + j * ROW_M) * S + oy);
+    for (let j = n - 1; j >= 0; j--) ctx.lineTo(buf[K * j + b] * S + ox, (ya + j * ROW_M) * S + oy);
     ctx.closePath();
     ctx.fill();
     // Rillen: je Linie die Abschnitte suchen, in denen sie zwischen den Rändern liegt
@@ -398,13 +408,13 @@ function surface(R, g, ox, oy) {
       const x = k * gap, sx = Math.round((x * S + ox) * R.dpr) / R.dpr + 0.5 / R.dpr;
       let inside = false;
       for (let j = 0; j < n; j++) {
-        const Lj = buf[4 * j + a], Rj = buf[4 * j + b];
+        const Lj = buf[K * j + a], Rj = buf[K * j + b];
         const now = x > Lj && x < Rj;
         if (now === inside) continue;
         // Übergang zwischen j-1 und j: dort kreuzt die Linie den linken oder rechten Rand
         let y = ya + j * ROW_M;
         if (j > 0) {
-          const Lp = buf[4 * (j - 1) + a], Rp = buf[4 * (j - 1) + b];
+          const Lp = buf[K * (j - 1) + a], Rp = buf[K * (j - 1) + b];
           const left = x <= Lp || x <= Lj;
           const e0 = left ? Lp : Rp, e1 = left ? Lj : Rj;
           const f = e1 !== e0 ? clamp((x - e0) / (e1 - e0), 0, 1) : 0;
@@ -427,7 +437,7 @@ function banks(R, p, ox, oy, y0, y1) {
     const pts = [];
     for (let y = b.y0; y <= b.y1 + 0.01; y += 1.5) {
       const u = Math.sin(Math.PI * (y - b.y0) / (b.y1 - b.y0));
-      pts.push([(centerAt(p, y) + b.side * halfAt(p, y)) * S + ox, y * S + oy, u * C.PISTE_BANK_W_M * S * b.side, u * 2.3 * S]);
+      pts.push([(centerAt(p, y, b.lane) + b.side * halfAt(p, y, b.lane)) * S + ox, y * S + oy, u * C.PISTE_BANK_W_M * S * b.side, u * 2.3 * S]);
     }
     const path = (fx, fy, gx, gy) => {
       ctx.beginPath();
@@ -451,9 +461,9 @@ function oldTracks(R, p, ox, oy, y0, y1) {
   ctx.strokeStyle = `rgba(${C.TRACK_RGB},${C.PISTE_OLD_TRACK_ALPHA})`;
   ctx.lineWidth = Math.max(1, 0.1 * S);
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  const split = centerAt(p, (y0 + y1) / 2, 1) - centerAt(p, (y0 + y1) / 2, 0) > 1;
+  const lanes = lanesIn(p, y0, y1);
   ctx.beginPath();
-  for (let l = 0; l < (split ? 2 : 1); l++) {
+  for (let l = 0; l < lanes; l++) {
     for (let i = 0; i < p.tracks.length; i++) {
       const tk = p.tracks[i];
       for (const off of [-0.16, 0.16]) {
@@ -692,11 +702,18 @@ function edgePoles(R, p, y0, y1, list) {
   for (let k = Math.max(0, Math.ceil(y0 / gap)); k * gap <= Math.min(y1, p.finishY - gap); k++) {
     const y = k * gap;
     if (netAt(p, y)) continue;
-    const c0 = centerAt(p, y, 0), h0 = halfAt(p, y, 0) - 0.3, c1 = centerAt(p, y, 1), h1 = halfAt(p, y, 1) - 0.3;
-    const g0 = gradeAt(p, y, 0), g1 = gradeAt(p, y, 1), bank = bankAt(p, y), bs = bank ? bank.side : 0;
-    if (bs !== -1) put(Math.min(c0 - h0, c1 - h1), y, g0, false);
-    if (bs !== 1) put(Math.max(c0 + h0, c1 + h1), y, g1, true);
-    if (c1 - h1 - (c0 + h0) > 2.5) { put(c0 + h0, y, g0, true); put(c1 - h1, y, g1, false); }
+    const n = lanesAt(p, y), bank = bankAt(p, y), last = n - 1;
+    const c0 = centerAt(p, y, 0), h0 = halfAt(p, y, 0) - 0.3, c1 = centerAt(p, y, last), h1 = halfAt(p, y, last) - 0.3;
+    // Außenränder: an der Wand der Steilkurve keine Stange
+    if (!(bank && bank.lane === 0 && bank.side === -1)) put(Math.min(c0 - h0, c1 - h1), y, gradeAt(p, y, 0), false);
+    if (!(bank && bank.lane === last && bank.side === 1)) put(Math.max(c0 + h0, c1 + h1), y, gradeAt(p, y, last), true);
+    // Innenränder zwischen Nachbarn, sobald Wald dazwischen steht
+    for (let l = 0; l < last; l++) {
+      const ca = centerAt(p, y, l), ha = halfAt(p, y, l) - 0.3, cb = centerAt(p, y, l + 1), hb = halfAt(p, y, l + 1) - 0.3;
+      if (cb - hb - (ca + ha) <= 2.5) continue;
+      if (!(bank && bank.lane === l && bank.side === 1)) put(ca + ha, y, gradeAt(p, y, l), true);
+      if (!(bank && bank.lane === l + 1 && bank.side === -1)) put(cb - hb, y, gradeAt(p, y, l + 1), false);
+    }
   }
 }
 
@@ -731,8 +748,7 @@ const SPRITES = {
   cannon: { key: (o) => 'cannon' + o.side, make: (R, o, key) => sprite(R, key, 2.8, 2.8, 5.2, 0.7, (x, s) => { if (o.side > 0) x.scale(-1, 1); cannonShape(x, s); }) },
   board: { key: () => 'board', make: (R, o, key) => sprite(R, key, 4.4, 4.6, 6.4, 0.5, boardShape) },
   camera: { key: () => 'camera', make: (R, o, key) => sprite(R, key, 1.2, 1.2, 3.4, 0.4, cameraShape) },
-  forksign: { key: (o) => 'fork' + o.fork.n, make: (R, o, key) => sprite(R, key, 9.3, 9.5, 6.4, 0.7, (x, s) => forkSignShape(x, s, o.fork)) },
-  parksign: { key: () => 'park', make: (R, o, key) => sprite(R, key, 3.4, 3.6, 4.2, 0.4, parkSignShape) },
+  forksign: { key: (o) => 'fork' + o.fork.n + '.' + o.wedge, make: (R, o, key) => sprite(R, key, 9.3, 9.5, 6.4, 0.7, (x, s) => forkSignShape(x, s, o.fork, o.wedge)) },
   mast: { key: (o) => 'mast' + o.dir, make: (R, o, key) => sprite(R, key, 2.3, 2.4, C.PISTE_MAST_H_M + 1, 0.5, (x, s) => mastShape(x, s, o.dir)) },
   arch: { key: (o) => 'arch' + o.half.toFixed(1), make: (R, o, key) => sprite(R, key, o.half + 1.6, o.half + 2, 6.8, 0.5, (x, s) => archShape(x, s, o.half)) },
 };
@@ -834,25 +850,28 @@ export function drawPisteOver(R, g, ox, oy, t) {
     const cx = clamp(s.x * S + ox + 4.2 * S, w / 2 + 6, W - w / 2 - 6);
     plate(ctx, cx, s.y * S + oy - z * S - 2.4 * S, w, 22, { fill: C.PISTE_YELLOW, tilt: -4, sh: 2, r: 6, draw: (c) => label(c, text, 0, 0, 13, C.INK) });
   }
-  // Vor einer Gabelung: die beiden Schilder am oberen Bildrand, bis sich die Zweige trennen
+  // Vor einer Gabelung: die Schilder am oberen Bildrand, bis sich die Zweige trennen; bei drei Zweigen steht der
+  // mittlere in der Mitte mit Pfeil nach oben
   for (const f of p.forks) {
     if (s.y < f.y0 - 260 || s.y > f.tipY || g.state !== 'running') continue;
     const top = R.safeTop + 30;
-    forkTag(ctx, 10, top, f.grades[0], false);
-    forkTag(ctx, W - 10, top, f.grades[1], true);
+    forkTag(ctx, 10, top, f.kinds[0], -1);
+    forkTag(ctx, W - 10, top, f.kinds[f.lanes - 1], 1);
+    if (f.lanes === 3) forkTag(ctx, W / 2, top + 34, f.kinds[1], 0);
   }
 }
 const POSE = { z: 0, rot: 0, flip: 1, cross: false, spread: false };
 
-function forkTag(ctx, edge, top, grade, right) {
-  const text = tr('piste.fork.' + grade);
+// Schild am Bildrand: dir −1 links, 1 rechts, 0 in der Mitte (Pfeil nach oben)
+function forkTag(ctx, edge, top, kind, dir) {
+  const text = kindLabel(kind);
   ctx.font = `14px ${FONT}`;
-  const w = ctx.measureText(text).width + 62, h = 28, cx = right ? edge - w / 2 : edge + w / 2;
-  plate(ctx, cx, top + h / 2, w, h, { tilt: right ? 1.5 : -1.5, sh: 2.5, r: 7, draw: (c) => {
-    const d = right ? 1 : -1;
-    arrow(c, d * (w / 2 - 13), 0, 13, right ? 0 : Math.PI, gradeCol(grade), 3);
-    disc(c, d * (w / 2 - 34), 0, 8, gradeCol(grade));
-    label(c, text, d * (w / 2 - 47), 0, 14, C.INK, right ? 'right' : 'left');
+  const w = ctx.measureText(text).width + 62, h = 28, cx = dir > 0 ? edge - w / 2 : dir < 0 ? edge + w / 2 : edge;
+  plate(ctx, cx, top + h / 2, w, h, { tilt: dir * 1.5, sh: 2.5, r: 7, draw: (c) => {
+    const d = dir || 1;
+    arrow(c, d * (w / 2 - 13), 0, 13, dir > 0 ? 0 : dir < 0 ? Math.PI : -Math.PI / 2, kindCol(kind), 3);
+    disc(c, d * (w / 2 - 34), 0, 8, kindCol(kind));
+    label(c, text, d * (w / 2 - 47), 0, 14, C.INK, dir >= 0 ? 'right' : 'left');
   } });
 }
 
@@ -953,16 +972,18 @@ export function drawPistePlan(canvas, g) {
       seg(m, e, line, gradeCol(gr < C.PISTE_BLUE_TO ? 0 : gr < C.PISTE_RED_TO ? 1 : 2), true);
     }
   };
-  forks.forEach(([fy, len, gl, gr], i) => {
+  // Versatz der Zweige im Plan: bei zwei Zweigen ±amp, bei drei −amp, 0, +amp
+  const laneDy = (lane, n) => (lane - (n - 1) / 2) * (n === 2 ? 2 * amp : amp);
+  forks.forEach(([fy, len, ...kinds], i) => {
     main(from, fy);
     const took = L ? L.route[i] : -1;
-    for (const [lane, grade, dy] of [[0, gl, -amp], [1, gr, amp]]) {
-      const on = took < 0 || took === lane;
+    kinds.forEach((kind, lane) => {
+      const on = took < 0 || took === lane, dy = laneDy(lane, kinds.length);
       x.globalAlpha = on ? 1 : 0.3;
-      x.strokeStyle = gradeCol(grade); x.lineWidth = 4;
+      x.strokeStyle = kindCol(kind); x.lineWidth = 4;
       const xa = X(fy), xb = X(fy + len), r = Math.min(8, (xb - xa) / 3);
       x.beginPath(); x.moveTo(xa, line); x.lineTo(xa + r, line + dy); x.lineTo(xb - r, line + dy); x.lineTo(xb, line); x.stroke();
-    }
+    });
     from = fy + len;
   });
   main(from, fin);
@@ -982,8 +1003,8 @@ export function drawPistePlan(canvas, g) {
   if (!L) return;
   const laneY = (m) => {
     for (let i = 0; i < forks.length; i++) {
-      const [fy, len] = forks[i];
-      if (m > fy && m < fy + len && L.route[i] >= 0) return line + (L.route[i] ? amp : -amp) * smooth(Math.min(m - fy, fy + len - m) / (len * 0.12));
+      const [fy, len, ...kinds] = forks[i];
+      if (m > fy && m < fy + len && L.route[i] >= 0) return line + laneDy(L.route[i], kinds.length) * smooth(Math.min(m - fy, fy + len - m) / (len * 0.12));
     }
     return line;
   };

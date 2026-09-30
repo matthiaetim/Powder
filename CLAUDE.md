@@ -71,7 +71,8 @@ Versionen, die mit anderen geteilt werden. Nicht entfernen und nicht „aufräum
 - Port 8080 kann von einem alten Server aus einem anderen Checkout belegt sein, der eine alte Version ausliefert.
   Vor dem Test `curl -s localhost:8080/src/constants.js | grep VERSION` mit der eigenen `src/constants.js`
   vergleichen. Weicht es ab, einen anderen Port nehmen; im Preview gibt es dafür die Konfiguration `powder-8090`.
-- Nützliche Parameter: `?debug=1` (Overlay mit fps, Hitboxen, Lawinen-Werten), `?seed=42` (reproduzierbare Welt).
+- Nützliche Parameter: `?debug=1` (Overlay mit fps, Hitboxen, Lawinen-Werten), `?seed=42` (reproduzierbare Welt),
+  `?at=4000&lane=1` (Piste: Lauf beginnt bei 4000 m im Zweig 1).
 - Bestenliste und Duell ohne Firebase testen: `node tools/serve.js 8082 --board` startet die Mocks der Datenbank-Schnittstelle
   (`tools/board-mock.js` und `tools/room-mock.js` mit Event-Stream, Preview-Konfiguration `powder-board`), im Browser dann
   `?board=local`. Gegner fürs Duell: `node tools/duel-bot.js http://localhost:8082 CODE --name Jo` (siehe README). Die echte

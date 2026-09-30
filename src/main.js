@@ -20,6 +20,8 @@ const R = createRenderer(canvas);
 const game = G.createGame({
   fixedSeed: seedParam != null ? parseInt(seedParam, 10) >>> 0 : null,
   debug: params.get('debug') === '1',
+  startAt: Math.max(0, parseFloat(params.get('at')) || 0),
+  startLane: Math.max(0, parseInt(params.get('lane'), 10) || 0),
 });
 const snd = createSound(game);
 // Bestenliste (board.js) und Duell-Räume (room.js, duel.js) teilen sich die Datenbank: ?board=local nutzt die Mocks des

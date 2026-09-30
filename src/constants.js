@@ -1,6 +1,6 @@
 // Alle Stellschrauben des Spiels an einem Ort.
 // Einheiten: Meter, Sekunden, Grad. Werte mit (Tuning) lassen sich im Spiel per Panel verstellen.
-export const VERSION = '0.27.10';
+export const VERSION = '0.28.0';
 
 export const C = {
   // Sicht (Hochkant): sichtbare Breite in Metern (Höhe folgt aus dem Seitenverhältnis), Fahrer bei 33 % Bildhöhe.
@@ -351,29 +351,35 @@ export const C = {
   PISTE_SNOW_P1: 0.9,        // … und im Tal
   PISTE_FINISH_CLEAR_M: 26,  // um das Ziel bleibt der Hang so weit frei (Auslauf und Talstation)
 
-  // Gabelungen: [Meter, Länge, Farbe links, Farbe rechts] mit 0 blau, 1 rot, 2 schwarz. Die Piste teilt sich über
-  // PISTE_FORK_RAMP_M in zwei Zweige, deren Mitten 2 × PISTE_FORK_SEP_M auseinanderliegen, und läuft am Ende ebenso
-  // wieder zusammen; dazwischen steht Wald. Je Farbe: Stufe (Wald, Fahrer), halbe Breite, Waldabstand, eigene
-  // Schlenker (Ausschlag, Wellenlänge), Endtempo und Gefälle als Faktor auf G_SLOPE. Blau ist breit, flach und
-  // gemütlich, Schwarz schmal, steil und frei von anderen Fahrern, Rot liegt dazwischen und fährt wie die Hauptpiste.
-  PISTE_FORKS: [[2000, 900, 0, 1], [4000, 900, 1, 2], [6000, 850, 0, 2], [8000, 950, 1, 2]],
+  // Gabelungen: [Meter, Länge, Art je Zweig von links nach rechts], zwei oder drei Zweige. Arten (piste.js): 0 blau,
+  // 1 rot, 2 schwarz, 3 Funpark (fährt wie rot, breit, mit Kickern, Wellenbahn und Steilkurve, keine anderen Fahrer),
+  // 4 Slalom (blau, mit Slalomstangen auf Zeit, keine anderen Fahrer). Die Piste teilt sich über PISTE_FORK_RAMP_M in
+  // die Zweige, deren Mitten bei zwei Zweigen 2 × PISTE_FORK_SEP_M und bei drei PISTE_FORK_GAP3_M auseinanderliegen,
+  // und läuft am Ende ebenso wieder zusammen; dazwischen steht Wald. Je Art: Stufe (Wald, Fahrer), halbe Breite,
+  // Waldabstand, eigene Schlenker (Ausschlag, Wellenlänge), Endtempo und Gefälle als Faktor auf G_SLOPE. Blau ist
+  // breit, flach und gemütlich, Schwarz schmal, steil und frei von anderen Fahrern, Rot liegt dazwischen und fährt wie
+  // die Hauptpiste. Der Funpark ist seit v0.28.0 ein eigener Zweig (Tim, 30.09.2026): man biegt bewusst ab, die
+  // Alternative ist Rot. Die Gabelung bei 4000 m hat drei Wege, der blaue ist der Slalom.
+  PISTE_FORKS: [[2000, 900, 0, 1], [3150, 650, 1, 3], [4000, 900, 4, 1, 2], [6000, 850, 0, 2], [8000, 950, 1, 2]],
   PISTE_FORK_SEP_M: 27,
+  PISTE_FORK_GAP3_M: 46,     // Abstand benachbarter Mitten bei drei Zweigen; die Zweige selbst sind höchstens 23 m breit
   PISTE_FORK_RAMP_M: 150,
-  PISTE_LANE_LEVEL: [1.2, 5, 8],
-  PISTE_LANE_HALF_M: [8.5, 6, 5],
-  PISTE_LANE_EDGE_M: [4, 2, 0.8],
-  PISTE_LANE_WIG_M: [2, 3, 5],
-  PISTE_LANE_WAVE_M: [260, 170, 120],
+  PISTE_LANE_LEVEL: [1.2, 5, 8, 2, 1.2],
+  PISTE_LANE_HALF_M: [8.5, 6, 5, 11.5, 7.5],
+  PISTE_LANE_EDGE_M: [4, 2, 0.8, 3, 4],
+  PISTE_LANE_WIG_M: [2, 3, 5, 1.5, 2],
+  PISTE_LANE_WAVE_M: [260, 170, 120, 220, 260],
   PISTE_BLACK_KMH: 230,      // (Tuning) Endtempo im schwarzen Zweig
   PISTE_BLACK_G: 1.35,       // Gefälle im schwarzen Zweig als Faktor auf G_SLOPE
   PISTE_BLUE_KMH: 150,       // (Tuning) Endtempo im blauen Zweig
   PISTE_BLUE_G: 0.75,
-  // Was an der Strecke steht, von oben nach unten. y in m; side −1 links, 1 rechts, 0 Mitte; lane 'L' oder 'R' legt
-  // es in den linken oder rechten Zweig einer Gabelung. Arten: lift (Sessellift oder Gondel kreuzt über der Piste),
-  // kicker (klein am Rand, big: breit mit weitem Flug), hut (Hütte mit Gästen), deer und hare (Tiere, nur Kulisse),
-  // gates (Torstrecke: sg = Super-G-Tore, sl = Slalomstangen; ein Angebot ohne Strafe), trap (Tempomessung mit Foto),
-  // park (Funpark: kleiner und breiter Kicker, Wellenbahn, Steilkurve), cannon (Schneekanone), ziehweg (schmaler
-  // Weg quer zum Hang mit Fangnetz).
+  // Was an der Strecke steht, von oben nach unten. y in m; side −1 links, 1 rechts, 0 Mitte; lane 'L', 'M' oder 'R'
+  // legt es in den linken, mittleren oder rechten Zweig einer Gabelung. Arten: lift (Sessellift oder Gondel kreuzt
+  // über der Piste), kicker (klein am Rand, big: breit mit weitem Flug), hut (Hütte mit Gästen), deer und hare
+  // (Tiere, nur Kulisse), gates (Torstrecke: sg = Super-G-Tore, sl = Slalomstangen; ein Angebot ohne Strafe; timed:
+  // Slalom auf Zeit zwischen zwei gesprühten Linien, siehe PISTE_SLALOM_*), trap (Tempomessung mit Foto), park
+  // (Funpark im Funpark-Zweig: kleiner und breiter Kicker, Wellenbahn, Steilkurve), cannon (Schneekanone), ziehweg
+  // (schmaler Weg quer zum Hang mit Fangnetz).
   PISTE_LAYOUT: [
     { k: 'lift', y: 760, type: 'chair', dir: 1 },
     { k: 'kicker', y: 950, side: -1 },
@@ -383,9 +389,9 @@ export const C = {
     { k: 'gates', y: 2260, lane: 'R', type: 'sg', n: 5 },
     { k: 'hare', y: 2520, lane: 'L' },
     { k: 'trap', y: 3060, side: 1 },
-    { k: 'park', y: 3300 },
+    { k: 'park', y: 3300, lane: 'R' },
     { k: 'cannon', y: 3850, side: -1 },
-    { k: 'gates', y: 4290, lane: 'L', type: 'sl', n: 8 },
+    { k: 'gates', y: 4200, lane: 'L', type: 'sl', n: 14, timed: true },
     { k: 'kicker', y: 5020, side: -1 },
     { k: 'lift', y: 5230, type: 'gondola', dir: -1 },
     { k: 'cannon', y: 5460, side: 1 },
@@ -422,11 +428,10 @@ export const C = {
   // Tricks [Schlüssel in i18n, Drehungen um die Hochachse, Überschläge, Ski gekreuzt, Ski gespreizt]
   PISTE_TRICKS_SMALL: [['t360', 1, 0, 0, 0], ['grab', 0, 0, 1, 0], ['spread', 0, 0, 0, 1], ['t180', 0.5, 0, 0, 0]],
   PISTE_TRICKS_BIG: [['backflip', 0, 1, 0, 0], ['t720', 2, 0, 0, 0], ['t360grab', 1, 0, 1, 0], ['frontflip', 0, -1, 0, 0], ['cork', 2, 1, 0, 0]],
-  // Funpark (Layout: park): ab dem Schild PISTE_PARK_LEN_M lang und PISTE_PARK_HALF_M je Seite breit. Darin, vom
+  // Funpark (Layout: park, im Funpark-Zweig einer Gabelung, Breite PISTE_LANE_HALF_M[3]): PISTE_PARK_LEN_M lang. Darin, vom
   // Schild aus gemessen: kleiner Kicker, breiter Kicker, drei Wellen, dann die Steilkurve, in der die Piste um
   // PISTE_BANK_DX_M zur Seite springt. Die Wand der Steilkurve fängt auf, wer geradeaus weiterfährt: kein Sturz.
   PISTE_PARK_LEN_M: 330,
-  PISTE_PARK_HALF_M: 11.5,
   PISTE_PARK_AT_M: [50, 110, 170, 250], // kleiner Kicker, breiter Kicker, erste Welle, Beginn der Steilkurve
   PISTE_ROLL_GAP_M: 13,
   PISTE_BANK_LEN_M: 56,
@@ -442,6 +447,13 @@ export const C = {
   PISTE_GATE_OFF_M: [5.5, 1.6],
   PISTE_GATE_HALF_M: [11.5, 7.5], // so breit ist die Piste an einer Torstrecke mindestens
   PISTE_GATE_REWARD: 1,      // (Tuning)
+  // Slalom auf Zeit (Layout: gates mit timed, im Slalom-Zweig): die Uhr läuft von der gesprühten Linie vor dem ersten
+  // Tor bis zur Linie hinter dem letzten, jedes verpasste Tor legt PISTE_SLALOM_PENALTY_S drauf. Bleibt die Zeit unter
+  // PISTE_SLALOM_LIMIT_S, gibt es PISTE_GATE_REWARD verbrauchte Stürze zurück; die Regel „alle Tore“ gilt hier nicht.
+  // 14 Stangen alle 13 m sind 169 m, dazu je 14 m bis zu den Linien: unter 11 s heißt gut 65 km/h im Schnitt.
+  PISTE_SLALOM_LIMIT_S: 11,  // (Tuning)
+  PISTE_SLALOM_PENALTY_S: 1.5, // (Tuning)
+  PISTE_SLALOM_LINE_M: 14,   // Abstand der Linien zum ersten und letzten Tor
   PISTE_NOTE_S: 2,           // so lange steht ein Hinweis im HUD (Tor 2/5, Tempo, Sturz zurück)
   // Tempomessung: zwei gesprühte Linien im Abstand PISTE_TRAP_M, die Tafel dahinter zeigt das gemessene Tempo. An
   // der zweiten Linie blitzt der Fotopunkt.
@@ -894,6 +906,8 @@ export const TUNABLES = [
   { key: 'PISTE_NPC_GAP1_M', label: 'Andere Fahrer im Tal alle', unit: 'm', min: 40, max: 400, step: 10 },
   { key: 'PISTE_AIR_BIG_S', label: 'Flugzeit breiter Kicker', unit: 's', min: 0.6, max: 2.5, step: 0.05, decimals: 2 },
   { key: 'PISTE_GATE_REWARD', label: 'Alle Tore: Stürze zurück', unit: '', min: 0, max: 1, step: 1 },
+  { key: 'PISTE_SLALOM_LIMIT_S', label: 'Slalom-Zweig: Zeit unter', unit: 's', min: 6, max: 20, step: 0.5, decimals: 1 },
+  { key: 'PISTE_SLALOM_PENALTY_S', label: 'Slalom-Zweig: Strafe pro Tor', unit: 's', min: 0, max: 5, step: 0.5, decimals: 1 },
   { key: 'PISTE_NIGHT_ALPHA', label: 'Dunkelheit im Flutlicht', unit: '%', min: 0, max: 0.85, step: 0.05, scale: 100, decimals: 0, visual: true },
   { key: 'PISTE_TURN_HARD_DEG', label: 'Schwenk an der Schlüsselstelle', unit: '°', min: 10, max: 45, step: 1 },
   { key: 'PISTE_WAVE_HARD_M', label: 'Kurvenlänge an der Schlüsselstelle', unit: 'm', min: 100, max: 400, step: 10 },

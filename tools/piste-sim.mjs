@@ -11,7 +11,7 @@
 // Zahlen sind also eine Schätzung, die am Ziehweg und im Funpark eher zu streng ist und im Dunkeln zu milde.
 import { C } from '../src/constants.js';
 import { createWorld } from '../src/world.js';
-import { createPiste, worldOpts, paceAt, levelAt, onPiste, centerAt } from '../src/piste.js';
+import { createPiste, worldOpts, paceAt, levelAt, onPiste, centerAt, PARK } from '../src/piste.js';
 import { createLife, moveNpcs } from '../src/piste-life.js';
 import { createBot, advanceBot } from '../src/bot.js';
 
@@ -30,9 +30,18 @@ args.forEach((a, i) => {
 const fin = C.PISTE_FINISH_M;
 const piste = createPiste(C.PISTE_SEED);
 const fmtT = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
-// Zweig je Gabelung: der mit der kleineren Farbe (blau < rot < schwarz) ist der leichtere
+// Zweig je Gabelung: der mit der kleinsten Farbe (blau < rot < schwarz) ist der leichteste, der mit der größten der
+// schwerste; den Funpark meidet der Bot, seine Steilkurve kennt er nicht
 const laneFor = (y) => {
-  for (const f of piste.forks) if (y >= f.y0 && y <= f.y1) return (f.grades[1] > f.grades[0]) === hard ? 1 : 0;
+  for (const f of piste.forks) {
+    if (y < f.y0 || y > f.y1) continue;
+    let best = -1;
+    for (let l = 0; l < f.lanes; l++) {
+      if (f.kinds[l] === PARK && f.lanes > 1) continue;
+      if (best < 0 || (hard ? f.grades[l] > f.grades[best] : f.grades[l] < f.grades[best])) best = l;
+    }
+    return Math.max(0, best);
+  }
   return 0;
 };
 

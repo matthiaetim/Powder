@@ -139,6 +139,7 @@ export function createHud(g, doc, hooks = {}) {
     const parts = [];
     if (L.tricks > 0) parts.push(L.tricks === 1 ? t('piste.tricks1') : t('piste.tricksN', { n: nf.format(L.tricks) }));
     if (L.gateRuns > 0) parts.push(L.gateRuns === 1 ? t('piste.gateRuns1') : t('piste.gateRunsN', { n: nf.format(L.gateRuns) }));
+    if (L.slalomOk > 0) parts.push(t('piste.slalomDone'));
     if (L.topKmh > 0) parts.push(t('piste.top', { v: nf.format(Math.round(L.topKmh)) }));
     return parts.join(' · ');
   }
@@ -570,7 +571,7 @@ export function createHud(g, doc, hooks = {}) {
     if (noteKey !== lastNote) {
       lastNote = noteKey;
       raceNoteEl.className = note ? note.kind : pn ? pn.kind : '';
-      raceNoteEl.textContent = note ? noteText(note) : pn ? t(pn.key, { a: nf.format(pn.a), b: nf.format(pn.b) }) : '';
+      raceNoteEl.textContent = note ? noteText(note) : pn ? t(pn.key, { a: (pn.dec ? nf1 : nf).format(pn.a), b: nf.format(pn.b) }) : '';
     }
     // Flutlicht: im Dunkeln wird das HUD hell (styles.css)
     const night = g.piste && g.state !== 'ready' && nightAt(g.skier.y) * C.PISTE_NIGHT_ALPHA > 0.3 ? '1' : '';
