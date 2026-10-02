@@ -453,17 +453,19 @@ export function createDuel({ g, net, board, onTune = null, debug = false }) {
     } else setReady(true);
   }
 
-  // Neustart gegen den Bot (Knopf oben rechts wie im Super-G): dieselbe Strecke, dieselbe Stufe, neuer Countdown.
-  // Eine neue Runde im Raum verwirft Proben und Wertung des abgebrochenen Laufs. Gegen einen Mitspieler gibt es ihn
-  // nicht, das würde dessen Rennen zerreißen.
+  // Neustart gegen den Bot (Knopf oben rechts wie im Super-G): der Lauf wird abgebrochen und es geht zurück in die
+  // Lobby auf der Fresh-Seite, dieselbe Strecke bleibt. Dort bestätigt der Spieler mit „Los“ den neuen Lauf und kann
+  // vorher Stufe, Zielweite oder Fahrer umstellen. Eine neue Runde im Raum verwirft Proben und Wertung des
+  // abgebrochenen Laufs. Gegen einen Mitspieler gibt es ihn nicht, das würde dessen Rennen zerreißen.
   function restart() {
     if (!d.vsBot || !(d.phase === 'count' || d.phase === 'race')) return false;
     if (!(g.state === 'count' || g.state === 'running' || g.state === 'paused')) return false;
-    room.patch('', { state: 'count', round: d.round + 1, startAt: room.serverNow() + C.DUEL_COUNT_LEAD_MS, ts: SV, 'live/host': null, 'live/guest': null }, true);
-    const r = room.data();
-    d.round = r.round;
+    room.patch('', { state: 'lobby', round: d.round + 1, startAt: 0, ts: SV, 'live/host': null, 'live/guest': null }, true);
+    d.round = room.data().round;
     newRound();
-    startRace(r);
+    // Startbild mit hold: die Fresh-Seite mit der Lobby steht sofort (overlayReady), startRace baut die Welt beim Los neu
+    reset(g, room.data().seed >>> 0, false);
+    enterLobby();
     return true;
   }
 
